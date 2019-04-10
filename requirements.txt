@@ -1,0 +1,9 @@
+flake8
+flake8-docstrings
+nose
+pep8
+pyflakes
+pydocstyle
+responses
+
+-e git://github.com/superdesk/superdesk-core.git@master#egg=Superdesk_Core
