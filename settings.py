@@ -1,6 +1,4 @@
-import json
 import os
-from kombu import Queue, Exchange
 from distutils.util import strtobool as _strtobool
 
 
@@ -38,13 +36,13 @@ def celery_queue(name):
     return "{}{}".format(os.environ.get('SUPERDESK_CELERY_PREFIX', ''), name)
 
 
-#: host, port
-MEDIA_WS_HOST = env('MEDIA_WS_HOST', 'localhost')
-MEDIA_WS_PORT = env('MEDIA_WS_PORT', '5001')
+#: logging
+LOG_CONFIG_FILE = env('LOG_CONFIG_FILE', 'logging_config.yml')
 
-CORE_APPS = [
-    'media.storage',
-    'media.video'
+INSTALLED_APPS = [
+    'media',
+    'media.video',
+    'media.command',
 ]
 
 #: rabbit-mq url
