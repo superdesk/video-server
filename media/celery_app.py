@@ -1,9 +1,8 @@
 from celery import Celery
 from pymongo import MongoClient
-app = Celery('celery_app', broker='pyamqp://guest@localhost//')
 import time
 
-
+app = Celery('celery_app', broker='pyamqp://guest@localhost//')
 
 METADATA = {
     "filename": "58482c53a121828cc5135de86be5257859ce586281f612d148fa853a75c6f64e",
@@ -16,6 +15,7 @@ METADATA = {
     "length": 69211,
 }
 
+
 @app.task
 def add(doc):
     connection = MongoClient('localhost', 27017)
@@ -23,5 +23,5 @@ def add(doc):
     doc = METADATA
     ids = video.insert_one(doc.copy())
     time.sleep(5)
-    print('instert %s successfully' %ids)
+    print('instert %s successfully' % ids)
     return True

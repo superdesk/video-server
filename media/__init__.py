@@ -1,2 +1,2 @@
-from . import celery_app
-from . import data_layer
+from . import celery_app# noqa
+from . import data_layer# noqa

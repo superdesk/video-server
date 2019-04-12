@@ -4,11 +4,10 @@ import superdesk
 from bson import ObjectId
 from flask import request, current_app as app, redirect
 import json
-
-bp = superdesk.Blueprint('project', __name__)
-
 from media.celery_app import add
 from media.data_layer import get_collection
+
+bp = superdesk.Blueprint('project', __name__)
 
 METADATA = {
     "filename": "58482c53a121828cc5135de86be5257859ce586281f612d148fa853a75c6f64e",
@@ -47,7 +46,7 @@ def delete_video(video_id):
 
 def update_video(video_id, updates):
     video = get_collection('video')
-    updates = {"$set":{"chunkSize": 0}}
+    updates = {"$set": {"chunkSize": 0}}
     update = video.update_one({'_id': ObjectId(video_id)}, updates)
     return 'update successfully'
 
