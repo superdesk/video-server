@@ -46,7 +46,7 @@ INSTALLED_APPS = [
 ]
 
 #: rabbit-mq url
-RABBIT_MQ_URL = env('RABBIT_MQ_URL', 'amqp://localhost')
+RABBIT_MQ_URL = env('RABBIT_MQ_URL', 'pyamqp://guest@localhost//')
 
 #: celery broker
 BROKER_MEDIA_URL = env('CELERY_MEDIA_BROKER_URL', RABBIT_MQ_URL)

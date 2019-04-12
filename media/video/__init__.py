@@ -2,10 +2,11 @@
 import logging
 import superdesk
 from bson import ObjectId
-from flask import request, current_app as app, redirect
+from flask import request
 import json
-from media.celery_app import add
 from media.data_layer import get_collection
+from superdesk.media.media_operations import process_file_from_stream
+from flask import current_app as app
 
 bp = superdesk.Blueprint('project', __name__)
 
@@ -21,10 +22,20 @@ METADATA = {
 }
 
 
+class JSONEncoder(json.JSONEncoder):
+    def default(self, o):
+        if isinstance(o, ObjectId):
+            return str(o)
+        return json.JSONEncoder.default(self, o)
+
+
 @bp.route('/project', methods=['POST'])
 def create_video_editor():
     if request.method == 'POST':
-        return create_video(request.form)
+        files = request.files.to_dict(flat=False)['media']
+        user_agent = request.headers.environ['HTTP_USER_AGENT']
+
+        return create_video(files, user_agent)
 
 
 @bp.route('/project/<path:video_id>', methods=['GET', 'PUT', 'DELETE'])
@@ -51,10 +62,24 @@ def update_video(video_id, updates):
     return 'update successfully'
 
 
-def create_video(doc):
-    """Keep previous url for backward compatibility"""
-    add.delay(doc)
-    return 'insert successfully'
+def create_video(files, agent):
+    """Save video to storage and create records to databases"""
+    video = get_collection('video')
+    docs = []
+    for file in files:
+        file_name, content_type, metadata = process_file_from_stream(file)
+        doc = {
+            'metadata': metadata,
+            'client_info': agent,
+            'version': 1,
+            'processing': False,
+            "parent": None,
+            'thumbnails': {}
+        }
+        docs.append(doc)
+        media_id = app.media.put(file, filename=file_name, content_type=content_type, metadata=metadata)
+    video.insert_many(docs)
+    return JSONEncoder().encode(docs)
 
 
 def get_video(video_id):
@@ -63,7 +88,7 @@ def get_video(video_id):
     items = list(video.find())
     for item in items:
         item['_id'] = str(item['_id'])
-    return json.dumps(items)
+    return items
 
 
 def init_app(app):
