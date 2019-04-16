@@ -1,0 +1,7 @@
+flake8
+flake8-docstrings
+nose
+pep8
+pyflakes
+pydocstyle
+responses
