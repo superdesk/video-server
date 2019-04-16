@@ -42,12 +42,3 @@ def get_app(config=None):
     for key in dir(settings):
         if key.isupper():
             config.setdefault(key, getattr(settings, key))
-    return app
-
-
-if __name__ == '__main__':
-    debug = True
-    host = '0.0.0.0'
-    port = int(os.environ.get('PORT', '5000'))
-    app = get_app()
-    app.run(host=host, port=port, debug=debug, use_reloader=debug)

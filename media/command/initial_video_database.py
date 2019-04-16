@@ -17,7 +17,6 @@ def init_video_database():
     :return:
     """
     connection = MongoClient(app.config['MONGO_HOST'], app.config['MONGO_PORT'])
-
     superdeskDb = connection['MONGO_DBNAME']
     superdeskDbCol = superdeskDb['video']
     initdata = {"name": "test"}

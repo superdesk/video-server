@@ -4,22 +4,11 @@ import superdesk
 from bson import ObjectId
 from flask import request
 import json
-from media.data_layer import get_collection
+from media import get_collection
 from superdesk.media.media_operations import process_file_from_stream
 from flask import current_app as app
 
 bp = superdesk.Blueprint('project', __name__)
-
-METADATA = {
-    "filename": "58482c53a121828cc5135de86be5257859ce586281f612d148fa853a75c6f64e",
-    "metadata": {
-        "length": "69211"
-    },
-    "contentType": "image/jpeg",
-    "md5": "a4abe83c1ad2dccbd996f069765a36ed",
-    "chunkSize": 261120,
-    "length": 69211,
-}
 
 
 class JSONEncoder(json.JSONEncoder):
@@ -77,7 +66,6 @@ def create_video(files, agent):
             'thumbnails': {}
         }
         docs.append(doc)
-        media_id = app.media.put(file, filename=file_name, content_type=content_type, metadata=metadata)
     video.insert_many(docs)
     return JSONEncoder().encode(docs)
 
