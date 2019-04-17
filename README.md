@@ -8,7 +8,15 @@ This is a server for process video for [superdesk](https://github.com/superdesk/
 It allows to edit video such as cut, crop, rotate, quality and capture thumbnails for video. 
 
 ## Configure Superdesk
-You only configure it in server and run it as stand alone server.
+You only configure it in server and run it as stand alone service.
+
+### Requirements
+
+These services must be installed, configured and running:
+
+ * MongoDB 
+ * Python (>= 3.6)
+ * RabbitMQ
 
 ## Install for Development
 

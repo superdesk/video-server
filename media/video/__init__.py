@@ -54,7 +54,6 @@ def create_video(files, agent):
     video = get_collection('video')
     docs = []
     for file in files:
-        #file_name, content_type, metadata = process_file_from_stream(file)
         doc = {
             'metadata': None,
             'client_info': agent,
@@ -63,7 +62,7 @@ def create_video(files, agent):
             "parent": None,
             'thumbnails': {}
         }
-        docs.append(doc)    
+        docs.append(doc)
     video.insert_many(docs)
     return JSONEncoder().encode(docs)
 
