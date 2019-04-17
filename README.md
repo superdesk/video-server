@@ -19,7 +19,7 @@ git clone git@github.com:superdesk/video-server.git
 
 pip3 install -r requirement.txt
 
-python3 manage.py runserver
+python3 app.py
 ```
 
 Unit Tests
