@@ -1,6 +1,5 @@
-flask=1.0.2
-celery=4.3
-kobum=4.5
+flask>=1.0.2
+celery>=4.3
+kombu>=4.5.0
 pytz>=2015.4
-pymongo
-werkzeug
+pymongo>=3.7.2

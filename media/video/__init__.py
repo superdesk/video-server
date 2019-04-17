@@ -1,14 +1,12 @@
 """Upload module"""
 import logging
-import superdesk
 from bson import ObjectId
 from flask import request
 import json
-from media import get_collection
-from superdesk.media.media_operations import process_file_from_stream
-from flask import current_app as app
+from media import get_collection, blueprint
+from flask import Blueprint
 
-bp = superdesk.Blueprint('project', __name__)
+bp = Blueprint('project', __name__)
 
 
 class JSONEncoder(json.JSONEncoder):
@@ -56,16 +54,16 @@ def create_video(files, agent):
     video = get_collection('video')
     docs = []
     for file in files:
-        file_name, content_type, metadata = process_file_from_stream(file)
+        #file_name, content_type, metadata = process_file_from_stream(file)
         doc = {
-            'metadata': metadata,
+            'metadata': None,
             'client_info': agent,
             'version': 1,
             'processing': False,
             "parent": None,
             'thumbnails': {}
         }
-        docs.append(doc)
+        docs.append(doc)    
     video.insert_many(docs)
     return JSONEncoder().encode(docs)
 
@@ -80,4 +78,4 @@ def get_video(video_id):
 
 
 def init_app(app):
-    superdesk.blueprint(bp, app)
+    blueprint(bp, app)

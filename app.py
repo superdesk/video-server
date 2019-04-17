@@ -13,6 +13,7 @@ import os
 import settings
 import importlib
 import logging.config
+from flask import Flask
 
 logger = logging.getLogger(__name__)
 
@@ -31,6 +32,7 @@ def get_app(config=None):
     :param config: configuration that can override config from `settings.py`
     :return: a new SuperdeskEve app instance
     """
+    app = Flask(__name__)
     if config is None:
         config = {}
 
@@ -39,6 +41,7 @@ def get_app(config=None):
     for key in dir(settings):
         if key.isupper():
             config.setdefault(key, getattr(settings, key))
+    app.config.update(config)
     installed = set()
 
     def install_app(module_name):
@@ -50,6 +53,7 @@ def get_app(config=None):
             app_module.init_app(app)
     for module_name in app.config.get('CORE_APPS', []):
         install_app(module_name)
+
     return app
 
 
@@ -58,4 +62,4 @@ if __name__ == '__main__':
     host = '0.0.0.0'
     port = int(os.environ.get('PORT', '5000'))
     app = get_app()
-    app.run(host=host, port=port, debug=debug, use_reloader=debug)
+    app.run(host=host, port=port)
