@@ -10,7 +10,7 @@ def strtobool(value):
 
 
 def env(variable, fallback_value=None):
-    if os.environ.get('SUPERDESK_USE_DEFAULTS'):
+    if os.environ.get('VIDEOSERVER_USE_DEFAULTS'):
         return fallback_value
 
     env_value = os.environ.get(variable)
@@ -33,26 +33,24 @@ def celery_queue(name):
 
     :param name: queue name
     """
-    return "{}{}".format(os.environ.get('SUPERDESK_CELERY_PREFIX', ''), name)
+    return "{}{}".format(os.environ.get('VIDEOSERVER_CELERY_PREFIX', ''), name)
 
 
 #: logging
 LOG_CONFIG_FILE = env('LOG_CONFIG_FILE', 'logging_config.yml')
 
 CORE_APPS = [
+    'app',
     'media',
     'media.video',
 ]
 
 #: Mongo host port
-MONGO_HOST = 'localhost'
-MONGO_PORT = 27017
+MONGO_HOST = env('MONGO_HOST', 'localhost')
+MONGO_PORT = env('MONGO_PORT', 27017)
 
 #: mongo db name, only used when mongo_uri is not set
 MONGO_DBNAME = env('MONGO_DBNAME', 'superdesk')
-
-#: full mongodb connection uri, overrides ``MONGO_DBNAME`` if set
-MONGO_URI = env('MONGO_URI', 'mongodb://localhost/%s' % MONGO_DBNAME)
 
 #: rabbit-mq url
 RABBIT_MQ_URL = env('RABBIT_MQ_URL', 'pyamqp://guest@localhost//')

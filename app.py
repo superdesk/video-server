@@ -15,6 +15,14 @@ import importlib
 import logging.config
 from flask import Flask
 
+app = Flask(__name__)
+
+
+@app.route("/app")
+def hello():
+    return "Hello World!"
+
+
 logger = logging.getLogger(__name__)
 
 if os.environ.get('NEW_RELIC_LICENSE_KEY'):
@@ -51,6 +59,7 @@ def get_app(config=None):
         app_module = importlib.import_module(module_name)
         if hasattr(app_module, 'init_app'):
             app_module.init_app(app)
+
     for module_name in app.config.get('CORE_APPS', []):
         install_app(module_name)
 
@@ -60,6 +69,6 @@ def get_app(config=None):
 if __name__ == '__main__':
     debug = True
     host = '0.0.0.0'
-    port = int(os.environ.get('PORT', '5000'))
+    port = int(os.environ.get('PORT', '5050'))
     app = get_app()
     app.run(host=host, port=port, debug=debug, use_reloader=debug)
