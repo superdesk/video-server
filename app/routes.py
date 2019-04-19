@@ -1,9 +1,12 @@
-from app import app
 from bson import ObjectId
 from flask import request, jsonify, Response
-from media import get_collection
+from media import get_collection, blueprint
+from flask import Blueprint
 
-@app.route('/projects', methods=['POST'])
+bp = Blueprint('projects', __name__)
+
+
+@bp.route('/projects', methods=['POST'])
 def create_video_editor():
     if request.method == 'POST':
         files = request.files.to_dict(flat=False)['media']
@@ -12,7 +15,7 @@ def create_video_editor():
         return create_video(files, user_agent)
 
 
-@app.route('/projects/<path:video_id>', methods=['GET', 'PUT', 'DELETE'])
+@bp.route('/projects/<path:video_id>', methods=['GET', 'PUT', 'DELETE'])
 def process_video_editor(video_id):
     """Keep previous url for backward compatibility"""
     if request.method == 'GET':
@@ -61,3 +64,7 @@ def get_video(video_id):
     for item in items:
         item['_id'] = str(item['_id'])
     return items
+
+
+def init_app(app):
+    blueprint(bp, app)

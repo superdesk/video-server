@@ -15,14 +15,6 @@ import importlib
 import logging.config
 from flask import Flask
 
-app = Flask(__name__)
-
-
-@app.route("/app")
-def hello():
-    return "Hello World!"
-
-
 logger = logging.getLogger(__name__)
 
 if os.environ.get('NEW_RELIC_LICENSE_KEY'):
