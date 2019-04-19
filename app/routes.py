@@ -1,10 +1,9 @@
 from bson import ObjectId
-from flask import request, jsonify, Response
-from media import get_collection, blueprint
+from flask import request, Response
+from media import get_collection
 from flask import Blueprint
-
+from bson import json_util
 bp = Blueprint('projects', __name__)
-
 
 @bp.route('/projects', methods=['POST'])
 def create_video_editor():
@@ -54,7 +53,8 @@ def create_video(files, agent):
         }
         docs.append(doc)
     video.insert_many(docs)
-    return Response(jsonify(docs), status=200, mimetype='application/json')
+
+    return Response(json_util.dumps(docs), status=200, mimetype='application/json')
 
 
 def get_video(video_id):
@@ -64,7 +64,3 @@ def get_video(video_id):
     for item in items:
         item['_id'] = str(item['_id'])
     return items
-
-
-def init_app(app):
-    blueprint(bp, app)
