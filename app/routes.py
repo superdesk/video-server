@@ -3,7 +3,9 @@ from flask import request, Response
 from media import get_collection
 from flask import Blueprint
 from bson import json_util
+
 bp = Blueprint('projects', __name__)
+
 
 @bp.route('/projects', methods=['POST'])
 def create_video_editor():
