@@ -1,7 +1,6 @@
-from bson import ObjectId
 from flask import request, Response, Blueprint
 from media import get_collection, validate_json
-from bson import json_util
+from bson import json_util, ObjectId, errors
 from .errors import bad_request
 from media.video.video_editor import get_video_editor_tool, create_file_name
 from flask import current_app as app
@@ -54,7 +53,7 @@ def process_video_editor(video_id):
 
 def delete_video(video_id):
     video = get_collection('video')
-    video.remove({'_id': ObjectId(video_id)})
+    video.remove({'_id': format_id(video_id)})
     return 'delete successfully'
 
 
@@ -90,7 +89,14 @@ def create_video(files, agent):
 def get_video(video_id):
     """Get data video"""
     video = get_collection('video')
-    items = list(video.find())
+    items = list(video.find({'_id': format_id(video_id)}))
     for item in items:
         item['_id'] = str(item['_id'])
     return Response(json_util.dumps(items), status=200, mimetype='application/json')
+
+
+def format_id(_id):
+    try:
+        return ObjectId(_id)
+    except:
+        return None
