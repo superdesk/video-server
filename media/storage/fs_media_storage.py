@@ -1,8 +1,5 @@
 import logging
-import json
-import mimetypes
 import bson
-import gridfs
 import os.path
 from media import get_collection
 
@@ -17,7 +14,11 @@ def format_id(_id):
         return _id
 
 
-class FileSystemMediaStorage():
+class MediaStorageFS():
+    pass
+
+
+class FileSystemMediaStorage(MediaStorageFS):
     def get(self, _id):
         logger.debug('Getting media file with id= %s' % _id)
         _id = format_id(_id)
@@ -28,20 +29,33 @@ class FileSystemMediaStorage():
             media_file = None
         return media_file
 
-    def put(self, content, filename=None, content_type=None, metadata=None, folder=None, **kwargs):
-        if '_id' in kwargs:
-            kwargs['_id'] = format_id(kwargs['_id'])
+    def put(self, content, filename, version=1, client_info=None, parent=None, metadata=None, folder=None, **kwargs):
         if folder:
             if folder[-1] == '/':
                 folder = folder[:-1]
             if filename:
                 filename = '{}/{}'.format(folder, filename)
         try:
-            logger.info('Adding file {} to the file system'.format(filename))
-            open("%s/%s" % (PATH_FS, filename), "w+").write(content)
-            get_collection('video').insert_one()
+            with open("%s/%s" % (PATH_FS, filename), "wb") as f:
+                f.write(content.read())
+            doc = {
+                'filename': filename,
+                'metadata': metadata,
+                'client_info': client_info,
+                'version': version,
+                'processing': False,
+                "parent": parent,
+                'thumbnails': {}
+            }
+            for k, v in kwargs:
+                doc[k] = v
+            get_collection('video').insert_one(doc)
+            return doc
         except Exception as ex:
             logger.info('File filename=%s error ex:' % (filename, ex))
+
+    def edit(self):
+        pass
 
     def delete(self, _id):
         logger.debug('Getting media file with id= %s' % _id)

@@ -17,10 +17,14 @@ class VideoEditor(object):
         pass
 
 
+def create_file_name(ext):
+    return "%s.%s" % (uuid.uuid4().hex, ext)
+
+
 class FfmpegVideoEditor(VideoEditor):
     def get_meta(self, file):
-        ext = file.filename.split('.')
-        file_name = "%s.%s" % (uuid.uuid4().hex, ext)
+        ext = file.filename.split('.')[1]
+        file_name = create_file_name(ext)
         metadata = {}
         try:
             file_temp_path = self.create_temp_file(file.stream, file_name)
@@ -81,7 +85,7 @@ class FfmpegVideoEditor(VideoEditor):
         :return:
         """
         res = cmd.Popen(
-            ["ffprobe", '-show_streams', '/home/thanhnguyen/PycharmProjects/0_test/video/video.mp4'],
+            ["ffprobe", '-show_streams', '-show_format', path_video],
             stdout=cmd.PIPE)
         data = res.communicate()[0].decode("utf-8").split('\n')
         metadata = {}
@@ -89,6 +93,11 @@ class FfmpegVideoEditor(VideoEditor):
             info = text.split('=')
             if len(info) == 2:
                 metadata[info[0]] = info[1]
+        res = cmd.Popen(
+            ["file", '--mime-type', '-b', path_video],
+            stdout=cmd.PIPE)
+        mime_type = res.communicate()[0].decode("utf-8").split('\n')
+        metadata['mime_type'] = mime_type
         return metadata
 
     def create_temp_file(self, file_stream, file_name):

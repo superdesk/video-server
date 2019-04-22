@@ -58,3 +58,11 @@ RABBIT_MQ_URL = env('RABBIT_MQ_URL', 'pyamqp://guest@localhost//')
 #: celery broker
 BROKER_MEDIA_URL = env('CELERY_MEDIA_BROKER_URL', RABBIT_MQ_URL)
 CELERY_MEDIA_BROKER_URL = BROKER_MEDIA_URL
+
+#: allow agent
+AGENT_ALLOW = env('AGENT_ALLOW', ['superdesk', 'postmanruntime'])
+#: Codec support
+CODEC_SUPPORT = env('CODEC_SUPPORT', ['vp8', 'vp9', 'h264', 'aac', 'flac', 'ogg'])
+
+#: media storage
+MEDIA_STORAGE = env('MEDIA_STORAGE', 'filesystem')

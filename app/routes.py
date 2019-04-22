@@ -3,7 +3,7 @@ from flask import request, Response, Blueprint
 from media import get_collection, validate_json
 from bson import json_util
 from .errors import bad_request
-from media.video.video_editor import get_video_editor_tool
+from media.video.video_editor import get_video_editor_tool, create_file_name
 from flask import current_app as app
 
 bp = Blueprint('projects', __name__)
@@ -14,7 +14,7 @@ SCHEMA_UPLOAD = {'media': {'type': 'binary'}}
 @bp.route('/projects', methods=['POST'])
 def create_video_editor():
     if request.method == 'POST':
-        files = request.files.to_dict(flat=False)['media']
+        files = request.files.to_dict(flat=False)
         user_agent = request.headers.environ['HTTP_USER_AGENT']
         return create_video(files, user_agent)
 
@@ -48,29 +48,21 @@ def create_video(files, agent):
     #: validate incoming data is a binary file
     if validate_json(SCHEMA_UPLOAD, files):
         return bad_request("file not found")
-    client_name = agent[0].split('/')
+    client_name = agent.split('/')[0]
     #: validate the user agent must be in a list support
-    if client_name in app.config.get('AGENT_ALLOW'):
+    if client_name.lower() not in app.config.get('AGENT_ALLOW'):
         return bad_request("client is not allow to edit")
     docs = []
     video_editor = get_video_editor_tool('ffmpeg')
-    for file in files:
+    for file in files.get('media'):
         metadata = video_editor.get_meta(file)
         #: validate codec must be support
         if metadata.get('codec_name') not in app.config.get('CODEC_SUPPORT'):
             return bad_request("codec is not support")
-        video_editor.create_video(file)
-        doc = {
-            'metadata': None,
-            'client_info': agent,
-            'version': 1,
-            'processing': False,
-            "parent": None,
-            'thumbnails': {}
-        }
+        ext = file.filename.split('.')[1]
+        file_name = create_file_name(ext)
+        doc = app.fs.put(None, file.stream, file_name, client_info=agent)
         docs.append(doc)
-    video = get_collection('video')
-    video.insert_many(docs)
     return Response(json_util.dumps(docs), status=200, mimetype='application/json')
 
 
