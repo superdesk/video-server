@@ -87,9 +87,9 @@ def create_video(files, agent):
 
 
 def get_video(video_id):
-    """Get data video"""
-    video = get_collection('video')
-    items = list(video.find({'_id': format_id(video_id)}))
+    """Get data media"""
+    media = get_collection('media')
+    items = list(media.find({'_id': format_id(video_id)}))
     for item in items:
         item['_id'] = str(item['_id'])
     return Response(json_util.dumps(items), status=200, mimetype='application/json')

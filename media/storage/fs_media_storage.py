@@ -68,7 +68,7 @@ class FileSystemMediaStorage(MediaStorageFS):
             }
             for k, v in kwargs:
                 doc[k] = v
-            get_collection('video').insert_one(doc)
+            get_collection('media').insert_one(doc)
             return doc
         except Exception as ex:
             logger.info('File filename=%s error ex:' % (filename, ex))
