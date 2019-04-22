@@ -8,7 +8,3 @@ class MediaStorage():
         if str.lower(name) == 'amazon':
             return None
         return None
-
-
-
-

@@ -20,6 +20,11 @@ class MediaStorageFS():
 
 class FileSystemMediaStorage(MediaStorageFS):
     def get(self, _id):
+        """
+        Get a stream file in storage
+        :param _id:
+        :return:
+        """
         logger.debug('Getting media file with id= %s' % _id)
         _id = format_id(_id)
         try:
@@ -30,6 +35,20 @@ class FileSystemMediaStorage(MediaStorageFS):
         return media_file
 
     def put(self, content, filename, version=1, client_info=None, parent=None, metadata=None, folder=None, **kwargs):
+        """
+        Put a file into storage
+        Create record for this file
+
+        :param content:
+        :param filename:
+        :param version:
+        :param client_info:
+        :param parent:
+        :param metadata:
+        :param folder:
+        :param kwargs:
+        :return:
+        """
         if folder:
             if folder[-1] == '/':
                 folder = folder[:-1]

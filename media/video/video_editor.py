@@ -34,15 +34,20 @@ class FfmpegVideoEditor(VideoEditor):
                 os.remove(file_temp_path)
         return metadata
 
-    def create_video(self, file):
-        ext = file.filename.split('.')
-        file_name = "%s.%s" % (uuid.uuid4().hex, ext)
+    def get_meta_of_stream(self, filestream):
+        file_name = create_file_name('tmp')
+        metadata = {}
         try:
-            file_temp_path = self.create_temp_file(file.stream, file_name)
+            file_temp_path = self.create_temp_file(filestream, file_name)
             metadata = self._get_meta(file_temp_path)
         finally:
             if file_temp_path:
                 os.remove(file_temp_path)
+        return metadata
+
+    def video_edit(self, stream_file, filename, metadata, media_id, video_cut=None, video_crop=None, video_rotate=None,
+                   video_quality=None):
+        pass
 
     def _capture_thumnail(self, path_video, path_output, time_capture=0):
         """
@@ -85,7 +90,7 @@ class FfmpegVideoEditor(VideoEditor):
         :return:
         """
         res = cmd.Popen(
-            ["ffprobe", '-show_streams', '-show_format', path_video],
+            ['ffprobe', '-show_streams', '-show_format', path_video],
             stdout=cmd.PIPE)
         data = res.communicate()[0].decode("utf-8").split('\n')
         metadata = {}
@@ -94,7 +99,7 @@ class FfmpegVideoEditor(VideoEditor):
             if len(info) == 2:
                 metadata[info[0]] = info[1]
         res = cmd.Popen(
-            ["file", '--mime-type', '-b', path_video],
+            ['file', '--mime-type', '-b', path_video],
             stdout=cmd.PIPE)
         mime_type = res.communicate()[0].decode("utf-8").split('\n')
         metadata['mime_type'] = mime_type
