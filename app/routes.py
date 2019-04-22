@@ -52,7 +52,7 @@ def process_video_editor(video_id):
 
 
 def delete_video(video_id):
-    video = get_collection('video')
+    video = get_collection('media')
     video.remove({'_id': format_id(video_id)})
     return 'delete successfully'
 
@@ -98,5 +98,5 @@ def get_video(video_id):
 def format_id(_id):
     try:
         return ObjectId(_id)
-    except:
+    except Exception as ex:
         return None
