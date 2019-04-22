@@ -93,4 +93,4 @@ def get_video(video_id):
     items = list(video.find())
     for item in items:
         item['_id'] = str(item['_id'])
-    return items
+    return Response(json_util.dumps(items), status=200, mimetype='application/json')
