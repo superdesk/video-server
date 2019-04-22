@@ -74,7 +74,7 @@ def create_video(files, agent):
 
     video_editor = get_video_editor_tool('ffmpeg')
     file = files.get('media')
-    metadata = video_editor.get_meta_of_stream(file.stream)
+    metadata = video_editor.get_meta(file.stream)
     #: validate codec must be support
     if metadata.get('codec_name') not in app.config.get('CODEC_SUPPORT'):
         return bad_request("codec is not support")
@@ -82,7 +82,7 @@ def create_video(files, agent):
     ext = file.filename.split('.')[1]
     file_name = create_file_name(ext)
     #: put file into storage
-    doc = app.fs.put(None, file.stream, file_name, client_info=agent)
+    doc = app.fs.put(None, file.stream, file_name, metadata=metadata, client_info=agent)
     return Response(json_util.dumps(doc), status=200, mimetype='application/json')
 
 

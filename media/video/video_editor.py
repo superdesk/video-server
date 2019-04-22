@@ -7,13 +7,17 @@ import tempfile
 
 class VideoEditor(object):
 
-    def get_meta(self):
+    def get_meta(self, filestream):
         pass
 
-    def create_video(self):
+    def edit_video(self, stream_file, filename, metadata, media_id, video_cut=None, video_crop=None, video_rotate=None,
+                   video_quality=None):
         pass
 
-    def edit_video(self):
+    def capture_thumnail(self, filestream):
+        pass
+
+    def capture_list_timeline_thumnails(self, filestream):
         pass
 
 
@@ -22,31 +26,26 @@ def create_file_name(ext):
 
 
 class FfmpegVideoEditor(VideoEditor):
-    def get_meta(self, file):
-        ext = file.filename.split('.')[1]
-        file_name = create_file_name(ext)
-        metadata = {}
-        try:
-            file_temp_path = self.create_temp_file(file.stream, file_name)
-            metadata = self._get_meta(file_temp_path)
-        finally:
-            if file_temp_path:
-                os.remove(file_temp_path)
-        return metadata
 
-    def get_meta_of_stream(self, filestream):
+    def get_meta(self, filestream):
         file_name = create_file_name('tmp')
         metadata = {}
         try:
-            file_temp_path = self.create_temp_file(filestream, file_name)
+            file_temp_path = self._create_temp_file(filestream, file_name)
             metadata = self._get_meta(file_temp_path)
         finally:
             if file_temp_path:
                 os.remove(file_temp_path)
         return metadata
 
-    def video_edit(self, stream_file, filename, metadata, media_id, video_cut=None, video_crop=None, video_rotate=None,
+    def edit_video(self, stream_file, filename, metadata, media_id, video_cut=None, video_crop=None, video_rotate=None,
                    video_quality=None):
+        pass
+
+    def capture_video(self, filestream):
+        pass
+
+    def capture_list_timeline_thumnails(self, filestream):
         pass
 
     def _capture_thumnail(self, path_video, path_output, time_capture=0):
@@ -102,10 +101,10 @@ class FfmpegVideoEditor(VideoEditor):
             ['file', '--mime-type', '-b', path_video],
             stdout=cmd.PIPE)
         mime_type = res.communicate()[0].decode("utf-8").split('\n')
-        metadata['mime_type'] = mime_type
+        metadata['mime_type'] = mime_type[0]
         return metadata
 
-    def create_temp_file(self, file_stream, file_name):
+    def _create_temp_file(self, file_stream, file_name):
         """
             Get stream file from resource and save it to /tmp directory for using (cutting and capture)
         :param media_id:
