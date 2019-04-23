@@ -1,6 +1,6 @@
 import logging
 import bson
-import os.path
+import os
 from media import get_collection
 
 logger = logging.getLogger(__name__)
@@ -44,8 +44,8 @@ class FileSystemMediaStorage(MediaStorage):
             media_file = None
         return media_file
 
-    def put(self, content, filename, version=1, client_info=None, parent=None, metadata=None, folder=None,
-            processing=False, **kwargs):
+    def put(self, content, filename, version=1, client_info=None, parent=None, metadata=None, processing=False,
+            **kwargs):
         """
         Put a file into storage
         Create record for this file
@@ -60,12 +60,9 @@ class FileSystemMediaStorage(MediaStorage):
         :param kwargs:
         :return:
         """
-        if folder:
-            if folder[-1] == '/':
-                folder = folder[:-1]
-            if filename:
-                filename = '{}/{}'.format(folder, filename)
         try:
+            if not os.path.exists(PATH_FS):
+                os.makedirs(PATH_FS)
             with open("%s/%s" % (PATH_FS, filename), "wb") as f:
                 f.write(content)
             doc = {
