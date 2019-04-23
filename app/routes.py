@@ -1,9 +1,9 @@
 from flask import request, Response, Blueprint
-from media import get_collection, validate_json
+from media import get_collection
 from bson import json_util, ObjectId
 from .errors import bad_request
 from media.video import get_video_editor_tool
-from media.utils import create_file_name
+from media.utils import create_file_name, validate_json
 from flask import current_app as app
 
 bp = Blueprint('projects', __name__)

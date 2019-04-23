@@ -1,6 +1,5 @@
 from pymongo import MongoClient
 from flask import current_app as app
-from cerberus import Validator
 
 
 def get_collection(colection, db=None):
@@ -17,8 +16,3 @@ def blueprint(blueprint, app, **kwargs):
     blueprint.kwargs = kwargs
     prefix = None
     app.register_blueprint(blueprint, url_prefix=prefix, **kwargs)
-
-
-def validate_json(schema, doc):
-    v = Validator(schema)
-    return v.validate(doc)

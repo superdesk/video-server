@@ -1,5 +1,4 @@
 from . import video_editor
-import uuid
 
 
 def get_video_editor_tool(name):
@@ -8,4 +7,3 @@ def get_video_editor_tool(name):
     if name == 'moviepy':
         return video_editor.MoviePyVideoEditor()
     return None
-
