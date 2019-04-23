@@ -14,11 +14,21 @@ def format_id(_id):
         return _id
 
 
-class MediaStorageFS():
-    pass
+class MediaStorage(object):
+    def get(self, id):
+        pass
+
+    def put(self, content, filename, version=1, client_info=None, parent=None, metadata=None, folder=None, **kwargs):
+        pass
+
+    def edit(self, content, filename, version=1, client_info=None, parent=None, metadata=None, folder=None, **kwargs):
+        pass
+
+    def delete(self):
+        pass
 
 
-class FileSystemMediaStorage(MediaStorageFS):
+class FileSystemMediaStorage(MediaStorage):
     def get(self, _id):
         """
         Get a stream file in storage
@@ -28,13 +38,14 @@ class FileSystemMediaStorage(MediaStorageFS):
         logger.debug('Getting media file with id= %s' % _id)
         _id = format_id(_id)
         try:
-            file_name = get_collection('video').find_one({"_id": _id}).get('filename')
+            file_name = get_collection('media').find_one({"_id": _id}).get('filename')
             media_file = (open("%s/%s" % (PATH_FS, file_name), 'r+')).read()
         except Exception:
             media_file = None
         return media_file
 
-    def put(self, content, filename, version=1, client_info=None, parent=None, metadata=None, folder=None, **kwargs):
+    def put(self, content, filename, version=1, client_info=None, parent=None, metadata=None, folder=None,
+            processing=False, **kwargs):
         """
         Put a file into storage
         Create record for this file
@@ -62,7 +73,7 @@ class FileSystemMediaStorage(MediaStorageFS):
                 'metadata': metadata,
                 'client_info': client_info,
                 'version': version,
-                'processing': False,
+                'processing': processing,
                 "parent": parent,
                 'thumbnails': {}
             }
@@ -73,17 +84,17 @@ class FileSystemMediaStorage(MediaStorageFS):
         except Exception as ex:
             logger.info('File filename=%s error ex:' % (filename, ex))
 
-    def edit(self):
+    def edit(self, content, filename, version=1, client_info=None, parent=None, metadata=None, folder=None, **kwargs):
         pass
 
     def delete(self, _id):
         logger.debug('Getting media file with id= %s' % _id)
         _id = format_id(_id)
         try:
-            video_collection = get_collection('video')
-            file_name = video_collection.find_one({"_id": _id}).get('file_name')
+            media_collection = get_collection('media')
+            file_name = media_collection.find_one({"_id": _id}).get('file_name')
             os.remove("%s/%s" % (PATH_FS, file_name))
-            video_collection.remove({'id': _id})
+            media_collection.remove({'id': _id})
         except Exception:
             media_file = None
         return media_file

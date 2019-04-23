@@ -1,8 +1,9 @@
 import os
 import subprocess as cmd
-from io import BytesIO
-import uuid
 import tempfile
+
+from io import BytesIO
+from media.utils import create_file_name
 
 
 class VideoEditor(object):
@@ -19,10 +20,6 @@ class VideoEditor(object):
 
     def capture_list_timeline_thumnails(self, filestream):
         pass
-
-
-def create_file_name(ext):
-    return "%s.%s" % (uuid.uuid4().hex, ext)
 
 
 class FfmpegVideoEditor(VideoEditor):
@@ -118,16 +115,3 @@ class FfmpegVideoEditor(VideoEditor):
 
 class MoviePyVideoEditor(VideoEditor):
     pass
-
-
-class VideoEditorFactory():
-    def get_video_editor_tool(self, name):
-        if name == 'ffmpeg':
-            return FfmpegVideoEditor()
-        if name == 'moviepy':
-            return MoviePyVideoEditor()
-        return None
-
-
-def get_video_editor_tool(name):
-    return VideoEditorFactory().get_video_editor_tool(name)

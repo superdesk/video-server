@@ -14,7 +14,7 @@ import settings
 import importlib
 import logging.config
 from flask import Flask
-from media.storage import MediaStorage
+from media.storage import get_media_storage
 
 logger = logging.getLogger(__name__)
 
@@ -45,7 +45,10 @@ def get_app(config=None):
             config.setdefault(key, getattr(settings, key))
 
     app.config.update(config)
-    app.fs = MediaStorage().get_media_storage(app.config.get('MEDIA_STORAGE'))
+
+    #: init storage
+    media_storage = get_media_storage(app.config.get('MEDIA_STORAGE'))
+    app.fs = media_storage
 
     installed = set()
 

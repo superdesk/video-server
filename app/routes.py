@@ -1,8 +1,9 @@
 from flask import request, Response, Blueprint
 from media import get_collection, validate_json
-from bson import json_util, ObjectId, errors
+from bson import json_util, ObjectId
 from .errors import bad_request
-from media.video.video_editor import get_video_editor_tool, create_file_name
+from media.video import get_video_editor_tool
+from media.utils import create_file_name
 from flask import current_app as app
 
 bp = Blueprint('projects', __name__)
@@ -64,8 +65,8 @@ def update_video(video_id, updates):
 def create_video(files, agent):
     """Validate data, then save video to storage and create records to databases"""
     #: validate incoming data is a binary file
-    if validate_json(SCHEMA_UPLOAD, files):
-        return bad_request("file not found")
+    if 'media' not in files:
+        return bad_request("file can not found in 'media'")
 
     #: validate the user agent must be in a list support
     client_name = agent.split('/')[0]
