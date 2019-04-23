@@ -74,7 +74,7 @@ class FileSystemMediaStorage(MediaStorage):
                 "parent": parent,
                 'thumbnails': {}
             }
-            for k, v in kwargs:
+            for k, v in kwargs.items():
                 doc[k] = v
             get_collection('media').insert_one(doc)
             return doc
