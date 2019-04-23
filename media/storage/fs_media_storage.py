@@ -67,7 +67,7 @@ class FileSystemMediaStorage(MediaStorage):
                 filename = '{}/{}'.format(folder, filename)
         try:
             with open("%s/%s" % (PATH_FS, filename), "wb") as f:
-                f.write(content.read())
+                f.write(content)
             doc = {
                 'filename': filename,
                 'metadata': metadata,

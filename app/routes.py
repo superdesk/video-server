@@ -5,6 +5,8 @@ from .errors import bad_request
 from media.video import get_video_editor_tool
 from media.utils import create_file_name, validate_json
 from flask import current_app as app
+from werkzeug.datastructures import FileStorage
+import io
 
 bp = Blueprint('projects', __name__)
 
@@ -64,8 +66,8 @@ def update_video(video_id, updates):
 
 def create_video(files, agent):
     """Validate data, then save video to storage and create records to databases"""
-    #: validate incoming data is a binary file
-    if 'media' not in files:
+    #: validate incoming data is a file
+    if 'media' not in files or not isinstance(files.get('media'), FileStorage):
         return bad_request("file can not found in 'media'")
 
     #: validate the user agent must be in a list support
@@ -75,7 +77,8 @@ def create_video(files, agent):
 
     video_editor = get_video_editor_tool('ffmpeg')
     file = files.get('media')
-    metadata = video_editor.get_meta(file.stream)
+    file_stream = file.stream.read()
+    metadata = video_editor.get_meta(file_stream)
     #: validate codec must be support
     if metadata.get('codec_name') not in app.config.get('CODEC_SUPPORT'):
         return bad_request("codec is not support")
@@ -83,7 +86,7 @@ def create_video(files, agent):
     ext = file.filename.split('.')[1]
     file_name = create_file_name(ext)
     #: put file into storage
-    doc = app.fs.put(None, file.stream, file_name, metadata=metadata, client_info=agent)
+    doc = app.fs.put(None, file_stream, file_name, metadata=metadata, client_info=agent)
     return Response(json_util.dumps(doc), status=200, mimetype='application/json')
 
 

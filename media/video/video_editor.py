@@ -109,7 +109,7 @@ class FfmpegVideoEditor(VideoEditor):
         """
         tmp_path = tempfile.gettempdir() + "/tmp_%s" % file_name
         with open(tmp_path, "wb") as f:
-            f.write(file_stream.read())
+            f.write(file_stream)
         return tmp_path
 
 
