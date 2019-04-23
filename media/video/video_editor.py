@@ -15,10 +15,10 @@ class VideoEditor(object):
                    video_quality=None):
         pass
 
-    def capture_thumnail(self, filestream):
+    def capture_thumnail(self, filestream, capture_time):
         pass
 
-    def capture_list_timeline_thumnails(self, filestream):
+    def capture_list_timeline_thumnails(self, filestream, number_frames):
         pass
 
 
@@ -28,7 +28,9 @@ class FfmpegVideoEditor(VideoEditor):
         file_name = create_file_name('tmp')
         metadata = {}
         try:
+            #: create a temp file
             file_temp_path = self._create_temp_file(filestream, file_name)
+            #: get metadata
             metadata = self._get_meta(file_temp_path)
         finally:
             if file_temp_path:
@@ -39,10 +41,10 @@ class FfmpegVideoEditor(VideoEditor):
                    video_quality=None):
         pass
 
-    def capture_video(self, filestream):
+    def capture_thumnail(self, filestream, capture_time):
         pass
 
-    def capture_list_timeline_thumnails(self, filestream):
+    def capture_list_timeline_thumnails(self, filestream, number_frames):
         pass
 
     def _capture_thumnail(self, path_video, path_output, time_capture=0):

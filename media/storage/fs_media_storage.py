@@ -64,8 +64,10 @@ class FileSystemMediaStorage(MediaStorage):
         try:
             if not os.path.exists(PATH_FS):
                 os.makedirs(PATH_FS)
+            #: write stream file to storage
             with open("%s/%s" % (PATH_FS, filename), "wb") as f:
                 f.write(content)
+            #: create a record in storage
             doc = {
                 'filename': filename,
                 'metadata': metadata,
