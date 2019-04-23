@@ -17,8 +17,9 @@ SCHEMA_UPLOAD = {'media': {'type': 'binary'}}
 def create_video_editor():
     """
         Api put a file into storage video server
+        content-type: multipart/form-data
         payload:
-            {'media': {'type': 'binary'}}
+            {'media': {'type': 'file'}}
 
         response: http 200
         {
@@ -87,7 +88,7 @@ def create_video(files, agent):
     file_name = create_file_name(ext)
     #: put file into storage
     doc = app.fs.put(None, file_stream, file_name, metadata=metadata, client_info=agent)
-    return Response(json_util.dumps(doc), status=200, mimetype='application/json')
+    return Response(json_util.dumps(doc), status=201, mimetype='application/json')
 
 
 def get_video(video_id):
