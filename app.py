@@ -15,6 +15,7 @@ import importlib
 import logging.config
 from flask import Flask
 from media.storage import get_media_storage
+from media.logging import configure_logging
 
 logger = logging.getLogger(__name__)
 
@@ -62,7 +63,7 @@ def get_app(config=None):
 
     for module_name in app.config.get('CORE_APPS', []):
         install_app(module_name)
-
+    configure_logging(app.config['LOG_CONFIG_FILE'])
     return app
 
 
