@@ -6,11 +6,11 @@ from media.video import get_video_editor_tool
 from media.utils import create_file_name, validate_json
 from flask import current_app as app
 from werkzeug.datastructures import FileStorage
-import io
+
 
 bp = Blueprint('projects', __name__)
 
-SCHEMA_UPLOAD = {'media': {'type': 'binary'}}
+SCHEMA_UPLOAD = {'filename': {'type': 'string', 'required': True, 'empty': True}}
 
 
 @bp.route('/projects', methods=['POST'])
@@ -19,9 +19,10 @@ def create_video_editor():
         Api put a file into storage video server
         content-type: multipart/form-data
         payload:
-            {'media': {'type': 'file'}}
+            files: {'media': <file>}
+            form: {filename: <string>}
 
-        response: http 200
+        response: http 201
         {
             "filename": "fa5079a38e0a4197864aa2ccb07f3bea.mp4",
             "metadata": null,
@@ -39,7 +40,10 @@ def create_video_editor():
     if request.method == 'POST':
         files = request.files
         user_agent = request.headers.environ['HTTP_USER_AGENT']
-        return create_video(files, user_agent)
+        file_name = request.form.to_dict()
+        if not validate_json(SCHEMA_UPLOAD, file_name):
+            return bad_request("invalid request")
+        return create_video(files, file_name.get('filename'), user_agent)
 
 
 @bp.route('/projects/<path:video_id>', methods=['GET', 'POST', 'PUT', 'DELETE'])
@@ -65,7 +69,7 @@ def update_video(video_id, updates):
     return 'update successfully'
 
 
-def create_video(files, agent):
+def create_video(files, original_filename, agent):
     """Validate data, then save video to storage and create records to databases"""
     #: validate incoming data is a file
     if 'media' not in files or not isinstance(files.get('media'), FileStorage):
@@ -87,7 +91,8 @@ def create_video(files, agent):
     ext = file.filename.split('.')[1]
     file_name = create_file_name(ext)
     #: put file into storage
-    doc = app.fs.put(None, file_stream, file_name, metadata=metadata, client_info=agent)
+    doc = app.fs.put(None, file_stream, file_name, metadata=metadata, client_info=agent,
+                     original_filename=original_filename)
     return Response(json_util.dumps(doc), status=201, mimetype='application/json')
 
 

@@ -56,7 +56,7 @@ class FileSystemMediaStorage(MediaStorage):
         :param client_info:
         :param parent:
         :param metadata:
-        :param folder:
+        :param processing:
         :param kwargs:
         :return:
         """
