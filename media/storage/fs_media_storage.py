@@ -35,7 +35,7 @@ class FileSystemMediaStorage(MediaStorage):
         :param _id:
         :return:
         """
-        logger.debug('Getting media file with id= %s' % _id)
+        logger.info('Getting media file with id= %s' % _id)
         _id = format_id(_id)
         try:
             file_name = get_collection('media').find_one({"_id": _id}).get('filename')
@@ -60,6 +60,7 @@ class FileSystemMediaStorage(MediaStorage):
         :param kwargs:
         :return:
         """
+        logger.info('put media file with file name = %s to storage' % filename)
         try:
             if not os.path.exists(PATH_FS):
                 os.makedirs(PATH_FS)
@@ -85,7 +86,7 @@ class FileSystemMediaStorage(MediaStorage):
         pass
 
     def delete(self, _id):
-        logger.debug('Getting media file with id= %s' % _id)
+        logger.debug('delete media file with id= %s' % _id)
         _id = format_id(_id)
         try:
             media_collection = get_collection('media')
