@@ -105,6 +105,7 @@ def create_video_editor():
                   $oid:
                     type: string
               example: { $oid: 5cbd5acfe24f6045607e51aa}
+
     """
     if request.method == 'POST':
         files = request.files

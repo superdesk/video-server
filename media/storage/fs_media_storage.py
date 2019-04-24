@@ -21,7 +21,7 @@ class MediaStorage(object):
     def get(self, id):
         pass
 
-    def put(self, content, filename, metadata, type='video', **kwargs):
+    def put(self, content, filename, metadata, mime_type, type='video', **kwargs):
         pass
 
     def edit(self, content, filename, version=1, client_info=None, parent=None, metadata=None, folder=None, **kwargs):
@@ -58,10 +58,10 @@ class FileSystemMediaStorage(MediaStorage):
         """
         Put a file into storage
         Create record for this file
-
         :param content:
         :param filename:
         :param metadata:
+        :param mime_type:
         :param type:
         :param kwargs:
         :return:

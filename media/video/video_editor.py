@@ -65,8 +65,7 @@ class FfmpegVideoEditor(VideoEditor):
 
             duration = float(metadata['duration'])
             if (not video_cut or (
-                    video_cut['start'] == 0 and int(video_cut['end']) == int(
-                duration))) and not video_crop and (
+                    video_cut['start'] == 0 and int(video_cut['end']) == int(duration))) and not video_crop and (
                     not video_rotate or int(video_rotate['degree']) % 360 == 0) and not video_quality:
                 return {}
             path_output = path_video + "_edit" + os.path.splitext(filename)[1]
