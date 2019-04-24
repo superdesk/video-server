@@ -164,7 +164,7 @@ class FfmpegVideoEditor(VideoEditor):
                      'nb_frames']
         for text in data:
             info = text.split('=')
-            if len(info) == 2 and info[0] in list_meta and info[0]:
+            if len(info) == 2 and info[0] in list_meta and not metadata.get(info[0]):
                 metadata[info[0]] = info[1]
         return metadata
 
