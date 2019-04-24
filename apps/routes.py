@@ -70,9 +70,12 @@ def create_video_editor():
         type: object
         required:
           file
+          filename
         properties:
-          media:
-            type: file
+          file:
+            type: binary
+          filename:
+            type: string
     responses:
       '201':
         description: CREATED
