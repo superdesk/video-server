@@ -5,7 +5,7 @@ from flask import request, render_template, jsonify
 from flask_swagger import swagger
 from werkzeug.datastructures import FileStorage
 
-from media import get_media_collection, get_thumbnails_collection
+from media import get_media_collection
 from media.utils import create_file_name, validate_json
 from media.video import get_video_editor_tool
 
@@ -72,7 +72,7 @@ def create_video_editor():
           media
         properties:
           media:
-            type: string
+            type: file
     responses:
       '201':
         description: CREATED
@@ -84,7 +84,7 @@ def create_video_editor():
               example: fa5079a38e0a4197864aa2ccb07f3bea.mp4
             metadata:
               type: object
-              example: null
+              example: {...}
             client_info:
               type: string
               example: PostmanRuntime/7.6.0
@@ -159,17 +159,11 @@ def create_video(files, original_filename, agent):
 
     ext = file.filename.split('.')[1]
     file_name = create_file_name(ext)
+    mime_type = file.mimetype
     #: put file into storage
-    doc = app.fs.put(None, file_stream, file_name, metadata=metadata, client_info=agent,
+    doc = app.fs.put(None, file_stream, file_name, metadata, mime_type, thumbnails={}, client_info=agent,
                      original_filename=original_filename)
-    thumbnails = []
-    for thumbnail_id in doc['thumbnails']:
-        thumbnail = (
-            get_thumbnails_collection()
-                .find_one({'_id': format_id(thumbnail_id)})
-        )
-        thumbnails.append(thumbnail)
-    doc['thumbnails'] = json_util.dumps(thumbnails)
+
     return Response(json_util.dumps(doc), status=201, mimetype='application/json')
 
 

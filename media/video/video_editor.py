@@ -11,7 +11,7 @@ class VideoEditor(object):
     def get_meta(self, filestream):
         pass
 
-    def edit_video(self, stream_file, filename, metadata, media_id, video_cut=None, video_crop=None, video_rotate=None,
+    def edit_video(self, stream_file, filename, metadata, video_cut=None, video_crop=None, video_rotate=None,
                    video_quality=None):
         pass
 
@@ -42,7 +42,7 @@ class FfmpegVideoEditor(VideoEditor):
                 os.remove(file_temp_path)
         return metadata
 
-    def edit_video(self, stream_file, filename, metadata, media_id, video_cut=None, video_crop=None, video_rotate=None,
+    def edit_video(self, stream_file, filename, metadata, video_cut=None, video_crop=None, video_rotate=None,
                    video_quality=None):
         """
         Use ffmpeg tool for edit video
@@ -69,8 +69,7 @@ class FfmpegVideoEditor(VideoEditor):
                 duration))) and not video_crop and (
                     not video_rotate or int(video_rotate['degree']) % 360 == 0) and not video_quality:
                 return {}
-            mime_type = metadata['mime_type']
-            path_output = path_video + "_edit." + str.split(mime_type, "/")[1]
+            path_output = path_video + "_edit" + os.path.splitext(filename)[1]
             # use copy data
             if video_cut:
                 path_video = self._edit_video(path_video, path_output,
@@ -162,15 +161,12 @@ class FfmpegVideoEditor(VideoEditor):
             stdout=cmd.PIPE)
         data = res.communicate()[0].decode("utf-8").split('\n')
         metadata = {}
+        list_meta = ['height', 'width', 'size', 'bit_rate', 'duration', 'codec_name', 'codec_long_name', 'format_name',
+                     'nb_frames']
         for text in data:
             info = text.split('=')
-            if len(info) == 2:
+            if len(info) == 2 and info[0] in list_meta:
                 metadata[info[0]] = info[1]
-        res = cmd.Popen(
-            ['file', '--mime-type', '-b', path_video],
-            stdout=cmd.PIPE)
-        mime_type = res.communicate()[0].decode("utf-8").split('\n')
-        metadata['mime_type'] = mime_type[0]
         return metadata
 
     def _create_temp_file(self, file_stream, file_name):

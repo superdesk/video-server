@@ -54,7 +54,7 @@ class FileSystemMediaStorage(MediaStorage):
                 media_file = None
         return doc, media_file
 
-    def put(self, content, filename, metadata, type='video', **kwargs):
+    def put(self, content, filename, metadata, mime_type, type='video', **kwargs):
         """
         Put a file into storage
         Create record for this file
@@ -80,9 +80,10 @@ class FileSystemMediaStorage(MediaStorage):
             #: create a record in storage
             doc = {
                 'filename': filename,
-                'folder': dir_file,
+                'folder': "%s/%s" % (year, month),
                 'metadata': metadata,
-                'thumbnails': {}
+                'create_time': createtime,
+                'mime_type': mime_type
             }
             for k, v in kwargs.items():
                 doc[k] = v
