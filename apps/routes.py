@@ -56,7 +56,7 @@ def create_video(files, agent):
         docs.append(doc)
     video.insert_many(docs)
 
-    return Response(json_util.dumps(docs), status=200, mimetype='application/json')
+    return json_util.dumps(docs)
 
 
 def get_video(video_id):
@@ -66,3 +66,4 @@ def get_video(video_id):
     for item in items:
         item['_id'] = str(item['_id'])
     return items
+

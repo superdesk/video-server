@@ -1,8 +1,6 @@
-from . import errors
-from . import routes
+from . import errors, routes
 from media import blueprint
-from .routes import bp
 
 
 def init_app(app):
-    blueprint(bp, app)
+    blueprint(routes.bp, app)
