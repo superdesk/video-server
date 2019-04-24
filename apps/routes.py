@@ -69,7 +69,7 @@ def create_video_editor():
       schema:
         type: object
         required:
-          media
+          file
         properties:
           media:
             type: file
@@ -142,8 +142,8 @@ def update_video(video_id, updates):
 def create_video(files, original_filename, agent):
     """Validate data, then save video to storage and create records to databases"""
     #: validate incoming data is a file
-    if 'media' not in files or not isinstance(files.get('media'), FileStorage):
-        return bad_request("file can not found in 'media'")
+    if 'file' not in files or not isinstance(files.get('file'), FileStorage):
+        return bad_request("file can not found in 'file'")
 
     #: validate the user agent must be in a list support
     client_name = agent.split('/')[0]
@@ -151,7 +151,7 @@ def create_video(files, original_filename, agent):
         return bad_request("client is not allow to edit")
 
     video_editor = get_video_editor_tool('ffmpeg')
-    file = files.get('media')
+    file = files.get('file')
     file_stream = file.stream.read()
     metadata = video_editor.get_meta(file_stream)
     #: validate codec must be support
