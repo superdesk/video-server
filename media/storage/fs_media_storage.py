@@ -1,7 +1,7 @@
 import logging
 import bson
 import os
-from media import get_collection
+from media import get_media_collection
 
 logger = logging.getLogger(__name__)
 PATH_FS = os.path.dirname(__file__) + '/fs'
@@ -38,7 +38,7 @@ class FileSystemMediaStorage(MediaStorage):
         logger.info('Getting media file with id= %s' % _id)
         _id = format_id(_id)
         try:
-            file_name = get_collection('media').find_one({"_id": _id}).get('filename')
+            file_name = get_media_collection().find_one({"_id": _id}).get('filename')
             media_file = (open("%s/%s" % (PATH_FS, file_name), 'r+')).read()
         except Exception:
             media_file = None
@@ -79,7 +79,7 @@ class FileSystemMediaStorage(MediaStorage):
             }
             for k, v in kwargs.items():
                 doc[k] = v
-            get_collection('media').insert_one(doc)
+            get_media_collection().insert_one(doc)
             return doc
         except Exception as ex:
             logger.info('File filename=%s error ex:' % (filename, ex))
@@ -91,7 +91,7 @@ class FileSystemMediaStorage(MediaStorage):
         logger.debug('delete media file with id= %s' % _id)
         _id = format_id(_id)
         try:
-            media_collection = get_collection('media')
+            media_collection = get_media_collection()
             file_name = media_collection.find_one({"_id": _id}).get('file_name')
             os.remove("%s/%s" % (PATH_FS, file_name))
             media_collection.remove({'id': _id})

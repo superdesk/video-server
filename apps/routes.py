@@ -1,12 +1,14 @@
-from flask import request, Response, Blueprint
-from media import get_collection
-from bson import json_util, ObjectId
-from .errors import bad_request
-from media.video import get_video_editor_tool
-from media.utils import create_file_name, validate_json
+from bson import ObjectId, json_util
+from flask import Blueprint, Response
 from flask import current_app as app
+from flask import request
 from werkzeug.datastructures import FileStorage
 
+from media import get_media_collection
+from media.utils import create_file_name, validate_json
+from media.video import get_video_editor_tool
+
+from .errors import bad_request
 
 bp = Blueprint('projects', __name__)
 
@@ -60,7 +62,7 @@ def process_video_editor(video_id):
 
 
 def delete_video(video_id):
-    video = get_collection('media')
+    video = get_media_collection()
     video.remove({'_id': format_id(video_id)})
     return 'delete successfully'
 
@@ -98,7 +100,7 @@ def create_video(files, original_filename, agent):
 
 def get_video(video_id):
     """Get data media"""
-    media = get_collection('media')
+    media = get_media_collection()
     items = list(media.find({'_id': format_id(video_id)}))
     for item in items:
         item['_id'] = str(item['_id'])
