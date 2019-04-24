@@ -4,7 +4,7 @@ from flask import current_app as app
 from flask import request
 from werkzeug.datastructures import FileStorage
 
-from media import get_media_collection
+from media import get_media_collection, get_thumbnails_collection
 from media.utils import create_file_name, validate_json
 from media.video import get_video_editor_tool
 
@@ -95,6 +95,14 @@ def create_video(files, original_filename, agent):
     #: put file into storage
     doc = app.fs.put(None, file_stream, file_name, metadata=metadata, client_info=agent,
                      original_filename=original_filename)
+    thumbnails = []
+    for thumbnail_id in doc['thumbnails']:
+        thumbnail = (
+            get_thumbnails_collection()
+                .find_one({'_id': format_id(thumbnail_id)})
+        )
+        thumbnails.append(thumbnail)
+    doc['thumbnails'] = json_util.dumps(thumbnails)
     return Response(json_util.dumps(doc), status=201, mimetype='application/json')
 
 
