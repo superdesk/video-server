@@ -40,12 +40,19 @@ class FileSystemMediaStorage(MediaStorage):
         """
         logger.info('Getting media file with id= %s' % _id)
         _id = format_id(_id)
-        try:
-            file_name = get_media_collection().find_one({"_id": _id}).get('filename')
-            media_file = (open("%s/%s" % (PATH_FS, file_name), 'r+')).read()
-        except Exception:
-            media_file = None
-        return media_file
+        doc = {}
+
+        doc = get_media_collection().find_one({"_id": _id})
+        if doc:
+            doc = get_thumbnails_collection().find_one({"_id": _id})
+            filename = doc.get('filename')
+            dir_file = doc.get('folder')
+            try:
+                media_file = (open("%s/%s/%s" % (PATH_FS, dir_file, filename), 'r+')).read()
+            except Exception as ex:
+                logger.error('can not get data filename=%s error ex: %s' % (filename, ex))
+                media_file = None
+        return doc, media_file
 
     def put(self, content, filename, metadata, type='video', **kwargs):
         """
@@ -73,6 +80,7 @@ class FileSystemMediaStorage(MediaStorage):
             #: create a record in storage
             doc = {
                 'filename': filename,
+                'folder': dir_file,
                 'metadata': metadata,
                 'thumbnails': {}
             }
@@ -86,7 +94,7 @@ class FileSystemMediaStorage(MediaStorage):
 
             return doc
         except Exception as ex:
-            logger.info('File filename=%s error ex:' % (filename, ex))
+            logger.error('File filename=%s error ex: %s' % (filename, ex))
 
     def edit(self, content, filename, version=1, client_info=None, parent=None, metadata=None, folder=None, **kwargs):
         pass

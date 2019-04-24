@@ -123,7 +123,7 @@ def process_video_editor(video_id):
     if request.method == 'PUT':
         return update_video(video_id, request.get_json())
     if request.method == 'POST':
-        return post_video(video_id, request.get_json())
+        return update_video(video_id, request.get_json())
     if request.method == 'DELETE':
         return delete_video(video_id)
 
