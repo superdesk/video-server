@@ -1,7 +1,10 @@
 import logging
-import bson
 import os
-from media import get_media_collection
+from datetime import datetime
+
+import bson
+
+from media import get_media_collection, get_thumbnails_collection
 
 logger = logging.getLogger(__name__)
 PATH_FS = os.path.dirname(__file__) + '/fs'
@@ -18,7 +21,7 @@ class MediaStorage(object):
     def get(self, id):
         pass
 
-    def put(self, content, filename, version=1, client_info=None, parent=None, metadata=None, folder=None, **kwargs):
+    def put(self, content, filename, metadata, type='video', **kwargs):
         pass
 
     def edit(self, content, filename, version=1, client_info=None, parent=None, metadata=None, folder=None, **kwargs):
@@ -44,42 +47,43 @@ class FileSystemMediaStorage(MediaStorage):
             media_file = None
         return media_file
 
-    def put(self, content, filename, version=1, client_info=None, parent=None, metadata=None, processing=False,
-            **kwargs):
+    def put(self, content, filename, metadata, type='video', **kwargs):
         """
         Put a file into storage
         Create record for this file
 
         :param content:
         :param filename:
-        :param version:
-        :param client_info:
-        :param parent:
         :param metadata:
-        :param processing:
+        :param type:
         :param kwargs:
         :return:
         """
         logger.info('put media file with file name = %s to storage' % filename)
         try:
-            if not os.path.exists(PATH_FS):
-                os.makedirs(PATH_FS)
+            createtime = datetime.utcnow()
+            year = createtime.year
+            month = createtime.month
             #: write stream file to storage
-            with open("%s/%s" % (PATH_FS, filename), "wb") as f:
+            dir_file = "%s/%s/%s" % (PATH_FS, year, month)
+            if not os.path.exists(dir_file):
+                os.makedirs(dir_file)
+            with open("%s/%s" % (dir_file, filename), "wb") as f:
                 f.write(content)
             #: create a record in storage
             doc = {
                 'filename': filename,
                 'metadata': metadata,
-                'client_info': client_info,
-                'version': version,
-                'processing': processing,
-                "parent": parent,
                 'thumbnails': {}
             }
             for k, v in kwargs.items():
                 doc[k] = v
-            get_media_collection().insert_one(doc)
+
+            if type == "thumbnail":
+                get_media_collection().insert_one(doc)
+            else:
+                get_thumbnails_collection().insert_one(doc)
+
             return doc
         except Exception as ex:
             logger.info('File filename=%s error ex:' % (filename, ex))
