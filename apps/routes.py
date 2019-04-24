@@ -1,7 +1,8 @@
 from bson import ObjectId, json_util
 from flask import Blueprint, Response
 from flask import current_app as app
-from flask import request
+from flask import request, render_template, jsonify
+from flask_swagger import swagger
 from werkzeug.datastructures import FileStorage
 
 from media import get_media_collection, get_thumbnails_collection
@@ -14,30 +15,96 @@ bp = Blueprint('projects', __name__)
 
 SCHEMA_UPLOAD = {'filename': {'type': 'string', 'required': True, 'empty': True}}
 
+SCHEMA_EDIT = {
+    'capture': {
+        'type': 'dict',
+        'required': False,
+        'empty': True,
+    },
+    'cut': {
+        'type': 'dict',
+        'required': False,
+        'empty': True,
+        'schema': {
+            'start': {'type': 'integer', 'required': True, },
+            'end': {'type': 'integer', 'required': True, },
+        },
+    },
+    'rotate': {
+        'type': 'dict',
+        'required': False,
+        'empty': True,
+        'schema': {
+            'degree': {'type': 'integer', 'required': True, }
+        },
+    },
+    'quality': {
+        'type': 'dict',
+        'required': False,
+        'empty': True,
+    },
+    'crop': {
+        'type': 'dict',
+        'required': False,
+        'empty': True,
+        'schema': {
+            'width': {'type': 'integer', 'required': True, },
+            'height': {'type': 'integer', 'required': True, },
+            'x': {'type': 'integer', 'required': True, },
+            'y': {'type': 'integer', 'required': True, },
+        },
+    },
+}
+
 
 @bp.route('/projects', methods=['POST'])
 def create_video_editor():
     """
-        Api put a file into storage video server
-        content-type: multipart/form-data
-        payload:
-            files: {'media': <file>}
-            form: {filename: <string>}
-
-        response: http 201
-        {
-            "filename": "fa5079a38e0a4197864aa2ccb07f3bea.mp4",
-            "metadata": null,
-            "client_info": "PostmanRuntime/7.6.0",
-            "version": 1,
-            "processing": false,
-            "parent": null,
-            "thumbnails": {},
-            "_id": {
-                "$oid": "5cbd5acfe24f6045607e51aa"
-            }
-        }
-    :return:
+    Api put a file into storage video server
+    ---
+    parameters:
+    - in: body
+      name: body
+      description: file object to upload
+      schema:
+        type: object
+        required:
+          media
+        properties:
+          media:
+            type: string
+    responses:
+      '201':
+        description: CREATED
+        schema:
+          type: object
+          properties:
+            filename:
+              type: string
+              example: fa5079a38e0a4197864aa2ccb07f3bea.mp4
+            metadata:
+              type: object
+              example: null
+            client_info:
+              type: string
+              example: PostmanRuntime/7.6.0
+            version:
+              type: integer
+              example: 1
+            parent:
+              type: object
+              example: {}
+            thumbnails:
+              type: object
+              example: {}
+            _id:
+              type: object
+              schema:
+                type: object
+                properties:
+                  $oid:
+                    type: string
+              example: { $oid: 5cbd5acfe24f6045607e51aa}
     """
     if request.method == 'POST':
         files = request.files
@@ -54,9 +121,9 @@ def process_video_editor(video_id):
     if request.method == 'GET':
         return get_video(video_id)
     if request.method == 'PUT':
-        return update_video(video_id, request.form)
+        return update_video(video_id, request.get_json())
     if request.method == 'POST':
-        return update_video(video_id, request.form)
+        return post_video(video_id, request.get_json())
     if request.method == 'DELETE':
         return delete_video(video_id)
 
@@ -120,3 +187,16 @@ def format_id(_id):
         return ObjectId(_id)
     except Exception as ex:
         return None
+
+
+@bp.route('/spec')
+def spec_data():
+    swag = swagger(app)
+    swag['info']['version'] = "1.0"
+    swag['info']['title'] = "My API"
+    return jsonify(swag)
+
+
+@bp.route('/swagger')
+def swag():
+    return render_template('index.html')
