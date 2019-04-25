@@ -14,6 +14,8 @@ import settings
 import importlib
 import logging.config
 from flask import Flask
+from flask_pymongo import PyMongo
+
 from lib.storage import get_media_storage
 from lib.logging import configure_logging
 
@@ -64,6 +66,11 @@ def get_app(config=None):
     for module_name in app.config.get('CORE_APPS', []):
         install_app(module_name)
     configure_logging(app.config['LOG_CONFIG_FILE'])
+
+    # pymongo
+    # https://flask-pymongo.readthedocs.io
+    app.mongo = PyMongo(app)
+
     return app
 
 

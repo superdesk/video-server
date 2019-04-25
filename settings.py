@@ -51,9 +51,10 @@ CORE_APPS = [
 #: Mongo host port
 MONGO_HOST = env('MONGO_HOST', 'localhost')
 MONGO_PORT = env('MONGO_PORT', 27017)
-
-#: mongo db name, only used when mongo_uri is not set
 MONGO_DBNAME = env('MONGO_DBNAME', 'superdesk')
+MONGO_URI = "mongodb://{host}:{port}/{dbname}".format(
+    host=MONGO_HOST, port=MONGO_PORT, dbname=MONGO_DBNAME
+)
 
 #: rabbit-mq url
 RABBIT_MQ_URL = env('RABBIT_MQ_URL', 'pyamqp://guest@localhost//')

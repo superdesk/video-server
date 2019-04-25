@@ -4,7 +4,6 @@ import logging
 from datetime import datetime
 from flask import current_app as app
 
-from media import get_media_collection, get_thumbnails_collection
 from .interface import MediaStorageInterface
 
 logger = logging.getLogger(__name__)
@@ -39,19 +38,22 @@ class FileSystemStorage(MediaStorageInterface):
         :return:
         """
         _id = format_id(_id)
-        doc = get_media_collection().find_one({"_id": _id})
-        if doc:
-            #: get data for thumbnails
-            thumbnails = doc.get('thumbnails')
-            if thumbnails:
-                ids = list(thumbnails.values())[0]
-                number = list(thumbnails.keys())[0]
-                timeline_thumbnails = []
-                for id in ids:
-                    timeline_thumbnails.append(get_thumbnails_collection().find_one({'_id': id}))
-                doc['thumbnails'] = {number: timeline_thumbnails}
-        else:
-            doc = get_thumbnails_collection().find_one({"_id": _id})
+        doc = app.mongo.db.projects.find_one({"_id": _id})
+        # doc = get_media_collection().find_one({"_id": _id})
+        # TODO uncomment and fix
+        # if doc:
+        #     #: get data for thumbnails
+        #     thumbnails = doc.get('thumbnails')
+        #     if thumbnails:
+        #         ids = list(thumbnails.values())[0]
+        #         number = list(thumbnails.keys())[0]
+        #         timeline_thumbnails = []
+        #         for id in ids:
+        #             # TODO we don't need a separate collection for thumbnails, check sequence diagram
+        #             timeline_thumbnails.append(get_thumbnails_collection().find_one({'_id': id}))
+        #         doc['thumbnails'] = {number: timeline_thumbnails}
+        # else:
+        #     doc = get_thumbnails_collection().find_one({"_id": _id})
         return doc
 
     def get_file(self, doc):
@@ -103,10 +105,11 @@ class FileSystemStorage(MediaStorageInterface):
             for k, v in kwargs.items():
                 doc[k] = v
 
-            if type == "thumbnail":
-                get_thumbnails_collection().insert_one(doc)
-            else:
-                get_media_collection().insert_one(doc)
+            # TODO we don't need a separate collection for thumbnails, check sequence diagram
+            # if type == "thumbnail":
+            #     get_thumbnails_collection().insert_one(doc)
+            # else:
+            app.mongo.db.projects.insert_one(doc)
 
             return doc
         except Exception as ex:
@@ -116,18 +119,18 @@ class FileSystemStorage(MediaStorageInterface):
         pass
 
     def delete(self, _id):
+        # TODO do we need debug here?
         logger.debug('delete media file with id= %s' % _id)
         _id = format_id(_id)
         try:
-            video_collection = get_media_collection()
-            doc = video_collection.find_one({"_id": _id})
+            doc = app.mongo.db.projects.find_one({"_id": _id})
             if doc:
                 filename = doc.get('filename')
                 dir_file = doc.get('folder')
                 file_path = "%s/%s/%s" % (app.config.get('FS_MEDIA_STORAGE_PATH'), dir_file, filename)
                 if os.path.exists(file_path):
                     os.remove(file_path)
-                video_collection.delete_one({'_id': _id})
+                app.mongo.db.projects.delete_one({'_id': _id})
         except Exception as ex:
             logger.error('Cannot delete filename=%s error ex: %s' % (filename, ex))
             return False
