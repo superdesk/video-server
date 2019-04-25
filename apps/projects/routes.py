@@ -1,4 +1,4 @@
-from bson import ObjectId, json_util
+from bson import json_util
 from flask import current_app as app, request, Response
 from flask.views import MethodView
 
