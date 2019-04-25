@@ -69,7 +69,10 @@ def get_app(config=None):
 
     # pymongo
     # https://flask-pymongo.readthedocs.io
-    app.mongo = PyMongo(app)
+    def init_db():
+        app.mongo = PyMongo(app)
+
+    app.init_db = init_db
 
     return app
 
@@ -79,4 +82,5 @@ if __name__ == '__main__':
     host = '0.0.0.0'
     port = int(os.environ.get('PORT', '5050'))
     app = get_app()
+    app.init_db()
     app.run(host=host, port=port)

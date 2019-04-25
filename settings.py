@@ -51,7 +51,7 @@ CORE_APPS = [
 #: Mongo host port
 MONGO_HOST = env('MONGO_HOST', 'localhost')
 MONGO_PORT = env('MONGO_PORT', 27017)
-MONGO_DBNAME = env('MONGO_DBNAME', 'superdesk')
+MONGO_DBNAME = env('MONGO_DBNAME', 'sd_video_editor')
 MONGO_URI = "mongodb://{host}:{port}/{dbname}".format(
     host=MONGO_HOST, port=MONGO_PORT, dbname=MONGO_DBNAME
 )

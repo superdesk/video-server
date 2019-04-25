@@ -31,9 +31,15 @@ pip3 install -r requirement.txt
 python3 app.py
 ```
 
-Unit Tests
+## Run Tests
+
+simple run with py.test
 ```
 cd video-server
-nosetests -v
-cd ../..
+pytest
+```
+
+show setups
+```
+pytest --setup-show
 ```
