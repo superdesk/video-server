@@ -10,7 +10,9 @@
 
 import logging
 import logging.config
+
 import yaml
+from yaml import Loader
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger('video-server')
@@ -30,7 +32,7 @@ def configure_logging(file_path):
 
     try:
         with open(file_path, 'r') as f:
-            logging_dict = yaml.load(f)
+            logging_dict = yaml.load(f, Loader=Loader)
 
         logging.config.dictConfig(logging_dict)
     except Exception:
