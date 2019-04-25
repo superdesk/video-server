@@ -17,6 +17,7 @@ These services must be installed, configured and running:
  * MongoDB 
  * Python (>= 3.6)
  * RabbitMQ
+ * Ffmpeg
 
 ## Install for Development
 

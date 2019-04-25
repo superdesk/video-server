@@ -14,6 +14,8 @@ import settings
 import importlib
 import logging.config
 from flask import Flask
+from media.storage import get_media_storage
+from media.logging import configure_logging
 
 logger = logging.getLogger(__name__)
 
@@ -33,6 +35,7 @@ def get_app(config=None):
     :return: a new SuperdeskEve app instance
     """
     app = Flask(__name__)
+
     if config is None:
         config = {}
 
@@ -41,7 +44,13 @@ def get_app(config=None):
     for key in dir(settings):
         if key.isupper():
             config.setdefault(key, getattr(settings, key))
+
     app.config.update(config)
+
+    #: init storage
+    media_storage = get_media_storage(app.config.get('MEDIA_STORAGE'))
+    app.fs = media_storage
+
     installed = set()
 
     def install_app(module_name):
@@ -54,7 +63,7 @@ def get_app(config=None):
 
     for module_name in app.config.get('CORE_APPS', []):
         install_app(module_name)
-
+    configure_logging(app.config['LOG_CONFIG_FILE'])
     return app
 
 
@@ -63,4 +72,4 @@ if __name__ == '__main__':
     host = '0.0.0.0'
     port = int(os.environ.get('PORT', '5050'))
     app = get_app()
-    app.run(host=host, port=port, debug=debug, use_reloader=debug)
+    app.run(host=host, port=port)

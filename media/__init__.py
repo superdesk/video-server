@@ -8,6 +8,14 @@ def get_collection(colection, db=None):
     return connection[db][colection]
 
 
+def get_media_collection():
+    return get_collection('video')
+
+
+def get_thumbnails_collection():
+    return get_collection('video_thumbnails')
+
+
 def blueprint(blueprint, app, **kwargs):
     """Register flask blueprint.
     :param blueprint: blueprint instance
