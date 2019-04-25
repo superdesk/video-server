@@ -4,6 +4,7 @@ from media.video.video_editor import FfmpegVideoEditor
 
 editor = FfmpegVideoEditor()
 
+
 def test_ffmpeg_video_editor_cut_video(client, filestream):
     content, metadata = editor.edit_video(
         filestream, 'test_ffmpeg_video_editor_cut_video.mp4', None,

@@ -76,7 +76,7 @@ class FileSystemMediaStorage(MediaStorage):
 
     def get_file(self, doc):
         """
-            only get stream file
+            Only get stream file
         :param doc:
         :return:
         """
@@ -144,7 +144,7 @@ class FileSystemMediaStorage(MediaStorage):
             if doc:
                 filename = doc.get('filename')
                 dir_file = doc.get('folder')
-                file_path= "%s/%s/%s" % (PATH_FS, dir_file, filename)
+                file_path = "%s/%s/%s" % (PATH_FS, dir_file, filename)
                 if os.path.exists(file_path):
                     os.remove(file_path)
                 video_collection.delete_one({'_id': _id})

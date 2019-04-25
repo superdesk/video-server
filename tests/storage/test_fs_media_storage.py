@@ -17,8 +17,7 @@ def test_put_fs_media_storage(client, filestream):
     dir_file = doc.get('folder')
     file_path = "%s/%s/%s" % (fs_media_storage.PATH_FS, dir_file, filename)
     assert doc['filename'] == filename
-    assert doc['metadata'] == None
     assert doc['mime_type'] == 'mp4'
-    assert os.path.exists(file_path) == True
+    assert os.path.exists(file_path) is True
     get_media_collection().delete_one({'_id': doc['_id']})
     shutil.rmtree(fs_media_storage.PATH_FS)

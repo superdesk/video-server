@@ -14,7 +14,7 @@ def client():
 
     with test_app.app_context():
         yield client
-    
+
 
 @pytest.fixture
 def test_path():
