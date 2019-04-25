@@ -181,16 +181,3 @@ def format_id(_id):
         return ObjectId(_id)
     except Exception as ex:
         return None
-
-
-@bp.route('/spec')
-def spec_data():
-    swag = swagger(app)
-    swag['info']['version'] = "1.0"
-    swag['info']['title'] = "My API"
-    return jsonify(swag)
-
-
-@bp.route('/swagger')
-def swag():
-    return render_template('index.html')
