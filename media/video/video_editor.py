@@ -3,7 +3,7 @@ import subprocess as cmd
 import tempfile
 
 from io import BytesIO
-from media.utils import create_file_name
+from lib.utils import create_file_name
 
 
 class VideoEditor(object):

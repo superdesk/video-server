@@ -40,6 +40,7 @@ LOG_CONFIG_FILE = env('LOG_CONFIG_FILE', 'logging_config.yml')
 
 CORE_APPS = [
     'apps.swagger',
+    'apps.projects',
     # 'media',
     # 'media.video',
 ]
