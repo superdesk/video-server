@@ -132,7 +132,7 @@ class FileSystemMediaStorage(MediaStorage):
         except Exception as ex:
             logger.error('File filename=%s error ex: %s' % (filename, ex))
 
-    def edit(self, content, filename, version=1, client_info=None, parent=None, metadata=None, folder=None, **kwargs):
+    def editedit(self, content, filename, metadata, mime_type, type='video', **kwargs):
         pass
 
     def delete(self, _id):

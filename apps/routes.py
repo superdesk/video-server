@@ -164,8 +164,8 @@ def create_video(files, original_filename, agent):
     file_name = create_file_name(ext)
     mime_type = file.mimetype
     #: put file into storage
-    doc = app.fs.put(file_stream, file_name, metadata, mime_type, version=1, processing=False, parent=None, thumbnails={},
-                     client_info=agent, original_filename=original_filename)
+    doc = app.fs.put(file_stream, file_name, metadata, mime_type, version=1, processing=False, parent=None,
+                     thumbnails={}, client_info=agent, original_filename=original_filename)
 
     return Response(json_util.dumps(doc), status=201, mimetype='application/json')
 
