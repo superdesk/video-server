@@ -133,8 +133,7 @@ def process_video_editor(video_id):
 
 
 def delete_video(video_id):
-    video = get_media_collection()
-    video.remove({'_id': format_id(video_id)})
+    app.fs.delete(video_id)
     return 'delete successfully'
 
 
@@ -165,7 +164,7 @@ def create_video(files, original_filename, agent):
     file_name = create_file_name(ext)
     mime_type = file.mimetype
     #: put file into storage
-    doc = app.fs.put(None, file_stream, file_name, metadata, mime_type, thumbnails={}, client_info=agent,
+    doc = app.fs.put(file_stream, file_name, metadata, mime_type, thumbnails={}, client_info=agent,
                      original_filename=original_filename)
 
     return Response(json_util.dumps(doc), status=201, mimetype='application/json')
@@ -173,11 +172,8 @@ def create_video(files, original_filename, agent):
 
 def get_video(video_id):
     """Get data media"""
-    media = get_media_collection()
-    items = list(media.find({'_id': format_id(video_id)}))
-    for item in items:
-        item['_id'] = str(item['_id'])
-    return Response(json_util.dumps(items), status=200, mimetype='application/json')
+    item = app.fs.get_record(video_id)
+    return Response(json_util.dumps(item), status=200, mimetype='application/json')
 
 
 def format_id(_id):

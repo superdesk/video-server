@@ -18,7 +18,7 @@ def format_id(_id):
 
 
 class MediaStorage(object):
-    def get(self, id):
+    def get(self, _id):
         pass
 
     def get_record(self, _id):
@@ -58,6 +58,7 @@ class FileSystemMediaStorage(MediaStorage):
         :param _id:
         :return:
         """
+        _id = format_id(_id)
         doc = get_media_collection().find_one({"_id": _id})
         if doc:
             #: get data for thumbnails
@@ -123,9 +124,9 @@ class FileSystemMediaStorage(MediaStorage):
                 doc[k] = v
 
             if type == "thumbnail":
-                get_media_collection().insert_one(doc)
-            else:
                 get_thumbnails_collection().insert_one(doc)
+            else:
+                get_media_collection().insert_one(doc)
 
             return doc
         except Exception as ex:
@@ -138,12 +139,15 @@ class FileSystemMediaStorage(MediaStorage):
         logger.debug('delete media file with id= %s' % _id)
         _id = format_id(_id)
         try:
-            media_collection = get_media_collection()
-            doc = media_collection.find_one({"_id": _id})
-            filename = doc.get('file_name')
-            dir_file = doc.get('folder')
-            os.remove(open("%s/%s/%s" % (PATH_FS, dir_file, filename)))
-            media_collection.remove({'id': _id})
+            video_collection = get_media_collection()
+            doc = video_collection.find_one({"_id": _id})
+            if doc:
+                filename = doc.get('filename')
+                dir_file = doc.get('folder')
+                file_path= "%s/%s/%s" % (PATH_FS, dir_file, filename)
+                if os.path.exists(file_path):
+                    os.remove(file_path)
+                video_collection.delete_one({'_id': _id})
         except Exception as ex:
             logger.error('Cannot delete filename=%s error ex: %s' % (filename, ex))
             return False
