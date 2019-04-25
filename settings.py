@@ -35,6 +35,7 @@ def celery_queue(name):
     """
     return "{}{}".format(os.environ.get('VIDEOSERVER_CELERY_PREFIX', ''), name)
 
+
 # base path
 BASE_PATH = os.path.dirname(__file__)
 

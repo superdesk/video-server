@@ -2,7 +2,7 @@ from flask import Blueprint
 
 bp = Blueprint('swagger', __name__, template_folder='templates', static_folder='static')
 
-from . import routes
+from . import routes # noqa
 
 
 def init_app(app):
