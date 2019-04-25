@@ -21,10 +21,16 @@ class MediaStorage(object):
     def get(self, id):
         pass
 
+    def get_record(self, _id):
+        pass
+
+    def get_file(self, doc):
+        pass
+
     def put(self, content, filename, metadata, mime_type, type='video', **kwargs):
         pass
 
-    def edit(self, content, filename, version=1, client_info=None, parent=None, metadata=None, folder=None, **kwargs):
+    def edit(self, content, filename, metadata, mime_type, type='video', **kwargs):
         pass
 
     def delete(self):
@@ -34,24 +40,52 @@ class MediaStorage(object):
 class FileSystemMediaStorage(MediaStorage):
     def get(self, _id):
         """
-        Get a stream file in storage
+        Get record in database and stream file in storage
         :param _id:
         :return:
         """
         logger.info('Getting media file with id= %s' % _id)
         _id = format_id(_id)
-        doc = {}
+        file_stream = None
+        doc = self.get_record(_id)
+        if doc:
+            file_stream = self.get_file(doc)
+        return doc, file_stream
 
+    def get_record(self, _id):
+        """
+        Only get record in database and list record thumbnails in video.
+        :param _id:
+        :return:
+        """
         doc = get_media_collection().find_one({"_id": _id})
         if doc:
+            #: get data for thumbnails
+            thumbnails = doc.get('thumbnails')
+            if thumbnails:
+                ids = list(thumbnails.values())[0]
+                number = list(thumbnails.keys())[0]
+                timeline_thumbnails = []
+                for id in ids:
+                    timeline_thumbnails.append(get_thumbnails_collection().find_one({'_id': id}))
+                doc['thumbnails'] = {number: timeline_thumbnails}
+        else:
             doc = get_thumbnails_collection().find_one({"_id": _id})
-            filename = doc.get('filename')
-            dir_file = doc.get('folder')
-            try:
-                media_file = (open("%s/%s/%s" % (PATH_FS, dir_file, filename), 'r+')).read()
-            except Exception as ex:
-                logger.error('can not get data filename=%s error ex: %s' % (filename, ex))
-                media_file = None
+        return doc
+
+    def get_file(self, doc):
+        """
+            only get stream file
+        :param doc:
+        :return:
+        """
+        filename = doc.get('filename')
+        dir_file = doc.get('folder')
+        try:
+            media_file = (open("%s/%s/%s" % (PATH_FS, dir_file, filename), 'r+')).read()
+        except Exception as ex:
+            logger.error('Can not get data filename=%s error ex: %s' % (filename, ex))
+            media_file = None
         return doc, media_file
 
     def put(self, content, filename, metadata, mime_type, type='video', **kwargs):
@@ -66,7 +100,7 @@ class FileSystemMediaStorage(MediaStorage):
         :param kwargs:
         :return:
         """
-        logger.info('put media file with file name = %s to storage' % filename)
+        logger.info('Put media file with file name = %s to storage' % filename)
         try:
             createtime = datetime.utcnow()
             year = createtime.year
@@ -105,9 +139,12 @@ class FileSystemMediaStorage(MediaStorage):
         _id = format_id(_id)
         try:
             media_collection = get_media_collection()
-            file_name = media_collection.find_one({"_id": _id}).get('file_name')
-            os.remove("%s/%s" % (PATH_FS, file_name))
+            doc = media_collection.find_one({"_id": _id})
+            filename = doc.get('file_name')
+            dir_file = doc.get('folder')
+            os.remove(open("%s/%s/%s" % (PATH_FS, dir_file, filename)))
             media_collection.remove({'id': _id})
-        except Exception:
-            media_file = None
-        return media_file
+        except Exception as ex:
+            logger.error('Cannot delete filename=%s error ex: %s' % (filename, ex))
+            return False
+        return True

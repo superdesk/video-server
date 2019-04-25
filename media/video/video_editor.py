@@ -72,9 +72,8 @@ class FfmpegVideoEditor(VideoEditor):
             # use copy data
             if video_cut:
                 path_video = self._edit_video(path_video, path_output,
-                                              ["-ss", str(video_cut["start"]), "-t", str(video_cut["end"]),
-                                               "-c",
-                                               "copy"])
+                                              ["-ss", str(video_cut["start"]), "-t",
+                                               str(int(video_cut["end"]) - int(video_cut["start"])), "-c", "copy"])
 
             # use filter data
             str_filter = ""
@@ -142,6 +141,7 @@ class FfmpegVideoEditor(VideoEditor):
             cmd.run(["ffmpeg", "-i", path_video, *para, path_output])
 
             # replace tmp origin
+
             cmd.run(["cp", "-r", path_output, path_video])
             return path_video
         finally:
