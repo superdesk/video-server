@@ -61,7 +61,7 @@ class FfmpegVideoEditor(VideoEditor):
             path_video = self._create_temp_file(stream_file, filename)
 
             if not metadata:
-                metadata = self._get_metadata(path_video)
+                metadata = self._get_meta(path_video)
 
             duration = float(metadata['duration'])
             if (not video_cut or (
@@ -138,6 +138,7 @@ class FfmpegVideoEditor(VideoEditor):
         """
         try:
             # cut video
+            print(' '.join(["ffmpeg", "-i", path_video, *para, path_output]))
             cmd.run(["ffmpeg", "-i", path_video, *para, path_output])
 
             # replace tmp origin

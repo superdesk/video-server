@@ -20,3 +20,11 @@ def client():
 def test_path():
     test_path = os.path.dirname(os.path.abspath(__file__))
     return test_path
+
+
+@pytest.fixture
+def filestream():
+    test_path = os.path.dirname(os.path.abspath(__file__))
+    with open(f'{test_path}/storage/fixtures/sample.mp4', 'rb') as f:
+        filestream = f.read()
+    return filestream

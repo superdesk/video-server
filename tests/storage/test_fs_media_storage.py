@@ -8,9 +8,7 @@ from media.storage.fs_media_storage import FileSystemMediaStorage
 storage = FileSystemMediaStorage()
 
 
-def test_put_fs_media_storage(client, test_path):
-    with open(f'{test_path}/storage/fixtures/sample.mp4', 'rb') as f:
-        filestream = f.read()
+def test_put_fs_media_storage(client, filestream):
     from media.storage import fs_media_storage
     fs_media_storage.PATH_FS = os.path.dirname(__file__) + '/fs'
     filename = 'test_fs_media_storage'
