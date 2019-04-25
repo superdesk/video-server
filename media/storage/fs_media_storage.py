@@ -33,7 +33,7 @@ class MediaStorage(object):
     def edit(self, content, filename, metadata, mime_type, type='video', **kwargs):
         pass
 
-    def delete(self):
+    def delete(self, _id):
         pass
 
 
