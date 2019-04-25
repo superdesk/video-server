@@ -87,7 +87,7 @@ class FileSystemMediaStorage(MediaStorage):
         except Exception as ex:
             logger.error('Can not get data filename=%s error ex: %s' % (filename, ex))
             media_file = None
-        return doc, media_file
+        return media_file
 
     def put(self, content, filename, metadata, mime_type, type='video', **kwargs):
         """
