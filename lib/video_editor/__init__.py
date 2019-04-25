@@ -2,7 +2,7 @@ from .ffmpeg import FFMPEGVideoEditor
 from .moviepy import MoviePyVideoEditor
 
 
-def get_video_editor_tool(name):
+def get_video_editor(name):
     # TODO this condition must be configurable
     if name == 'ffmpeg':
         return FFMPEGVideoEditor()

@@ -35,6 +35,9 @@ def celery_queue(name):
     """
     return "{}{}".format(os.environ.get('VIDEOSERVER_CELERY_PREFIX', ''), name)
 
+# base path
+BASE_PATH = os.path.dirname(__file__)
+
 #: logging
 LOG_CONFIG_FILE = env('LOG_CONFIG_FILE', 'logging_config.yml')
 
@@ -66,3 +69,4 @@ CODEC_SUPPORT = env('CODEC_SUPPORT', ['vp8', 'vp9', 'h264', 'aac', 'flac', 'ogg'
 
 #: media storage
 MEDIA_STORAGE = env('MEDIA_STORAGE', 'filesystem')
+FS_MEDIA_STORAGE_PATH = os.path.join(BASE_PATH, 'media', 'projects')

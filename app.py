@@ -14,7 +14,7 @@ import settings
 import importlib
 import logging.config
 from flask import Flask
-from media.storage import get_media_storage
+from lib.storage import get_media_storage
 from lib.logging import configure_logging
 
 logger = logging.getLogger(__name__)

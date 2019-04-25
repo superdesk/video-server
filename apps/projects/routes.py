@@ -2,7 +2,7 @@ from bson import json_util
 from flask import current_app as app, request, Response
 from flask.views import MethodView
 
-from media.video import get_video_editor_tool
+from lib.video_editor import get_video_editor
 from lib.utils import create_file_name
 from lib.errors import bad_request, not_found
 from lib.validator import Validator
@@ -79,7 +79,7 @@ class UploadProject(MethodView):
             return bad_request("client is not allow to edit")
 
         # validate codec
-        video_editor = get_video_editor_tool('ffmpeg')
+        video_editor = get_video_editor('ffmpeg')
         file = request.files['file']
         file_stream = file.stream.read()
         metadata = video_editor.get_meta(file_stream)
