@@ -1,5 +1,4 @@
 import os
-import shutil
 
 from lib.storage.file_system_storage import FileSystemStorage
 
@@ -17,11 +16,3 @@ def test_put_file_system_storage(test_app, client, filestream):
     assert doc['metadata'] is None
     assert doc['mime_type'] == 'mp4'
     assert os.path.exists(file_path) is True
-
-    # TODO use some kind of teardown here
-    # we should configure setup/teardown for every test
-    # here we simply should drop entire collection and temp folder
-    # every test MUST be independent
-    # see teardown hooks
-    test_app.mongo.db.projects.drop()
-    shutil.rmtree(os.path.dirname(test_app.config.get('FS_MEDIA_STORAGE_PATH')))
