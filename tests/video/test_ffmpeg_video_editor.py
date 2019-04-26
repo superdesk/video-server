@@ -1,4 +1,5 @@
 from lib.video_editor.ffmpeg import FFMPEGVideoEditor
+import sys
 
 editor = FFMPEGVideoEditor()
 
@@ -24,16 +25,9 @@ def test_ffmpeg_video_editor_crop_video(client, filestream):
 
     assert metadata['width'] == '500'
     assert metadata['height'] == '400'
-
-    # TODO
-    # double check it with different OS
-    # it has 553714 bytes on OS X
-    # assert metadata['bit_rate'] == '553486'
-
-    # TODO
-    # double check it with different OS
-    # it has 2354481 bytes on OS X
-    # assert metadata['size'] == '2353910'
+    if sys.platform == 'linux':
+        assert metadata['bit_rate'] == '553486'
+        assert metadata['size'] == '2353910'
 
 
 def test_ffmpeg_video_editor_rotate_video(client, filestream):
