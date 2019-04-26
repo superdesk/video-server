@@ -17,121 +17,50 @@ def format_id(_id):
 
 
 class FileSystemStorage(MediaStorageInterface):
-    def get(self, _id):
-        """
-        Get record in database and stream file in storage
-        :param _id:
-        :return:
-        """
-        logger.info('Getting media file with id= %s' % _id)
-        _id = format_id(_id)
-        file_stream = None
-        doc = self.get_record(_id)
-        if doc:
-            file_stream = self.get_file(doc)
-        return doc, file_stream
 
-    def get_record(self, _id):
+    def get(self, file_path):
         """
-        Only get record in database and list record thumbnails in video.
-        :param _id:
-        :return:
-        """
-        _id = format_id(_id)
-        doc = app.mongo.db.projects.find_one({"_id": _id})
-        # doc = get_media_collection().find_one({"_id": _id})
-        # TODO uncomment and fix
-        # if doc:
-        #     #: get data for thumbnails
-        #     thumbnails = doc.get('thumbnails')
-        #     if thumbnails:
-        #         ids = list(thumbnails.values())[0]
-        #         number = list(thumbnails.keys())[0]
-        #         timeline_thumbnails = []
-        #         for id in ids:
-        #             # TODO we don't need a separate collection for thumbnails, check sequence diagram
-        #             timeline_thumbnails.append(get_thumbnails_collection().find_one({'_id': id}))
-        #         doc['thumbnails'] = {number: timeline_thumbnails}
-        # else:
-        #     doc = get_thumbnails_collection().find_one({"_id": _id})
-        return doc
-
-    def get_file(self, doc):
-        """
-        Only get stream file
+        Get stream file
         :param doc:
         :return:
         """
-        filename = doc.get('filename')
-        dir_file = doc.get('folder')
         try:
-            media_file = (open("%s/%s/%s" % (app.config.get('FS_MEDIA_STORAGE_PATH'), dir_file, filename), 'r+')).read()
+            media_file = (open(file_path, 'rb')).read()
         except Exception as ex:
-            logger.error('Can not get data filename=%s error ex: %s' % (filename, ex))
+            logger.error('Cannot get data file %s ex: %s' % (file_path, ex))
             media_file = None
         return media_file
 
-    def put(self, content, filename, metadata, mime_type, type='video', **kwargs):
+    def put(self, content, file_path):
         """
         Put a file into storage
-        Create record for this file
-        :param content:
-        :param filename:
-        :param metadata:
-        :param mime_type:
-        :param type:
-        :param kwargs:
+        :param content: stream of file, binary type
+        :param file_path:  file_name and folder contain file
         :return:
         """
-        logger.info('Put media file with file name = %s to storage' % filename)
         try:
-            createtime = datetime.utcnow()
-            year = createtime.year
-            month = createtime.month
-            #: write stream file to storage
-            dir_file = "%s/%s/%s" % (app.config.get('FS_MEDIA_STORAGE_PATH'), year, month)
-            if not os.path.exists(dir_file):
-                os.makedirs(dir_file)
-            with open("%s/%s" % (dir_file, filename), "wb") as f:
+            # Check dir contain file is exist, if not create
+            file_dir = os.path.join(app.config.get('FS_MEDIA_STORAGE_PATH'), os.path.dirname(file_path))
+            if not os.path.exists(file_dir):
+                os.makedirs(file_dir)
+            # write stream to file
+            with open(os.path.join(app.config.get('FS_MEDIA_STORAGE_PATH'), file_path), "wb") as f:
                 f.write(content)
-            #: create a record in storage
-            doc = {
-                'filename': filename,
-                'folder': "%s/%s" % (year, month),
-                'metadata': metadata,
-                'create_time': createtime,
-                'mime_type': mime_type
-            }
-            for k, v in kwargs.items():
-                doc[k] = v
-
-            # TODO we don't need a separate collection for thumbnails, check sequence diagram
-            # if type == "thumbnail":
-            #     get_thumbnails_collection().insert_one(doc)
-            # else:
-            app.mongo.db.projects.insert_one(doc)
-
-            return doc
+            logger.info('Put media file %s to storage' % file_path)
+            return True
         except Exception as ex:
-            logger.error('File filename=%s error ex: %s' % (filename, ex))
+            logger.error('Cannot put file %s ex: %s' % (file_path, ex))
+            return False
 
-    def edit(self, content, filename, metadata, mime_type, type='video', **kwargs):
+    def replace(self, file_path):
         pass
 
-    def delete(self, _id):
-        # TODO do we need debug here?
-        logger.debug('delete media file with id= %s' % _id)
-        _id = format_id(_id)
+    def delete(self, file_path):
         try:
-            doc = app.mongo.db.projects.find_one({"_id": _id})
-            if doc:
-                filename = doc.get('filename')
-                dir_file = doc.get('folder')
-                file_path = "%s/%s/%s" % (app.config.get('FS_MEDIA_STORAGE_PATH'), dir_file, filename)
-                if os.path.exists(file_path):
-                    os.remove(file_path)
-                app.mongo.db.projects.delete_one({'_id': _id})
+            if os.path.exists(os.path.join(app.config.get('FS_MEDIA_STORAGE_PATH'), file_path)):
+                os.remove(file_path)
+            logger.info('Deleted media file %s from storage' % file_path)
+            return True
         except Exception as ex:
-            logger.error('Cannot delete filename=%s error ex: %s' % (filename, ex))
+            logger.error('Cannot delete file %s ex: %s' % (file_path, ex))
             return False
-        return True

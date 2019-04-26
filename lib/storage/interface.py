@@ -4,23 +4,15 @@ import abc
 class MediaStorageInterface(metaclass=abc.ABCMeta):
 
     @abc.abstractmethod
-    def get(self, _id):
+    def get(self, file_path):
         pass
 
     @abc.abstractmethod
-    def get_record(self, _id):
+    def put(self, content, file_path):
         pass
 
     @abc.abstractmethod
-    def get_file(self, doc):
-        pass
-
-    @abc.abstractmethod
-    def put(self, content, filename, metadata, mime_type, type='video', **kwargs):
-        pass
-
-    @abc.abstractmethod
-    def edit(self, content, filename, metadata, mime_type, type='video', **kwargs):
+    def replace(self, file_path):
         pass
 
     @abc.abstractmethod

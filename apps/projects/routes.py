@@ -1,10 +1,12 @@
+from datetime import datetime
+
 from bson import json_util
 from flask import current_app as app, request, Response
 from flask.views import MethodView
 
 from lib.video_editor import get_video_editor
-from lib.utils import create_file_name
-from lib.errors import bad_request, not_found
+from lib.utils import create_file_name, get_path_group_by_year_month
+from lib.errors import bad_request, not_found, forbidden
 from lib.validator import Validator
 from . import bp
 
@@ -90,20 +92,33 @@ class UploadProject(MethodView):
         # put file into storage
         file_name = create_file_name(ext=file.filename.split('.')[1])
         mime_type = file.mimetype
-        # TODO separate FS from DB
-        doc = app.fs.put(
-            file_stream,
-            file_name,
-            metadata,
-            mime_type,
-            version=1,
-            processing=False,
-            parent=None,
-            thumbnails={},
-            client_info=user_agent,
-            original_filename=file.filename
-        )
 
+        # get path group by year month
+        create_date = datetime.utcnow()
+        file_name = get_path_group_by_year_month(file_name, create_date)
+
+        # put stream file into storage
+        if app.fs.put(file_stream, file_name):
+            try:
+                # add record to database
+                doc = {
+                    'filename': file_name,
+                    'metadata': metadata,
+                    'create_time': create_date,
+                    'mime_type': mime_type,
+                    'version': 1,
+                    'processing': False,
+                    'parent': None,
+                    'thumbnails': {},
+                    'client_info': user_agent,
+                    'original_filename': file.filename
+                }
+                app.mongo.db.projects.insert_one(doc)
+            except Exception as ex:
+                app.fs.delete(file_name)
+                return forbidden("Can not connect database")
+        else:
+            return forbidden("Can store file")
         return Response(json_util.dumps(doc), status=201, mimetype='application/json')
 
 

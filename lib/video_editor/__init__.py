@@ -4,8 +4,8 @@ from flask import current_app as app
 
 
 def get_video_editor(name=None):
-    # TODO this condition must be configurable
-    if name:
+    # Set default tool for video editor
+    if not name:
         name = app.config.get("DEFAULT_MEDIA_TOOL")
     if name == 'ffmpeg':
         return FFMPEGVideoEditor()

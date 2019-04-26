@@ -83,9 +83,7 @@ class FFMPEGVideoEditor(VideoEditorInterface):
             if str_filter != '':
                 path_video = self._edit_video(path_video, path_output,
                                               ["-filter:v", str_filter, "-max_muxing_queue_size", "1024", "-threads",
-                                               "5",
-                                               "-preset", "ultrafast", "-strict",
-                                               "-2", "-c:a", "copy"])
+                                               "5", "-preset", "ultrafast", "-strict", "-2", "-c:a", "copy"])
             content = open(path_video, "rb+").read()
             metadata_edit_file = self._get_meta(path_video)
 
