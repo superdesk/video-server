@@ -1,19 +1,10 @@
 import os
-import bson
 import logging
-from datetime import datetime
 from flask import current_app as app
 
 from .interface import MediaStorageInterface
 
 logger = logging.getLogger(__name__)
-
-
-def format_id(_id):
-    try:
-        return bson.ObjectId(_id)
-    except bson.errors.InvalidId:
-        return _id
 
 
 class FileSystemStorage(MediaStorageInterface):

@@ -5,7 +5,7 @@ from flask import current_app as app, request, Response
 from flask.views import MethodView
 
 from lib.video_editor import get_video_editor
-from lib.utils import create_file_name, get_path_group_by_year_month
+from lib.utils import create_file_name, format_id
 from lib.errors import bad_request, not_found, forbidden
 from lib.validator import Validator
 from . import bp
@@ -95,14 +95,15 @@ class UploadProject(MethodView):
 
         # get path group by year month
         create_date = datetime.utcnow()
-        file_name = get_path_group_by_year_month(file_name, create_date)
+        folder = f'{create_date.year}/{create_date.month}'
 
         # put stream file into storage
-        if app.fs.put(file_stream, file_name):
+        if app.fs.put(file_stream, f'{folder}/{file_name}'):
             try:
                 # add record to database
                 doc = {
                     'filename': file_name,
+                    'folder': folder,
                     'metadata': metadata,
                     'create_time': create_date,
                     'mime_type': mime_type,
@@ -207,9 +208,7 @@ class RetrieveEditDestroyProject(MethodView):
                   type: object
                   example: {}
         """
-
-        # TODO make object retrieve or 404  generic
-        item = app.fs.get_record(project_id)
+        item = app.mongo.db.projects.find_one({'_id': format_id(project_id)})
         if not item:
             return not_found("Project with id: {} was not found.".format(project_id))
 
@@ -241,7 +240,7 @@ class RetrieveEditDestroyProject(MethodView):
               description: Unique project id
         """
 
-        item = app.fs.get_record(project_id)
+        item = app.mongo.db.projects.find_one({'_id': format_id(project_id)})
         if not item:
             return not_found("Project with id: {} was not found.".format(project_id))
 
@@ -263,11 +262,11 @@ class RetrieveEditDestroyProject(MethodView):
               description: Unique project id
         """
 
-        item = app.fs.get_record(project_id)
+        item = app.mongo.db.projects.find_one({'_id': format_id(project_id)})
         if not item:
             return not_found("Project with id: {} was not found.".format(project_id))
-
-        app.fs.delete(project_id)
+        app.fs.delete(f"{item.get('folder')}/{item.get('filename')}")
+        app.mongo.db.projects.delete_one({'_id': format_id(project_id)})
         return 'delete successfully'
 
 
