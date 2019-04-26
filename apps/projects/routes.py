@@ -215,10 +215,10 @@ class RetrieveEditDestroyProject(MethodView):
 
         return Response(json_util.dumps(item), status=200, mimetype='application/json')
 
-    # TODO check swagger, somehow it does not see more than one method in MethodView
     def put(self, project_id):
         """
         Edit video. This method does not create a new project.
+        ---
         parameters:
             - name: project_id
               in: path
@@ -232,6 +232,7 @@ class RetrieveEditDestroyProject(MethodView):
     def post(self, project_id):
         """
         Edit video. This method creates a new project.
+        ---
         parameters:
             - name: project_id
               in: path
@@ -253,6 +254,7 @@ class RetrieveEditDestroyProject(MethodView):
     def delete(self, project_id):
         """
         Delete project from db and video from filestorage.
+        ---
         parameters:
             - name: project_id
               in: path
