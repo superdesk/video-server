@@ -65,6 +65,7 @@ def get_app(config=None):
 
     for module_name in app.config.get('CORE_APPS', []):
         install_app(module_name)
+    #: logging
     configure_logging(app.config['LOG_CONFIG_FILE'])
 
     # pymongo

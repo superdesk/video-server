@@ -45,8 +45,6 @@ LOG_CONFIG_FILE = env('LOG_CONFIG_FILE', 'logging_config.yml')
 CORE_APPS = [
     'apps.swagger',
     'apps.projects',
-    # 'media',
-    # 'media.video',
 ]
 
 #: Mongo host port
@@ -72,3 +70,6 @@ CODEC_SUPPORT = env('CODEC_SUPPORT', ['vp8', 'vp9', 'h264', 'aac', 'flac', 'ogg'
 #: media storage
 MEDIA_STORAGE = env('MEDIA_STORAGE', 'filesystem')
 FS_MEDIA_STORAGE_PATH = os.path.join(BASE_PATH, 'media', 'projects')
+
+#: media tool
+DEFAULT_MEDIA_TOOL = env('DEFAULT_MEDIA_TOOL', 'ffmpeg')

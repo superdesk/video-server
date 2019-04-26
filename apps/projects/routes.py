@@ -79,7 +79,7 @@ class UploadProject(MethodView):
             return bad_request("client is not allow to edit")
 
         # validate codec
-        video_editor = get_video_editor('ffmpeg')
+        video_editor = get_video_editor()
         file = request.files['file']
         file_stream = file.stream.read()
         metadata = video_editor.get_meta(file_stream)
