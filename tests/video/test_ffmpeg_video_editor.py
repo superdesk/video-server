@@ -1,5 +1,9 @@
-from lib.video_editor.ffmpeg import FFMPEGVideoEditor
 import sys
+import os
+
+from flask import current_app as app
+
+from lib.video_editor.ffmpeg import FFMPEGVideoEditor
 
 editor = FFMPEGVideoEditor()
 
@@ -38,3 +42,20 @@ def test_ffmpeg_video_editor_rotate_video(client, filestream):
 
     assert metadata['width'] == '480'
     assert metadata['height'] == '640'
+
+
+def test_ffmpeg_video_editor_generate_thumbnails(client, filestream):
+    metadata = editor.get_meta(filestream)
+    filename = 'test_ffmpeg_video_editor_generate_thumbnails'
+    for index, thumb in enumerate(
+        editor.capture_list_timeline_thumnails(
+            filestream,
+            filename,
+            metadata,
+            app.config.get('AMOUNT_FRAMES', 40))
+    ):
+        app.fs.put(thumb[0], f'test_generate_thumbnails/filename_{index}.png')
+    list_files = os.listdir(app.config['FS_MEDIA_STORAGE_PATH'] + f'/test_generate_thumbnails')
+    list_files = [fi for fi in list_files if fi.startswith(f'filename_')]
+
+    assert len(list_files) == 41

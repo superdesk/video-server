@@ -16,6 +16,7 @@ logger = logging.getLogger(__name__)
 def task_edit_video(temp_path, doc, updates):
     with open(temp_path, 'rb') as f:
         video_stream = f.read()
+        os.remove(temp_path)
     doc = json_util.loads(doc)
     app.mongo.db.projects.update_one(
         {'_id': doc['_id']},
