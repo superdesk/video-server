@@ -53,7 +53,6 @@ def get_app(config=None):
     #: init storage
     media_storage = get_media_storage(app.config.get('MEDIA_STORAGE'))
     app.fs = media_storage
-    init_celery(app)
 
     installed = set()
 
@@ -76,6 +75,8 @@ def get_app(config=None):
         app.mongo = PyMongo(app)
 
     app.init_db = init_db
+
+    init_celery(app)
 
     return app
 

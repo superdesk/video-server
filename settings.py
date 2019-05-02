@@ -47,6 +47,8 @@ CORE_APPS = [
     'apps.projects',
 ]
 
+PORT = env('PORT', '5050')
+
 #: Mongo host port
 MONGO_HOST = env('MONGO_HOST', 'localhost')
 MONGO_PORT = env('MONGO_PORT', 27017)

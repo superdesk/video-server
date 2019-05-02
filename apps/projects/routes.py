@@ -121,8 +121,10 @@ class UploadProject(MethodView):
                 return forbidden("Can not connect database")
         else:
             return forbidden("Can not store file")
-        get_list_thumbnails(doc)
-        return Response(json_util.dumps(doc), status=201, mimetype='application/json')
+        # Run get list thumbnail for video in celery
+        res = json_util.dumps(doc)
+        get_list_thumbnails.delay(res)
+        return Response(res, status=201, mimetype='application/json')
 
 
 class RetrieveEditDestroyProject(MethodView):
@@ -274,7 +276,8 @@ class RetrieveEditDestroyProject(MethodView):
 
 @celery.task
 def get_list_thumbnails(doc, retry=0):
-    app.mongo.db.projects.update_one({'_id': doc.get('_id')},
+    doc = json_util.loads(doc)
+    app.mongo.db.projects.update_one({'_id': format_id(doc.get('_id'))},
                                      {"$set": {'processing': True}},
                                      upsert=False)
     file_path = '%s/%s' % (doc.get('folder'), doc.get('filename'))
@@ -297,10 +300,11 @@ def get_list_thumbnails(doc, retry=0):
             }
         )
         count += 1
-    app.mongo.db.projects.update_one({'_id': doc.get('_id')},
-                                     {"$set": {'thumnails': {amount: update_thumbnails},
-                                               'processing': False}},
-                                     upsert=False)
+
+    updates = app.mongo.db.projects.update_one({'_id': format_id(doc.get('_id'))},
+                                               {"$set": {'thumbnails': {str(amount): update_thumbnails},
+                                                         'processing': True}},
+                                               upsert=False)
     pass
 
 
