@@ -255,6 +255,8 @@ class RetrieveEditDestroyProject(MethodView):
         """
         client_name = self._check_user_agent()
         doc = app.mongo.db.projects.find_one_or_404({'_id': format_id(project_id)})
+        if doc.get('processing') is True:
+            return forbidden('this video is still processing, please wait.')
         self._edit_video(doc['filename'], doc)
         return Response(
             json_util.dumps(doc), status=200, mimetype='application/json'
@@ -273,7 +275,8 @@ class RetrieveEditDestroyProject(MethodView):
         """
         client_name = self._check_user_agent()
         doc = app.mongo.db.projects.find_one_or_404({'_id': format_id(project_id)})
-
+        if doc.get('processing') is True:
+            return forbidden('this video is still processing, please wait.')
         filename, ext = os.path.splitext(doc['filename'])
         version = doc.get('version', 1) + 1
         new_file_name = f'{filename}_v{version}{ext}'
