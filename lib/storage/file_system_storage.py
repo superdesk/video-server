@@ -16,7 +16,7 @@ class FileSystemStorage(MediaStorageInterface):
         :return:
         """
         try:
-            media_file = (open(file_path, 'rb')).read()
+            media_file = (open(os.path.join(app.config.get('FS_MEDIA_STORAGE_PATH'), file_path), 'rb')).read()
         except Exception as ex:
             logger.error('Cannot get data file %s ex: %s' % (file_path, ex))
             media_file = None

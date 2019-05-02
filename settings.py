@@ -59,8 +59,8 @@ MONGO_URI = "mongodb://{host}:{port}/{dbname}".format(
 RABBIT_MQ_URL = env('RABBIT_MQ_URL', 'pyamqp://guest@localhost//')
 
 #: celery broker
-BROKER_MEDIA_URL = env('CELERY_MEDIA_BROKER_URL', RABBIT_MQ_URL)
-CELERY_MEDIA_BROKER_URL = BROKER_MEDIA_URL
+BROKER_URL = env('CELERY_MEDIA_BROKER_URL', RABBIT_MQ_URL)
+CELERY_BROKER_URL = BROKER_URL
 
 #: allow agent
 AGENT_ALLOW = env('AGENT_ALLOW', ['superdesk', 'postmanruntime'])

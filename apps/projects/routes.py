@@ -8,6 +8,7 @@ from lib.video_editor import get_video_editor
 from lib.utils import create_file_name, format_id
 from lib.errors import bad_request, not_found, forbidden
 from lib.validator import Validator
+from lib.celery_app import celery
 from . import bp
 
 
@@ -119,7 +120,8 @@ class UploadProject(MethodView):
                 app.fs.delete(file_name)
                 return forbidden("Can not connect database")
         else:
-            return forbidden("Can store file")
+            return forbidden("Can not store file")
+        get_list_thumbnails(doc)
         return Response(json_util.dumps(doc), status=201, mimetype='application/json')
 
 
@@ -268,6 +270,38 @@ class RetrieveEditDestroyProject(MethodView):
         app.fs.delete(f"{item.get('folder')}/{item.get('filename')}")
         app.mongo.db.projects.delete_one({'_id': format_id(project_id)})
         return 'delete successfully'
+
+
+@celery.task
+def get_list_thumbnails(doc, retry=0):
+    app.mongo.db.projects.update_one({'_id': doc.get('_id')},
+                                     {"$set": {'processing': True}},
+                                     upsert=False)
+    file_path = '%s/%s' % (doc.get('folder'), doc.get('filename'))
+    stream_file = app.fs.get(file_path)
+    video_editor = get_video_editor()
+    count = 0
+    amount = 40
+    update_thumbnails = []
+    for thumbnail_stream, thumbnail_meta in video_editor.capture_list_timeline_thumnails(stream_file,
+                                                                                         doc.get('filename'),
+                                                                                         doc.get('metadata'), amount):
+        thumbnail_path = '%s_timeline_%0d.png' % (file_path, count)
+        app.fs.put(thumbnail_stream, thumbnail_path)
+        update_thumbnails.append(
+            {
+                'mimetype': 'image/bmp',
+                'width': thumbnail_meta.get('width'),
+                'height': thumbnail_meta.get('height'),
+                'size': thumbnail_meta.get('size')
+            }
+        )
+        count += 1
+    app.mongo.db.projects.update_one({'_id': doc.get('_id')},
+                                     {"$set": {'thumnails': {amount: update_thumbnails},
+                                               'processing': False}},
+                                     upsert=False)
+    pass
 
 
 # register all urls

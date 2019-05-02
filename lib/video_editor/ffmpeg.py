@@ -95,8 +95,30 @@ class FFMPEGVideoEditor(VideoEditorInterface):
     def capture_thumnail(self, filestream, capture_time):
         pass
 
-    def capture_list_timeline_thumnails(self, filestream, number_frames):
-        pass
+    def capture_list_timeline_thumnails(self, stream_file, filename, metadata, number_frames):
+        """
+            capture a list frames in video and store it to resource.
+        :param metadata:
+        :param path_video:
+        :param number_frames:
+        :param item_id:
+        :return:
+        """
+        path_video = self._create_temp_file(stream_file, filename)
+        duration = float(metadata['duration'])
+        frame_per_second = (duration - 1) / number_frames
+
+        # capture list frame via script capture_list_frames.sh
+        path_script = os.path.dirname(__file__) + '/script/capture_list_frames.sh'
+        cmd.run([path_script, path_video, path_video + "_", str(frame_per_second), str(number_frames + 1)])
+        for i in range(0, number_frames + 1):
+            path_output = path_video + '_%0d.bmp' % i
+            try:
+                thumbnail_metadata = self._get_meta(path_output)
+                thumbnail_metadata['mimetype'] = 'image/bmp',
+                yield open(path_output, "rb+").read(), thumbnail_metadata
+            finally:
+                os.remove(path_output)
 
     def _capture_thumnail(self, path_video, path_output, time_capture=0):
         """

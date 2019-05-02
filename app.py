@@ -16,6 +16,7 @@ import logging.config
 from flask import Flask
 from flask_pymongo import PyMongo
 
+from lib.celery_app import init_celery
 from lib.storage import get_media_storage
 from lib.logging import configure_logging
 
@@ -52,6 +53,7 @@ def get_app(config=None):
     #: init storage
     media_storage = get_media_storage(app.config.get('MEDIA_STORAGE'))
     app.fs = media_storage
+    init_celery(app)
 
     installed = set()
 
