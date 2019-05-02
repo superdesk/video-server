@@ -340,8 +340,8 @@ class RetrieveEditDestroyProject(MethodView):
         app.mongo.db.projects.delete_one({'_id': format_id(project_id)})
         return 'delete successfully'
 
-        def _check_user_agent(self):
-            user_agent = request.headers.environ.get('HTTP_USER_AGENT')
+    def _check_user_agent(self):
+        user_agent = request.headers.environ.get('HTTP_USER_AGENT')
 
         client_name = user_agent.split('/')[0]
         if client_name.lower() not in app.config.get('AGENT_ALLOW'):

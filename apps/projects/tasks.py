@@ -53,9 +53,8 @@ def task_edit_video(temp_path, doc, updates):
     get_list_thumbnails.delay(json_util.dumps(updated_doc))
 
 
-
 @celery.task
-def get_list_thumbnails(sdoc, retry=0):
+def get_list_thumbnails(sdoc):
     update_thumbnails = []
     try:
         doc = json_util.loads(sdoc)
@@ -76,11 +75,12 @@ def get_list_thumbnails(sdoc, retry=0):
                                                                                              doc.get('filename'),
                                                                                              doc.get('metadata'),
                                                                                              amount):
-            thumbnail_path = '%s_timeline_%0d.png' % (file_path, count)
+            thumbnail_path = '%s_timeline_%02d.png' % (file_path, count)
             app.fs.put(thumbnail_stream, thumbnail_path)
+            filename, ext = os.path.splitext(doc.get('filename'))
             update_thumbnails.append(
                 {
-                    'filename': '%s_timeline_%0d.png' % (doc.get('filename'), count),
+                    'filename': '%s_timeline_%0d.png' % (filename, count),
                     'folder': doc.get('folder'),
                     'mimetype': 'image/bmp',
                     'width': thumbnail_meta.get('width'),
@@ -97,7 +97,7 @@ def get_list_thumbnails(sdoc, retry=0):
                 'thumbnails': {
                     str(amount): update_thumbnails
                 },
-                'processing': True,
+                'processing': False,
             }},
             upsert=False)
     except Exception as exc:
@@ -106,5 +106,3 @@ def get_list_thumbnails(sdoc, retry=0):
         if update_thumbnails:
             for thumbnail in update_thumbnails:
                 os.remove('%s/%s' % (thumbnail.get('folder'), thumbnail.get('filename')))
-        if retry > app.config.get('NUMBER_RETRY', 3):
-            get_list_thumbnails.delay(sdoc, retry=retry + 1)
