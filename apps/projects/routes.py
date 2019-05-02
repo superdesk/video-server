@@ -1,10 +1,12 @@
+from datetime import datetime
+
 from bson import json_util
 from flask import current_app as app, request, Response
 from flask.views import MethodView
 
 from lib.video_editor import get_video_editor
-from lib.utils import create_file_name
-from lib.errors import bad_request, not_found
+from lib.utils import create_file_name, format_id
+from lib.errors import bad_request, not_found, forbidden
 from lib.validator import Validator
 from . import bp
 
@@ -79,7 +81,7 @@ class UploadProject(MethodView):
             return bad_request("client is not allow to edit")
 
         # validate codec
-        video_editor = get_video_editor('ffmpeg')
+        video_editor = get_video_editor()
         file = request.files['file']
         file_stream = file.stream.read()
         metadata = video_editor.get_meta(file_stream)
@@ -90,20 +92,34 @@ class UploadProject(MethodView):
         # put file into storage
         file_name = create_file_name(ext=file.filename.split('.')[1])
         mime_type = file.mimetype
-        # TODO separate FS from DB
-        doc = app.fs.put(
-            file_stream,
-            file_name,
-            metadata,
-            mime_type,
-            version=1,
-            processing=False,
-            parent=None,
-            thumbnails={},
-            client_info=user_agent,
-            original_filename=file.filename
-        )
 
+        # get path group by year month
+        create_date = datetime.utcnow()
+        folder = f'{create_date.year}/{create_date.month}'
+
+        # put stream file into storage
+        if app.fs.put(file_stream, f'{folder}/{file_name}'):
+            try:
+                # add record to database
+                doc = {
+                    'filename': file_name,
+                    'folder': folder,
+                    'metadata': metadata,
+                    'create_time': create_date,
+                    'mime_type': mime_type,
+                    'version': 1,
+                    'processing': False,
+                    'parent': None,
+                    'thumbnails': {},
+                    'client_info': user_agent,
+                    'original_filename': file.filename
+                }
+                app.mongo.db.projects.insert_one(doc)
+            except Exception as ex:
+                app.fs.delete(file_name)
+                return forbidden("Can not connect database")
+        else:
+            return forbidden("Can store file")
         return Response(json_util.dumps(doc), status=201, mimetype='application/json')
 
 
@@ -192,18 +208,16 @@ class RetrieveEditDestroyProject(MethodView):
                   type: object
                   example: {}
         """
-
-        # TODO make object retrieve or 404  generic
-        item = app.fs.get_record(project_id)
+        item = app.mongo.db.projects.find_one({'_id': format_id(project_id)})
         if not item:
             return not_found("Project with id: {} was not found.".format(project_id))
 
         return Response(json_util.dumps(item), status=200, mimetype='application/json')
 
-    # TODO check swagger, somehow it does not see more than one method in MethodView
     def put(self, project_id):
         """
         Edit video. This method does not create a new project.
+        ---
         parameters:
             - name: project_id
               in: path
@@ -217,6 +231,7 @@ class RetrieveEditDestroyProject(MethodView):
     def post(self, project_id):
         """
         Edit video. This method creates a new project.
+        ---
         parameters:
             - name: project_id
               in: path
@@ -225,7 +240,7 @@ class RetrieveEditDestroyProject(MethodView):
               description: Unique project id
         """
 
-        item = app.fs.get_record(project_id)
+        item = app.mongo.db.projects.find_one({'_id': format_id(project_id)})
         if not item:
             return not_found("Project with id: {} was not found.".format(project_id))
 
@@ -238,6 +253,7 @@ class RetrieveEditDestroyProject(MethodView):
     def delete(self, project_id):
         """
         Delete project from db and video from filestorage.
+        ---
         parameters:
             - name: project_id
               in: path
@@ -246,11 +262,11 @@ class RetrieveEditDestroyProject(MethodView):
               description: Unique project id
         """
 
-        item = app.fs.get_record(project_id)
+        item = app.mongo.db.projects.find_one({'_id': format_id(project_id)})
         if not item:
             return not_found("Project with id: {} was not found.".format(project_id))
-
-        app.fs.delete(project_id)
+        app.fs.delete(f"{item.get('folder')}/{item.get('filename')}")
+        app.mongo.db.projects.delete_one({'_id': format_id(project_id)})
         return 'delete successfully'
 
 

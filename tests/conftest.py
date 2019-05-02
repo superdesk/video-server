@@ -1,4 +1,5 @@
 import os
+import shutil
 
 import pytest
 
@@ -12,6 +13,10 @@ def test_app():
     test_app.config['MONGO_DBNAME'] = 'sd_video_editor_test'
     test_app.config['MONGO_URI'] = 'mongodb://localhost:27017/sd_video_editor_test'
     test_app.config['FS_MEDIA_STORAGE_PATH'] = os.path.join(os.path.dirname(__file__), 'media', 'projects')
+
+    if not os.path.exists(test_app.config['FS_MEDIA_STORAGE_PATH']):
+        os.makedirs(test_app.config['FS_MEDIA_STORAGE_PATH'])
+
     test_app.init_db()
 
     return test_app
@@ -23,6 +28,9 @@ def client(test_app):
 
     with test_app.app_context():
         yield client
+
+    test_app.mongo.db.projects.drop()
+    shutil.rmtree(os.path.dirname(test_app.config.get('FS_MEDIA_STORAGE_PATH')))
 
 
 @pytest.fixture(scope='session')
