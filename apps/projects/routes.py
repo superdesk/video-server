@@ -1,7 +1,3 @@
-
-
-import itertools
-
 from datetime import datetime
 
 from bson import json_util
@@ -10,7 +6,7 @@ from flask.views import MethodView
 
 from apps.projects.tasks import get_list_thumbnails
 from lib.video_editor import get_video_editor
-from lib.utils import create_file_name, format_id
+from lib.utils import create_file_name, format_id, paginate
 from lib.errors import bad_request, not_found, forbidden
 from lib.validator import Validator
 
@@ -269,7 +265,6 @@ class RetrieveEditDestroyProject(MethodView):
         item = app.mongo.db.projects.find_one({'_id': format_id(project_id)})
         if not item:
             return not_found("Project with id: {} was not found.".format(project_id))
-
         self._edit_video()
         return 'edited successfully'
 
@@ -294,19 +289,6 @@ class RetrieveEditDestroyProject(MethodView):
         app.fs.delete(f"{item.get('folder')}/{item.get('filename')}")
         app.mongo.db.projects.delete_one({'_id': format_id(project_id)})
         return 'delete successfully'
-
-
-
-
-
-def paginate(iterable, page_size):
-    while True:
-        i1, i2 = itertools.tee(iterable)
-        iterable, page = (itertools.islice(i1, page_size, None),
-                          list(itertools.islice(i2, page_size)))
-        if len(page) == 0:
-            break
-        yield page
 
 
 # register all urls

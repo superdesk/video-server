@@ -12,7 +12,8 @@ logger = logging.getLogger(__name__)
 
 
 @celery.task
-def get_list_thumbnails(sdoc, retry=0):
+def get_list_thumbnails(sdoc):
+    update_thumbnails = []
     try:
         doc = json_util.loads(sdoc)
         app.mongo.db.projects.update_one({'_id': format_id(doc.get('_id'))},
@@ -47,11 +48,9 @@ def get_list_thumbnails(sdoc, retry=0):
                                                    'processing': True}},
                                          upsert=False)
     except Exception as exc:
-        logger.elogger.exception(exc)
+        logger.exception(exc)
         if update_thumbnails:
             for thumbnail in update_thumbnails:
                 os.remove('%s/%s' % (thumbnail.get('folder'), thumbnail.get('filename')))
-        if retry > app.config.get('NUMBER_RETRY', 3):
-            get_list_thumbnails.delay(sdoc, retry=retry + 1)
 
     return

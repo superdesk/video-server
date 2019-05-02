@@ -64,6 +64,10 @@ RABBIT_MQ_URL = env('RABBIT_MQ_URL', 'pyamqp://guest@localhost//')
 BROKER_URL = env('CELERY_BROKER_URL', RABBIT_MQ_URL)
 CELERY_BROKER_URL = BROKER_URL
 
+#: number retry when task fail
+NUMBER_RETRY = env('NUMBER_RETRY', 3)
+BROKER_CONNECTION_MAX_RETRIES = NUMBER_RETRY
+
 #: allow agent
 AGENT_ALLOW = env('AGENT_ALLOW', ['superdesk', 'postmanruntime'])
 #: Codec support
@@ -75,9 +79,6 @@ FS_MEDIA_STORAGE_PATH = os.path.join(BASE_PATH, 'media', 'projects')
 
 #: media tool
 DEFAULT_MEDIA_TOOL = env('DEFAULT_MEDIA_TOOL', 'ffmpeg')
-
-#: number retry when edit video fail
-NUMBER_RETRY = env('NUMBER_RETRY', 3)
 
 #: number frame capture in video
 AMOUNT_FRAMES = env('AMOUNT_FRAMES', 40)
