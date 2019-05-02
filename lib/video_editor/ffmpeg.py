@@ -92,13 +92,13 @@ class FFMPEGVideoEditor(VideoEditorInterface):
                 os.remove(path_video)
         return content, metadata_edit_file
 
-    def capture_thumnail(self, filestream, capture_time):
+    def capture_thumbnail(self, filestream, capture_time):
         pass
 
-    def capture_list_timeline_thumnails(self, filestream, number_frames):
+    def capture_list_timeline_thumbnails(self, filestream, number_frames):
         pass
 
-    def _capture_thumnail(self, path_video, path_output, time_capture=0):
+    def _capture_thumbnail(self, path_video, path_output, time_capture=0):
         """
             Use ffmpeg to capture video at a time.
         :param path_video:

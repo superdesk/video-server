@@ -13,9 +13,9 @@ class VideoEditorInterface(metaclass=abc.ABCMeta):
         pass
 
     @abc.abstractmethod
-    def capture_thumnail(self, filestream, capture_time):
+    def capture_thumbnail(self, filestream, capture_time):
         pass
 
     @abc.abstractmethod
-    def capture_list_timeline_thumnails(self, filestream, number_frames):
+    def capture_list_timeline_thumbnails(self, filestream, number_frames):
         pass
