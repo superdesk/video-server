@@ -50,9 +50,10 @@ class FFMPEGVideoEditor(VideoEditorInterface):
                 metadata = self._get_meta(path_video)
 
             duration = float(metadata['duration'])
-            if (not video_cut or (
-                    video_cut['start'] == 0 and int(video_cut['end']) == int(duration))) and not video_crop and (
-                    not video_rotate or int(video_rotate['degree']) % 360 == 0) and not video_quality:
+            if (not video_cut or (video_cut['start'] == 0 and int(video_cut['end']) == int(duration))) \
+                    and not video_crop \
+                    and (not video_rotate or int(video_rotate['degree']) % 360 == 0) \
+                    and not video_quality:
                 return {}
             path_output = path_video + "_edit" + os.path.splitext(filename)[1]
             # use copy data
@@ -64,6 +65,11 @@ class FFMPEGVideoEditor(VideoEditorInterface):
             # use filter data
             str_filter = ""
             if video_crop:
+                # get max width, height if crop over the video
+                if video_crop.get('width') > metadata.get('width'):
+                    video_crop['width'] = metadata.get('width')
+                if video_crop.get('height') > metadata.get('height'):
+                    video_crop['height'] = metadata.get('height')
                 str_filter += "crop=%s:%s:%s:%s" % (
                     video_crop["width"], video_crop["height"], video_crop["x"], video_crop["y"])
             if video_rotate:
@@ -144,7 +150,6 @@ class FFMPEGVideoEditor(VideoEditorInterface):
         """
         try:
             # cut video
-            print(' '.join(["ffmpeg", "-i", path_video, *para, path_output]))
             cmd.run(["ffmpeg", "-i", path_video, *para, path_output])
 
             # replace tmp origin

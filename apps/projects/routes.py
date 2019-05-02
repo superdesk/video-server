@@ -1,20 +1,23 @@
-
-
-import itertools
-
+import logging
+import os
 from datetime import datetime
+from tempfile import gettempdir
 
 from bson import json_util
-from flask import current_app as app, request, Response
+from flask import Response
+from flask import current_app as app
+from flask import request
 from flask.views import MethodView
 
-from apps.projects.tasks import get_list_thumbnails
-from lib.video_editor import get_video_editor
-from lib.utils import create_file_name, format_id
-from lib.errors import bad_request, not_found, forbidden
+from lib.errors import bad_request, forbidden, not_found
+from lib.utils import create_file_name, format_id, paginate
 from lib.validator import Validator
+from lib.video_editor import get_video_editor
 
 from . import bp
+from .tasks import get_list_thumbnails, task_edit_video
+
+logger = logging.getLogger(__name__)
 
 
 class UploadProject(MethodView):
@@ -234,11 +237,10 @@ class RetrieveEditDestroyProject(MethodView):
                   type: object
                   example: {}
         """
-        item = app.mongo.db.projects.find_one({'_id': format_id(project_id)})
-        if not item:
-            return not_found("Project with id: {} was not found.".format(project_id))
 
-        return Response(json_util.dumps(item), status=200, mimetype='application/json')
+        doc = app.mongo.db.projects.find_one_or_404({'_id': format_id(project_id)})
+
+        return Response(json_util.dumps(doc), status=200, mimetype='application/json')
 
     def put(self, project_id):
         """
@@ -251,8 +253,12 @@ class RetrieveEditDestroyProject(MethodView):
               required: true
               description: Unique project id
         """
-        self._edit_video()
-        return 'edited successfully'
+        client_name = self._check_user_agent()
+        doc = app.mongo.db.projects.find_one_or_404({'_id': format_id(project_id)})
+        self._edit_video(doc['filename'], doc)
+        return Response(
+            json_util.dumps(doc), status=200, mimetype='application/json'
+        )
 
     def post(self, project_id):
         """
@@ -265,16 +271,57 @@ class RetrieveEditDestroyProject(MethodView):
               required: true
               description: Unique project id
         """
+        client_name = self._check_user_agent()
+        doc = app.mongo.db.projects.find_one_or_404({'_id': format_id(project_id)})
 
-        item = app.mongo.db.projects.find_one({'_id': format_id(project_id)})
-        if not item:
-            return not_found("Project with id: {} was not found.".format(project_id))
+        filename, ext = os.path.splitext(doc['filename'])
+        version = doc.get('version', 1) + 1
+        new_file_name = f'{filename}_v{version}{ext}'
 
-        self._edit_video()
-        return 'edited successfully'
+        new_doc = {
+            'filename': new_file_name,
+            'folder': doc['folder'],
+            'metadata': None,
+            'client_info': client_name,
+            'version': version,
+            'processing': False,
+            'mime_type': doc['mime_type'],
+            'parent': {
+                '_id': doc['_id'],
+            },
+            'thumbnails': {}
+        }
+        app.mongo.db.projects.insert_one(new_doc)
 
-    def _edit_video(self):
-        pass
+        self._edit_video(doc['filename'], new_doc)
+
+        return Response(
+            json_util.dumps(new_doc), status=200, mimetype='application/json'
+        )
+
+    def _edit_video(self, current_file_name, doc):
+        updates = request.get_json()
+        validator = Validator(self.SCHEMA_EDIT)
+        if not validator.validate(updates):
+            return bad_request(validator.errors)
+
+        actions = updates.keys()
+        supported_action = ('cut', 'crop', 'rotate')
+        for action in actions:
+            if action not in supported_action:
+                return bad_request("Action is not supported")
+
+        file_path = os.path.join(doc['folder'], current_file_name)
+        temp_path = os.path.join(gettempdir(), file_path)
+        temp_dir = os.path.dirname(temp_path)
+        if not os.path.exists(temp_dir):
+            os.makedirs(temp_dir)
+
+        video_stream = app.fs.get(file_path)
+        with open(temp_path, 'wb') as f:
+            f.write(video_stream)
+
+        task_edit_video.delay(temp_path, json_util.dumps(doc), updates)
 
     def delete(self, project_id):
         """
@@ -288,25 +335,17 @@ class RetrieveEditDestroyProject(MethodView):
               description: Unique project id
         """
 
-        item = app.mongo.db.projects.find_one({'_id': format_id(project_id)})
-        if not item:
-            return not_found("Project with id: {} was not found.".format(project_id))
-        app.fs.delete(f"{item.get('folder')}/{item.get('filename')}")
+        doc = app.mongo.db.projects.find_one_or_404({'_id': format_id(project_id)})
+        app.fs.delete(f"{doc.get('folder')}/{doc.get('filename')}")
         app.mongo.db.projects.delete_one({'_id': format_id(project_id)})
         return 'delete successfully'
 
+        def _check_user_agent(self):
+            user_agent = request.headers.environ.get('HTTP_USER_AGENT')
 
-
-
-
-def paginate(iterable, page_size):
-    while True:
-        i1, i2 = itertools.tee(iterable)
-        iterable, page = (itertools.islice(i1, page_size, None),
-                          list(itertools.islice(i2, page_size)))
-        if len(page) == 0:
-            break
-        yield page
+        client_name = user_agent.split('/')[0]
+        if client_name.lower() not in app.config.get('AGENT_ALLOW'):
+            return bad_request("client is not allow to edit")
 
 
 # register all urls

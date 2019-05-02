@@ -39,7 +39,3 @@ cd video-server
 pytest
 ```
 
-show setups
-```
-pytest --setup-show
-```
