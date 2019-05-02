@@ -61,7 +61,7 @@ MONGO_URI = "mongodb://{host}:{port}/{dbname}".format(
 RABBIT_MQ_URL = env('RABBIT_MQ_URL', 'pyamqp://guest@localhost//')
 
 #: celery broker
-BROKER_URL = env('CELERY_MEDIA_BROKER_URL', RABBIT_MQ_URL)
+BROKER_URL = env('CELERY_BROKER_URL', RABBIT_MQ_URL)
 CELERY_BROKER_URL = BROKER_URL
 
 #: allow agent
@@ -75,3 +75,9 @@ FS_MEDIA_STORAGE_PATH = os.path.join(BASE_PATH, 'media', 'projects')
 
 #: media tool
 DEFAULT_MEDIA_TOOL = env('DEFAULT_MEDIA_TOOL', 'ffmpeg')
+
+#: number retry when edit video fail
+NUMBER_RETRY = env('NUMBER_RETRY', 3)
+
+#: number frame capture in video
+AMOUNT_FRAMES = env('AMOUNT_FRAMES', 40)

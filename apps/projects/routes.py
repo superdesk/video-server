@@ -1,14 +1,19 @@
+
+
+import itertools
+
 from datetime import datetime
 
 from bson import json_util
 from flask import current_app as app, request, Response
 from flask.views import MethodView
 
+from apps.projects.tasks import get_list_thumbnails
 from lib.video_editor import get_video_editor
 from lib.utils import create_file_name, format_id
 from lib.errors import bad_request, not_found, forbidden
 from lib.validator import Validator
-from lib.celery_app import celery
+
 from . import bp
 
 
@@ -125,6 +130,23 @@ class UploadProject(MethodView):
         res = json_util.dumps(doc)
         get_list_thumbnails.delay(res)
         return Response(res, status=201, mimetype='application/json')
+
+    def get(self):
+
+        offset = int(request.args.get('offset', 0))
+        size = int(request.args.get('size', 25))
+        docs = list(app.mongo.db.projects.find())
+        list_pages = list(paginate(docs, size))
+        if offset >= len(list_pages):
+            offset = len(list_pages) - 1
+        res = {
+            'items': list_pages[offset],
+            'offset': offset,
+            'size': len(list_pages[offset]),
+            'max_size': size
+        }
+        return Response(json_util.dumps(res), status=200, mimetype='application/json')
+        pass
 
 
 class RetrieveEditDestroyProject(MethodView):
@@ -274,38 +296,17 @@ class RetrieveEditDestroyProject(MethodView):
         return 'delete successfully'
 
 
-@celery.task
-def get_list_thumbnails(doc, retry=0):
-    doc = json_util.loads(doc)
-    app.mongo.db.projects.update_one({'_id': format_id(doc.get('_id'))},
-                                     {"$set": {'processing': True}},
-                                     upsert=False)
-    file_path = '%s/%s' % (doc.get('folder'), doc.get('filename'))
-    stream_file = app.fs.get(file_path)
-    video_editor = get_video_editor()
-    count = 0
-    amount = 40
-    update_thumbnails = []
-    for thumbnail_stream, thumbnail_meta in video_editor.capture_list_timeline_thumnails(stream_file,
-                                                                                         doc.get('filename'),
-                                                                                         doc.get('metadata'), amount):
-        thumbnail_path = '%s_timeline_%0d.png' % (file_path, count)
-        app.fs.put(thumbnail_stream, thumbnail_path)
-        update_thumbnails.append(
-            {
-                'mimetype': 'image/bmp',
-                'width': thumbnail_meta.get('width'),
-                'height': thumbnail_meta.get('height'),
-                'size': thumbnail_meta.get('size')
-            }
-        )
-        count += 1
 
-    updates = app.mongo.db.projects.update_one({'_id': format_id(doc.get('_id'))},
-                                               {"$set": {'thumbnails': {str(amount): update_thumbnails},
-                                                         'processing': True}},
-                                               upsert=False)
-    pass
+
+
+def paginate(iterable, page_size):
+    while True:
+        i1, i2 = itertools.tee(iterable)
+        iterable, page = (itertools.islice(i1, page_size, None),
+                          list(itertools.islice(i2, page_size)))
+        if len(page) == 0:
+            break
+        yield page
 
 
 # register all urls

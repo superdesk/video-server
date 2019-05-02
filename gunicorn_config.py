@@ -1,6 +1,6 @@
 
 import os
-import multiprocessing
+
 
 bind = '0.0.0.0:%s' % os.environ.get('PORT', '5050')
 workers = int(os.environ.get('WEB_CONCURRENCY', 2))
