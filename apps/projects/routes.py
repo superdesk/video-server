@@ -277,6 +277,8 @@ class RetrieveEditDestroyProject(MethodView):
         filename, ext = os.path.splitext(doc['filename'])
         version = doc.get('version', 1) + 1
         new_file_name = f'{filename}_v{version}{ext}'
+        if doc.get('version') >= 2:
+            return bad_request("Only POST original video version 1")
 
         new_doc = {
             'filename': new_file_name,
