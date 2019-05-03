@@ -6,7 +6,7 @@ from tempfile import gettempdir
 from bson import json_util
 from flask import Response
 from flask import current_app as app
-from flask import request
+from flask import request, jsonify
 from flask.views import MethodView
 
 from lib.errors import bad_request, forbidden, not_found
@@ -32,19 +32,15 @@ class UploadProject(MethodView):
         """
         Create new project record in DB and save file into file storage
         ---
+        consumes:
+          - multipart/form-data
         parameters:
-        - in: body
-          name: body
+        - in: formData
+          name: file
+          type: file
           description: file object to upload
-          schema:
-            type: object
-            required:
-              file
-            properties:
-              file:
-                type: binary
         responses:
-          '201':
+          201:
             description: CREATED
             schema:
               type: object
@@ -52,30 +48,72 @@ class UploadProject(MethodView):
                 filename:
                   type: string
                   example: fa5079a38e0a4197864aa2ccb07f3bea.mp4
+                folder:
+                  type: string
+                  example: 2019/5
                 metadata:
                   type: object
-                  example: {...}
+                  properties:
+                    codec_name:
+                      type: string
+                      example: h264
+                    codec_long_name:
+                      type: string
+                      example: H.264 / AVC / MPEG-4 AVC / MPEG-4 part 10
+                    width:
+                      type: string
+                      example: 640
+                    height:
+                      type: string
+                      example: 360
+                    duration:
+                      type: string
+                      example: 300.014000
+                    bit_rate:
+                      type: string
+                      example: 287654
+                    nb_frames:
+                      type: string
+                      example: 7654
+                    format_name:
+                      type: string
+                      example: mov,mp4,m4a,3gp,3g2,mj2
+                    size:
+                      type: string
+                      example: 14567890
+                mime_type:
+                  type: string
+                  example: video/mp4
+                create_time:
+                  type: object
+                  properties:
+                    $date:
+                      type: integer
+                      example: 1556853105063
+                original_filename:
+                  type: string
+                  example: video.mp4
                 client_info:
                   type: string
-                  example: PostmanRuntime/7.6.0
+                  example: Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:66.0) Gecko/20100101 Firefox/66.0
                 version:
                   type: integer
                   example: 1
                 parent:
                   type: object
                   example: {}
+                processing:
+                  type: boolean
+                  example: False
                 thumbnails:
                   type: object
                   example: {}
                 _id:
                   type: object
-                  schema:
-                    type: object
-                    properties:
-                      $oid:
-                        type: string
-                  example: { $oid: 5cbd5acfe24f6045607e51aa}
-
+                  properties:
+                    $oid:
+                      type: string
+                      example: 5cbd5acfe24f6045607e51aa
         """
 
         # validate request
@@ -142,7 +180,108 @@ class UploadProject(MethodView):
         return Response(res, status=201, mimetype='application/json')
 
     def get(self):
-
+        """
+        Get list of projects in DB
+        ---
+        parameters:
+        - name: offset
+          in: query
+          type: integer
+          description: Page number
+        - name: size
+          in: query
+          type: integer
+          description: Number of items per page
+        responses:
+          200:
+            description: OK
+            schema:
+              type: object
+              properties:
+                offset:
+                  type: integer
+                  example: 1
+                size:
+                  type: integer
+                  example: 14
+                max_size:
+                  type: integer
+                  example: 50
+                items:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      filename:
+                        type: string
+                        example: fa5079a38e0a4197864aa2ccb07f3bea.mp4
+                      folder:
+                        type: string
+                        example: 2019/5
+                      metadata:
+                        type: object
+                        properties:
+                          codec_name:
+                            type: string
+                            example: h264
+                          codec_long_name:
+                            type: string
+                            example: H.264 / AVC / MPEG-4 AVC / MPEG-4 part 10
+                          width:
+                            type: string
+                            example: 640
+                          height:
+                            type: string
+                            example: 360
+                          duration:
+                            type: string
+                            example: 300.014000
+                          bit_rate:
+                            type: string
+                            example: 287654
+                          nb_frames:
+                            type: string
+                            example: 7654
+                          format_name:
+                            type: string
+                            example: mov,mp4,m4a,3gp,3g2,mj2
+                          size:
+                            type: string
+                            example: 14567890
+                      mime_type:
+                        type: string
+                        example: video/mp4
+                      create_time:
+                        type: object
+                        properties:
+                          $date:
+                            type: integer
+                            example: 1556853105063
+                      original_filename:
+                        type: string
+                        example: video.mp4
+                      client_info:
+                        type: string
+                        example: Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:66.0) Gecko/20100101 Firefox/66.0
+                      version:
+                        type: integer
+                        example: 1
+                      parent:
+                        type: object
+                        example: {}
+                      processing:
+                        type: boolean
+                        example: False
+                      thumbnails:
+                        type: object
+                        example: {}
+                      _id:
+                        type: object
+                        properties:
+                          $oid:
+                            type: string
+                            example: 5cbd5acfe24f6045607e51aa
+        """
         offset = int(request.args.get('offset', 0))
         size = int(request.args.get('size', 25))
         docs = list(app.mongo.db.projects.find())
@@ -212,37 +351,80 @@ class RetrieveEditDestroyProject(MethodView):
               required: true
               description: Unique project id
         responses:
-          '200':
+          200:
             description: OK
             schema:
               type: object
               properties:
-                _id:
-                  type: object
-                  schema:
-                    type: object
-                    properties:
-                      $oid:
-                        type: string
-                  example: { $oid: 5cbd5acfe24f6045607e51aa}
                 filename:
                   type: string
                   example: fa5079a38e0a4197864aa2ccb07f3bea.mp4
+                folder:
+                  type: string
+                  example: 2019/5
                 metadata:
                   type: object
-                  example: {...}
+                  properties:
+                    codec_name:
+                      type: string
+                      example: h264
+                    codec_long_name:
+                      type: string
+                      example: H.264 / AVC / MPEG-4 AVC / MPEG-4 part 10
+                    width:
+                      type: string
+                      example: 640
+                    height:
+                      type: string
+                      example: 360
+                    duration:
+                      type: string
+                      example: 300.014000
+                    bit_rate:
+                      type: string
+                      example: 287654
+                    nb_frames:
+                      type: string
+                      example: 7654
+                    format_name:
+                      type: string
+                      example: mov,mp4,m4a,3gp,3g2,mj2
+                    size:
+                      type: string
+                      example: 14567890
+                mime_type:
+                  type: string
+                  example: video/mp4
+                create_time:
+                  type: object
+                  properties:
+                    $date:
+                      type: integer
+                      example: 1556853105063
+                original_filename:
+                  type: string
+                  example: video.mp4
                 client_info:
                   type: string
-                  example: PostmanRuntime/7.6.0
+                  example: Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:66.0) Gecko/20100101 Firefox/66.0
                 version:
                   type: integer
                   example: 1
                 parent:
                   type: object
                   example: {}
+                processing:
+                  type: boolean
+                  example: False
                 thumbnails:
                   type: object
                   example: {}
+                _id:
+                  type: object
+                  properties:
+                    $oid:
+                      type: string
+                      example: 5cbd5acfe24f6045607e51aa
         """
 
         doc = app.mongo.db.projects.find_one_or_404({'_id': format_id(project_id)})
@@ -253,14 +435,128 @@ class RetrieveEditDestroyProject(MethodView):
         """
         Edit video. This method does not create a new project.
         ---
+        consumes:
+        - application/json
         parameters:
-            - name: project_id
-              in: path
-              type: string
-              required: true
-              description: Unique project id
+        - in: path
+          name: project_id
+          type: string
+          required: True
+          description: Unique project id
+        - in: body
+          name: action
+          description: Actions want to apply to the video
+          required: True
+          schema:
+            type: object
+            properties:
+              cut:
+                type: object
+                properties:
+                  start:
+                    type: integer
+                    example: 5
+                  end:
+                    type: integer
+                    example: 10
+              crop:
+                type: object
+                properties:
+                  width:
+                    type: integer
+                    example: 480
+                  height:
+                    type: integer
+                    example: 360
+                  x:
+                    type: integer
+                    example: 10
+                  y:
+                    type: integer
+                    example: 10
+              rotate:
+                type: object
+                properties:
+                  degree:
+                    type: integer
+                    example: 90
+        responses:
+          200:
+            description: OK
+            schema:
+              type: object
+              properties:
+                filename:
+                  type: string
+                  example: fa5079a38e0a4197864aa2ccb07f3bea.mp4
+                folder:
+                  type: string
+                  example: 2019/5
+                metadata:
+                  type: object
+                  properties:
+                    codec_name:
+                      type: string
+                      example: h264
+                    codec_long_name:
+                      type: string
+                      example: H.264 / AVC / MPEG-4 AVC / MPEG-4 part 10
+                    width:
+                      type: string
+                      example: 640
+                    height:
+                      type: string
+                      example: 360
+                    duration:
+                      type: string
+                      example: 300.014000
+                    bit_rate:
+                      type: string
+                      example: 287654
+                    nb_frames:
+                      type: string
+                      example: 7654
+                    format_name:
+                      type: string
+                      example: mov,mp4,m4a,3gp,3g2,mj2
+                    size:
+                      type: string
+                      example: 14567890
+                mime_type:
+                  type: string
+                  example: video/mp4
+                create_time:
+                  type: object
+                  properties:
+                    $date:
+                      type: integer
+                      example: 1556853105063
+                original_filename:
+                  type: string
+                  example: video.mp4
+                client_info:
+                  type: string
+                  example: Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:66.0) Gecko/20100101 Firefox/66.0
+                version:
+                  type: integer
+                  example: 1
+                parent:
+                  type: object
+                  example: {}
+                processing:
+                  type: boolean
+                  example: False
+                thumbnails:
+                  type: object
+                  example: {}
+                _id:
+                  type: object
+                  properties:
+                    $oid:
+                      type: string
+                      example: 5cbd5acfe24f6045607e51aa
         """
-        client_name = self._check_user_agent()
+        user_agent = self._check_user_agent()
         doc = app.mongo.db.projects.find_one_or_404({'_id': format_id(project_id)})
         if doc.get('processing') is True:
             return forbidden('this video is still processing, please wait.')
@@ -280,14 +576,107 @@ class RetrieveEditDestroyProject(MethodView):
         """
         Edit video. This method creates a new project.
         ---
+        consumes:
+        - application/json
         parameters:
-            - name: project_id
-              in: path
-              type: string
-              required: true
-              description: Unique project id
+        - in: path
+          name: project_id
+          type: string
+          required: True
+          description: Unique project id
+        - in: body
+          name: action
+          description: Actions want to apply to the video
+          required: True
+          schema:
+            type: object
+            properties:
+              cut:
+                type: object
+                properties:
+                  start:
+                    type: integer
+                    example: 5
+                  end:
+                    type: integer
+                    example: 10
+              crop:
+                type: object
+                properties:
+                  width:
+                    type: integer
+                    example: 480
+                  height:
+                    type: integer
+                    example: 360
+                  x:
+                    type: integer
+                    example: 10
+                  y:
+                    type: integer
+                    example: 10
+              rotate:
+                type: object
+                properties:
+                  degree:
+                    type: integer
+                    example: 90
+        responses:
+          200:
+            description: OK
+            schema:
+              type: object
+              properties:
+                filename:
+                  type: string
+                  example: fa5079a38e0a4197864aa2ccb07f3bea_v2.mp4
+                folder:
+                  type: string
+                  example: 2019/5
+                metadata:
+                  type: object
+                  example: {}
+                mime_type:
+                  type: string
+                  example: video/mp4
+                create_time:
+                  type: object
+                  properties:
+                    $date:
+                      type: integer
+                      example: 1556853105063
+                original_filename:
+                  type: string
+                  example: video.mp4
+                client_info:
+                  type: string
+                  example: Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:66.0) Gecko/20100101 Firefox/66.0
+                version:
+                  type: integer
+                  example: 2
+                parent:
+                  type: object
+                  parameters:
+                    _id:
+                      type: object
+                      parameters:
+                        $oid:
+                          type: string
+                          example: 5ccbc4104dfd9b8fa153d60e
+                processing:
+                  type: boolean
+                  example: False
+                thumbnails:
+                  type: object
+                  example: {}
+                _id:
+                  type: object
+                  properties:
+                    $oid:
+                      type: string
+                      example: 5cbd5acfe24f6045607e51aa
         """
-        client_name = self._check_user_agent()
+        user_agent = self._check_user_agent()
         doc = app.mongo.db.projects.find_one_or_404({'_id': format_id(project_id)})
         if doc.get('processing') is True:
             return forbidden('this video is still processing, please wait.')
@@ -301,7 +690,7 @@ class RetrieveEditDestroyProject(MethodView):
             'filename': new_file_name,
             'folder': doc['folder'],
             'metadata': None,
-            'client_info': client_name,
+            'client_info': user_agent,
             'version': version,
             'processing': False,
             'mime_type': doc['mime_type'],
@@ -353,17 +742,32 @@ class RetrieveEditDestroyProject(MethodView):
         Delete project from db and video from filestorage.
         ---
         parameters:
-            - name: project_id
-              in: path
-              type: string
-              required: true
-              description: Unique project id
+        - name: project_id
+          in: path
+          type: string
+          required: true
+          description: Unique project id
+        responses:
+          200:
+            description: OK
+            schema:
+              type: object
+              properties:
+                status:
+                  type: boolean
+                  example: True
+                message:
+                  type: string
+                  example: Delete successfully
         """
 
         doc = app.mongo.db.projects.find_one_or_404({'_id': format_id(project_id)})
         app.fs.delete(f"{doc.get('folder')}/{doc.get('filename')}")
         app.mongo.db.projects.delete_one({'_id': format_id(project_id)})
-        return 'delete successfully'
+        return jsonify({
+            'status': True,
+            'message': 'Delete successfully'
+        })
 
     def _check_user_agent(self):
         user_agent = request.headers.environ.get('HTTP_USER_AGENT')
@@ -371,6 +775,7 @@ class RetrieveEditDestroyProject(MethodView):
         client_name = user_agent.split('/')[0]
         if client_name.lower() not in app.config.get('AGENT_ALLOW'):
             return bad_request("client is not allow to edit")
+        return user_agent
 
 
 # register all urls

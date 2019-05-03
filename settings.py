@@ -1,3 +1,4 @@
+import json
 import os
 from distutils.util import strtobool as _strtobool
 
@@ -68,9 +69,9 @@ NUMBER_RETRY = env('NUMBER_RETRY', 3)
 BROKER_CONNECTION_MAX_RETRIES = NUMBER_RETRY
 
 #: allow agent
-AGENT_ALLOW = env('AGENT_ALLOW', ['superdesk', 'postmanruntime'])
+AGENT_ALLOW = json.loads(env('AGENT_ALLOW', '["superdesk", "postmanruntime", "mozilla"]'))
 #: Codec support
-CODEC_SUPPORT = env('CODEC_SUPPORT', ['vp8', 'vp9', 'h264', 'aac', 'flac', 'ogg', 'vorbis'])
+CODEC_SUPPORT = json.loads(env('CODEC_SUPPORT', '["vp8", "vp9", "h264", "aac", "flac", "ogg", "vorbis"]'))
 
 #: media storage
 MEDIA_STORAGE = env('MEDIA_STORAGE', 'filesystem')
