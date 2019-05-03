@@ -36,21 +36,24 @@ def celery_queue(name):
     return "{}{}".format(os.environ.get('VIDEOSERVER_CELERY_PREFIX', ''), name)
 
 
+# base path
+BASE_PATH = os.path.dirname(__file__)
+
 #: logging
 LOG_CONFIG_FILE = env('LOG_CONFIG_FILE', 'logging_config.yml')
 
 CORE_APPS = [
-    'apps',
-    'media',
-    'media.video',
+    'apps.swagger',
+    'apps.projects',
 ]
 
 #: Mongo host port
 MONGO_HOST = env('MONGO_HOST', 'localhost')
 MONGO_PORT = env('MONGO_PORT', 27017)
-
-#: mongo db name, only used when mongo_uri is not set
-MONGO_DBNAME = env('MONGO_DBNAME', 'superdesk')
+MONGO_DBNAME = env('MONGO_DBNAME', 'sd_video_editor')
+MONGO_URI = "mongodb://{host}:{port}/{dbname}".format(
+    host=MONGO_HOST, port=MONGO_PORT, dbname=MONGO_DBNAME
+)
 
 #: rabbit-mq url
 RABBIT_MQ_URL = env('RABBIT_MQ_URL', 'pyamqp://guest@localhost//')
@@ -66,6 +69,7 @@ CODEC_SUPPORT = env('CODEC_SUPPORT', ['vp8', 'vp9', 'h264', 'aac', 'flac', 'ogg'
 
 #: media storage
 MEDIA_STORAGE = env('MEDIA_STORAGE', 'filesystem')
+FS_MEDIA_STORAGE_PATH = os.path.join(BASE_PATH, 'media', 'projects')
 
-#: log config file
-LOG_CONFIG_FILE = env('LOG_CONFIG_FILE', 'logging_config.yml')
+#: media tool
+DEFAULT_MEDIA_TOOL = env('DEFAULT_MEDIA_TOOL', 'ffmpeg')

@@ -14,8 +14,10 @@ import settings
 import importlib
 import logging.config
 from flask import Flask
-from media.storage import get_media_storage
-from media.logging import configure_logging
+from flask_pymongo import PyMongo
+
+from lib.storage import get_media_storage
+from lib.logging import configure_logging
 
 logger = logging.getLogger(__name__)
 
@@ -63,7 +65,16 @@ def get_app(config=None):
 
     for module_name in app.config.get('CORE_APPS', []):
         install_app(module_name)
+    #: logging
     configure_logging(app.config['LOG_CONFIG_FILE'])
+
+    # pymongo
+    # https://flask-pymongo.readthedocs.io
+    def init_db():
+        app.mongo = PyMongo(app)
+
+    app.init_db = init_db
+
     return app
 
 
@@ -72,4 +83,5 @@ if __name__ == '__main__':
     host = '0.0.0.0'
     port = int(os.environ.get('PORT', '5050'))
     app = get_app()
+    app.init_db()
     app.run(host=host, port=port)
