@@ -13,10 +13,9 @@ logger = logging.getLogger(__name__)
 
 
 @celery.task
-def task_edit_video(temp_path, doc, updates):
-    with open(temp_path, 'rb') as f:
-        video_stream = f.read()
-        os.remove(temp_path)
+def task_edit_video(file_path, doc, updates):
+    video_stream = app.fs.get(file_path)
+
     doc = json_util.loads(doc)
     app.mongo.db.projects.update_one(
         {'_id': doc['_id']},

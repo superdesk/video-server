@@ -726,16 +726,8 @@ class RetrieveEditDestroyProject(MethodView):
                 return bad_request("Action is not supported")
 
         file_path = os.path.join(doc['folder'], current_file_name)
-        temp_path = os.path.join(gettempdir(), file_path)
-        temp_dir = os.path.dirname(temp_path)
-        if not os.path.exists(temp_dir):
-            os.makedirs(temp_dir)
 
-        video_stream = app.fs.get(file_path)
-        with open(temp_path, 'wb') as f:
-            f.write(video_stream)
-
-        task_edit_video.delay(temp_path, json_util.dumps(doc), updates)
+        task_edit_video.delay(file_path, json_util.dumps(doc), updates)
 
     def delete(self, project_id):
         """
