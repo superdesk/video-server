@@ -13,44 +13,59 @@ logger = logging.getLogger(__name__)
 
 
 @celery.task
-def task_edit_video(file_path, doc, updates):
-    video_stream = app.fs.get(file_path)
+def task_edit_video(file_path, doc, updates, retry=0):
+    try:
+        video_stream = app.fs.get(file_path)
 
-    doc = json_util.loads(doc)
-    app.mongo.db.projects.update_one(
-        {'_id': doc['_id']},
-        {'$set': {
-            'processing': True,
-        }}
-    )
+        doc = json_util.loads(doc)
+        app.mongo.db.projects.update_one(
+            {'_id': doc['_id']},
+            {'$set': {
+                'processing': True,
+            }}
+        )
 
-    video_editor = get_video_editor()
-    edited_video_stream, metadata = video_editor.edit_video(
-        video_stream,
-        doc['filename'],
-        doc.get('metadata'),
-        updates.get('cut'),
-        updates.get('crop'),
-        updates.get('rotate'),
-        updates.get('quality')
-    )
+        video_editor = get_video_editor()
+        edited_video_stream, metadata = video_editor.edit_video(
+            video_stream,
+            doc['filename'],
+            doc.get('metadata'),
+            updates.get('cut'),
+            updates.get('crop'),
+            updates.get('rotate'),
+            updates.get('quality')
+        )
 
-    app.fs.put(
-        edited_video_stream,
-        f"{doc['folder']}/{doc['filename']}"
-    )
+        app.fs.put(
+            edited_video_stream,
+            f"{doc['folder']}/{doc['filename']}"
+        )
 
-    updated_doc = app.mongo.db.projects.find_one_and_update(
-        {'_id': doc['_id']},
-        {'$set': {
-            **doc,
-            'processing': False,
-            'metadata': metadata,
-            'thumbnails': {},
-        }},
-        return_document=ReturnDocument.AFTER
-    )
-    get_list_thumbnails.delay(json_util.dumps(updated_doc))
+        updated_doc = app.mongo.db.projects.find_one_and_update(
+            {'_id': doc['_id']},
+            {'$set': {
+                'processing': False,
+                'metadata': metadata,
+                'thumbnails': {},
+            }},
+            return_document=ReturnDocument.AFTER
+        )
+
+        get_list_thumbnails.delay(json_util.dumps(updated_doc))
+    except Exception as exc:
+        logger.exception(exc)
+        if retry < app.config.get('NUMBER_RETRY', 3):
+            task_edit_video.delay(file_path, json_util.dumps(doc), updates, retry=retry + 1)
+        else:
+            if doc['version'] >= 2:
+                app.mongo.db.projects.delete_one({'_id': doc['_id']})
+            else:
+                app.mongo.db.projects.update_one(
+                    {'_id': doc['_id']},
+                    {'$set': {
+                        'processing': False,
+                    }}
+                )
 
 
 @celery.task
@@ -71,10 +86,11 @@ def get_list_thumbnails(sdoc, retry=0):
         video_editor = get_video_editor()
         count = 0
         amount = app.config.get('AMOUNT_FRAMES', 40)
-        for thumbnail_stream, thumbnail_meta in video_editor.capture_list_timeline_thumnails(stream_file,
-                                                                                             doc.get('filename'),
-                                                                                             doc.get('metadata'),
-                                                                                             amount):
+        for thumbnail_stream, \
+            thumbnail_meta in video_editor.capture_list_timeline_thumbnails(stream_file,
+                                                                            doc.get('filename'),
+                                                                            doc.get('metadata'),
+                                                                            amount):
             thumbnail_path = '%s_timeline_%02d.png' % (file_path, count)
             app.fs.put(thumbnail_stream, thumbnail_path)
             filename, ext = os.path.splitext(doc.get('filename'))
@@ -115,4 +131,3 @@ def get_list_thumbnails(sdoc, retry=0):
                     'processing': True,
                 }},
                 upsert=False)
-

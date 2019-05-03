@@ -48,7 +48,7 @@ def test_ffmpeg_video_editor_generate_thumbnails(client, filestream):
     metadata = editor.get_meta(filestream)
     filename = 'test_ffmpeg_video_editor_generate_thumbnails'
     for index, thumb in enumerate(
-        editor.capture_list_timeline_thumnails(
+        editor.capture_list_timeline_thumbnails(
             filestream,
             filename,
             metadata,
