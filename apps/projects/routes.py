@@ -128,7 +128,108 @@ class UploadProject(MethodView):
         return Response(res, status=201, mimetype='application/json')
 
     def get(self):
-
+        """
+        Get list of projects in DB
+        ---
+        parameters:
+        - name: offset
+          in: query
+          type: integer
+          description: Page number
+        - name: size
+          in: query
+          type: integer
+          description: Number of items per page
+        responses:
+          200:
+            description: OK
+            schema:
+              type: object
+              properties:
+                offset:
+                  type: integer
+                  example: 1
+                size:
+                  type: integer
+                  example: 14
+                max_size:
+                  type: integer
+                  example: 50
+                items:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      filename:
+                        type: string
+                        example: fa5079a38e0a4197864aa2ccb07f3bea.mp4
+                      folder:
+                        type: string
+                        example: 2019/5
+                      metadata:
+                        type: object
+                        properties:
+                          codec_name:
+                            type: string
+                            example: h264
+                          codec_long_name:
+                            type: string
+                            example: H.264 / AVC / MPEG-4 AVC / MPEG-4 part 10
+                          width:
+                            type: string
+                            example: 640
+                          height:
+                            type: string
+                            example: 360
+                          duration:
+                            type: string
+                            example: 300.014000
+                          bit_rate:
+                            type: string
+                            example: 287654
+                          nb_frames:
+                            type: string
+                            example: 7654
+                          format_name:
+                            type: string
+                            example: mov,mp4,m4a,3gp,3g2,mj2
+                          size:
+                            type: string
+                            example: 14567890
+                      mime_type:
+                        type: string
+                        example: video/mp4
+                      create_time:
+                        type: object
+                        properties:
+                          $date:
+                            type: integer
+                            example: 1556853105063
+                      original_filename:
+                        type: string
+                        example: video.mp4
+                      client_info:
+                        type: string
+                        example: Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:66.0) Gecko/20100101 Firefox/66.0
+                      version:
+                        type: integer
+                        example: 1
+                      parent:
+                        type: object
+                        example: {}
+                      processing:
+                        type: boolean
+                        example: False
+                      thumbnails:
+                        type: object
+                        example: {}
+                      _id:
+                        type: object
+                        properties:
+                          $oid:
+                            type: string
+                            example: 5cbd5acfe24f6045607e51aa
+        """
         offset = int(request.args.get('offset', 0))
         size = int(request.args.get('size', 25))
         docs = list(app.mongo.db.projects.find())
