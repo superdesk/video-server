@@ -54,7 +54,7 @@ def task_edit_video(file_path, doc, updates):
 
 
 @celery.task
-def get_list_thumbnails(sdoc):
+def get_list_thumbnails(sdoc, retry=0):
     update_thumbnails = []
     try:
         doc = json_util.loads(sdoc)
@@ -91,7 +91,7 @@ def get_list_thumbnails(sdoc):
             )
             count += 1
 
-        updates = app.mongo.db.projects.update_one(
+        app.mongo.db.projects.update_one(
             {'_id': format_id(doc.get('_id'))},
             {"$set": {
                 'thumbnails': {
@@ -106,3 +106,13 @@ def get_list_thumbnails(sdoc):
         if update_thumbnails:
             for thumbnail in update_thumbnails:
                 os.remove('%s/%s' % (thumbnail.get('folder'), thumbnail.get('filename')))
+        if retry < app.config.get('NUMBER_RETRY', 3):
+            get_list_thumbnails.delay(sdoc, retry=retry + 1)
+        else:
+            app.mongo.db.projects.update_one(
+                {'_id': format_id(doc.get('_id'))},
+                {"$set": {
+                    'processing': True,
+                }},
+                upsert=False)
+
