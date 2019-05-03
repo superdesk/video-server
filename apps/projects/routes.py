@@ -1,3 +1,4 @@
+import os
 from datetime import datetime
 
 from bson import json_util
@@ -70,6 +71,10 @@ class UploadProject(MethodView):
         """
 
         # validate request
+        if 'file' not in request.files:
+            # to avoid TypeError: cannot serialize '_io.BufferedRandom' error
+            return bad_request({ "file": ["required field"]})
+
         v = Validator(self.SCHEMA_UPLOAD)
         if not v.validate(request.files):
             return bad_request(v.errors)
@@ -89,24 +94,22 @@ class UploadProject(MethodView):
         if codec_name not in app.config.get('CODEC_SUPPORT'):
             return bad_request("Codec: {} is not supported.".format(codec_name))
 
-        # put file into storage
+        # generate file path
         file_name = create_file_name(ext=file.filename.split('.')[1])
-        mime_type = file.mimetype
+        utcnow = datetime.utcnow()
+        folder = f'{utcnow.year}/{utcnow.month}'
+        file_path = os.path.join(app.config.get('FS_MEDIA_STORAGE_PATH'), folder, file_name)
 
-        # get path group by year month
-        create_date = datetime.utcnow()
-        folder = f'{create_date.year}/{create_date.month}'
-
-        # put stream file into storage
-        if app.fs.put(file_stream, f'{folder}/{file_name}'):
+        # put file stream into storage
+        if app.fs.put(file_stream, file_path=file_path):
             try:
                 # add record to database
                 doc = {
                     'filename': file_name,
                     'folder': folder,
                     'metadata': metadata,
-                    'create_time': create_date,
-                    'mime_type': mime_type,
+                    'create_time': utcnow,
+                    'mime_type': file.mimetype,
                     'version': 1,
                     'processing': False,
                     'parent': None,
@@ -116,10 +119,12 @@ class UploadProject(MethodView):
                 }
                 app.mongo.db.projects.insert_one(doc)
             except Exception as ex:
+                # remove file from storage
                 app.fs.delete(file_name)
-                return forbidden("Can not connect database")
+                return forbidden("Can not insert a record to database: {}".format(ex))
         else:
-            return forbidden("Can store file")
+            return forbidden("Can not save file")
+
         return Response(json_util.dumps(doc), status=201, mimetype='application/json')
 
 
@@ -265,10 +270,14 @@ class RetrieveEditDestroyProject(MethodView):
         item = app.mongo.db.projects.find_one({'_id': format_id(project_id)})
         if not item:
             return not_found("Project with id: {} was not found.".format(project_id))
-        app.fs.delete(f"{item.get('folder')}/{item.get('filename')}")
+        # remove record from db
         app.mongo.db.projects.delete_one({'_id': format_id(project_id)})
-        return 'delete successfully'
-
+        # remove file from storage
+        file_path = os.path.join(app.config.get('FS_MEDIA_STORAGE_PATH'), item.get('folder'), item.get('filename'))
+        if app.fs.delete(file_path):
+            return Response(status=204, mimetype='application/json')
+        else:
+            return Response(status=500, mimetype='application/json')
 
 # register all urls
 bp.add_url_rule('/', view_func=UploadProject.as_view('upload_project'))
