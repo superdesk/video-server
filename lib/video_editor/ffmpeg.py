@@ -43,6 +43,7 @@ class FFMPEGVideoEditor(VideoEditorInterface):
         :param video_quality:
         :return:
         """
+        path_video = ''
         try:
             path_video = self._create_temp_file(stream_file, filename)
 
@@ -75,6 +76,7 @@ class FFMPEGVideoEditor(VideoEditorInterface):
             if video_rotate:
                 delta90 = round((int(video_rotate['degree'] % 360) / 90))
                 if delta90 != 0:
+                    rotate_string = ''
                     if delta90 == 1:
                         rotate_string = "transpose=1"
                     if delta90 == 2:
@@ -92,16 +94,26 @@ class FFMPEGVideoEditor(VideoEditorInterface):
                                                "5", "-preset", "ultrafast", "-strict", "-2", "-c:a", "copy"])
             content = open(path_video, "rb+").read()
             metadata_edit_file = self._get_meta(path_video)
-
         finally:
             if path_video:
                 os.remove(path_video)
         return content, metadata_edit_file
 
-    def capture_thumnail(self, filestream, capture_time):
-        pass
+    def capture_thumnail(self, stream_file, filename, metadata, capture_time):
+        try:
+            path_video = self._create_temp_file(stream_file, filename)
+            duration = float(metadata['duration'])
+            path_output = path_video + "_thumnail.png"
+            if int(duration) <= int(capture_time):
+                capture_time = int(duration) - 0.1
+            content = self._capture_thumnail(path_video, path_output, capture_time)
+            thumbnail_metadata = self._get_meta(path_output)
+        finally:
+            if path_video:
+                os.remove(path_video)
+        return content, thumbnail_metadata
 
-    def capture_list_timeline_thumnails(self, stream_file, filename, metadata, number_frames):
+    def capture_list_timeline_thumbnails(self, stream_file, filename, metadata, number_frames):
         """
             capture a list frames in video and store it to resource.
         :param metadata:
@@ -110,21 +122,26 @@ class FFMPEGVideoEditor(VideoEditorInterface):
         :param item_id:
         :return:
         """
-        path_video = self._create_temp_file(stream_file, filename)
-        duration = float(metadata['duration'])
-        frame_per_second = (duration - 1) / number_frames
+        path_video = ''
+        try:
+            path_video = self._create_temp_file(stream_file, filename)
+            duration = float(metadata['duration'])
+            frame_per_second = (duration - 1) / number_frames
 
-        # capture list frame via script capture_list_frames.sh
-        path_script = os.path.dirname(__file__) + '/script/capture_list_frames.sh'
-        cmd.run([path_script, path_video, path_video + "_", str(frame_per_second), str(number_frames + 1)])
-        for i in range(0, number_frames + 1):
-            path_output = path_video + '_%0d.bmp' % i
-            try:
-                thumbnail_metadata = self._get_meta(path_output)
-                thumbnail_metadata['mimetype'] = 'image/bmp',
-                yield open(path_output, "rb+").read(), thumbnail_metadata
-            finally:
-                os.remove(path_output)
+            # capture list frame via script capture_list_frames.sh
+            path_script = os.path.dirname(__file__) + '/script/capture_list_frames.sh'
+            cmd.run([path_script, path_video, path_video + "_", str(frame_per_second), str(number_frames + 1)])
+            for i in range(0, number_frames + 1):
+                path_output = path_video + '_%0d.bmp' % i
+                try:
+                    thumbnail_metadata = self._get_meta(path_output)
+                    thumbnail_metadata['mimetype'] = 'image/bmp',
+                    yield open(path_output, "rb+").read(), thumbnail_metadata
+                finally:
+                    os.remove(path_output)
+        finally:
+            if path_video:
+                os.remove(path_video)
 
     def _capture_thumnail(self, path_video, path_output, time_capture=0):
         """
@@ -136,7 +153,7 @@ class FFMPEGVideoEditor(VideoEditorInterface):
         """
         try:
             cmd.run(["ffmpeg", "-i", path_video, "-ss", str(time_capture), "-vframes", "1", path_output])
-            return BytesIO(open(path_output, "rb+").read())
+            return open(path_output, "rb+").read()
         finally:
             os.remove(path_output)
 

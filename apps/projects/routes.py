@@ -777,6 +777,32 @@ class RetrieveEditDestroyProject(MethodView):
             return bad_request("client is not allow to edit")
         return user_agent
 
+"""
+class UploadProject(MethodView):
+    def get(self, project_id):
+        doc = app.mongo.db.projects.find_one({'_id': format_id(project_id)})
+        if not doc:
+            return not_found("Project with id: {} was not found.".format(project_id))
+        media_file = app.fs.get('%s/%s')
+        if media_file:
+            data = wrap_file(request.environ, media_file, buffer_size=1024 * 256)
+            response = app.response_class(
+                data,
+                mimetype=media_file.content_type,
+                direct_passthrough=True)
+            response.content_length = media_file.length
+            response.last_modified = media_file.upload_date
+            response.set_etag(media_file.md5)
+            response.cache_control.max_age = cache_for
+            response.cache_control.s_max_age = cache_for
+            response.cache_control.public = True
+            response.make_conditional(request)
+            response.headers['Content-Disposition'] = 'inline'
+            return response
+        raise SuperdeskApiError.notFoundError('File not found on media storage.')
+
+        pass
+"""
 
 # register all urls
 bp.add_url_rule('/', view_func=UploadProject.as_view('upload_project'))
