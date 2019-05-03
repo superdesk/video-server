@@ -114,7 +114,7 @@ class UploadProject(MethodView):
                     'filename': file_name,
                     'folder': folder,
                     'metadata': metadata,
-                    'create_time': create_date,
+                    'create_date': create_date,
                     'mime_type': mime_type,
                     'version': 1,
                     'processing': False,
@@ -124,6 +124,13 @@ class UploadProject(MethodView):
                     'original_filename': file.filename
                 }
                 app.mongo.db.projects.insert_one(doc)
+                activity = {
+                    "action": "UPLOAD",
+                    "file_id": doc.get('_id'),
+                    "payload": {"file": doc.get(file.filename)},
+                    "create_date": create_date
+                }
+                app.mongo.db.activity.insert_one(activity)
             except Exception as ex:
                 app.fs.delete(file_name)
                 return forbidden("Can not connect database")
@@ -258,6 +265,13 @@ class RetrieveEditDestroyProject(MethodView):
         if doc.get('processing') is True:
             return forbidden('this video is still processing, please wait.')
         self._edit_video(doc['filename'], doc)
+        activity = {
+            "action": "EDIT PUT",
+            "file_id": doc.get('_id'),
+            "payload": {request.get_json()},
+            "create_date": datetime.utcnow()
+        }
+        app.mongo.db.activity.insert_one(activity)
         return Response(
             json_util.dumps(doc), status=200, mimetype='application/json'
         )
@@ -299,7 +313,13 @@ class RetrieveEditDestroyProject(MethodView):
         app.mongo.db.projects.insert_one(new_doc)
 
         self._edit_video(doc['filename'], new_doc)
-
+        activity = {
+            "action": "EDIT POST",
+            "file_id": doc.get('_id'),
+            "payload": {request.get_json()},
+            "create_date": datetime.utcnow()
+        }
+        app.mongo.db.activity.insert_one(activity)
         return Response(
             json_util.dumps(new_doc), status=200, mimetype='application/json'
         )
