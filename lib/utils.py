@@ -1,6 +1,9 @@
-import uuid
-import bson
 import itertools
+import uuid
+
+import bson
+from flask import Response
+
 
 def create_file_name(ext):
     return "%s.%s" % (uuid.uuid4().hex, ext)
@@ -21,3 +24,10 @@ def paginate(iterable, page_size):
         if len(page) == 0:
             break
         yield page
+
+
+def json_response(doc, status=200):
+    """
+    Serialize mongodb documents and return Response with applicaton/json mimetype
+    """
+    return Response(bson.json_util.dumps(doc), status=status, mimetype='application/json')

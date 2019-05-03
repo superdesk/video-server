@@ -4,13 +4,12 @@ from datetime import datetime
 from tempfile import gettempdir
 
 from bson import json_util
-from flask import Response
 from flask import current_app as app
-from flask import request, jsonify
+from flask import jsonify, request
 from flask.views import MethodView
 
 from lib.errors import bad_request, forbidden, not_found
-from lib.utils import create_file_name, format_id, paginate
+from lib.utils import create_file_name, format_id, json_response, paginate
 from lib.validator import Validator
 from lib.video_editor import get_video_editor
 
@@ -177,7 +176,7 @@ class UploadProject(MethodView):
         # Run get list thumbnail for video in celery
         res = json_util.dumps(doc)
         get_list_thumbnails.delay(res)
-        return Response(res, status=201, mimetype='application/json')
+        return json_response(doc, status=201)
 
     def get(self):
         """
@@ -294,8 +293,7 @@ class UploadProject(MethodView):
             'size': len(list_pages[offset]),
             'max_size': size
         }
-        return Response(json_util.dumps(res), status=200, mimetype='application/json')
-        pass
+        return json_response(res)
 
 
 class RetrieveEditDestroyProject(MethodView):
@@ -429,7 +427,7 @@ class RetrieveEditDestroyProject(MethodView):
 
         doc = app.mongo.db.projects.find_one_or_404({'_id': format_id(project_id)})
 
-        return Response(json_util.dumps(doc), status=200, mimetype='application/json')
+        return json_response(doc)
 
     def put(self, project_id):
         """
@@ -564,13 +562,11 @@ class RetrieveEditDestroyProject(MethodView):
         activity = {
             "action": "EDIT PUT",
             "file_id": doc.get('_id'),
-            "payload": {request.get_json()},
+            "payload": request.get_json(),
             "create_date": datetime.utcnow()
         }
         app.mongo.db.activity.insert_one(activity)
-        return Response(
-            json_util.dumps(doc), status=200, mimetype='application/json'
-        )
+        return json_response(doc)
 
     def post(self, project_id):
         """
@@ -705,13 +701,11 @@ class RetrieveEditDestroyProject(MethodView):
         activity = {
             "action": "EDIT POST",
             "file_id": doc.get('_id'),
-            "payload": {request.get_json()},
+            "payload": request.get_json(),
             "create_date": datetime.utcnow()
         }
         app.mongo.db.activity.insert_one(activity)
-        return Response(
-            json_util.dumps(new_doc), status=200, mimetype='application/json'
-        )
+        return json_response(new_doc)
 
     def _edit_video(self, current_file_name, doc):
         updates = request.get_json()
