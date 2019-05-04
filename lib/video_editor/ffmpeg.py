@@ -192,9 +192,10 @@ class FFMPEGVideoEditor(VideoEditorInterface):
         list_meta = ['height', 'width', 'size', 'bit_rate', 'duration', 'codec_name', 'codec_long_name', 'format_name',
                      'nb_frames']
         for text in data:
-            info = text.split('=')
-            if len(info) == 2 and info[0] in list_meta and not metadata.get(info[0]):
-                metadata[info[0]] = info[1]
+            if text.count('=') == 1:
+                key, value = text.split('=')
+                if key in list_meta and not metadata.get('key') and value != 'N/A':
+                    metadata[key] = value
         return metadata
 
     def _create_temp_file(self, file_stream, file_name):
