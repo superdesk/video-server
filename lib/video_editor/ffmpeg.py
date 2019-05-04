@@ -111,6 +111,8 @@ class FFMPEGVideoEditor(VideoEditorInterface):
         finally:
             if path_video:
                 os.remove(path_video)
+            if path_output:
+                os.remove(path_output)
         return content, thumbnail_metadata
 
     def capture_list_timeline_thumbnails(self, stream_file, filename, metadata, number_frames):
@@ -151,11 +153,8 @@ class FFMPEGVideoEditor(VideoEditorInterface):
         :param time_capture:
         :return:
         """
-        try:
-            cmd.run(["ffmpeg", "-i", path_video, "-ss", str(time_capture), "-vframes", "1", path_output])
-            return open(path_output, "rb+").read()
-        finally:
-            os.remove(path_output)
+        cmd.run(["ffmpeg", "-i", path_video, "-ss", str(time_capture), "-vframes", "1", path_output])
+        return open(path_output, "rb+").read()
 
     def _edit_video(self, path_video, path_output, para=[]):
         """

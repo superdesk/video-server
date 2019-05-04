@@ -554,11 +554,28 @@ class RetrieveEditDestroyProject(MethodView):
                       type: string
                       example: 5cbd5acfe24f6045607e51aa
         """
-        user_agent = self._check_user_agent()
+        self._check_user_agent()
+        self._check_request_validity()
         doc = app.mongo.db.projects.find_one_or_404({'_id': format_id(project_id)})
         if doc.get('processing') is True:
             return forbidden('this video is still processing, please wait.')
-        self._edit_video(doc['filename'], doc)
+        updates = request.get_json()
+        file_path = os.path.join(doc['folder'], doc['filename'])
+
+        if updates.get('thumbnail'):
+            preview_thumbnail = self._set_thumbnail(file_path, updates['thumbnail'], json_util.dumps(doc))
+            if not preview_thumbnail:
+                return bad_request('Invalid request')
+            else:
+                app.mongo.db.projects.update_one(
+                    {'_id': doc['_id']},
+                    {'$set': {
+                        'preview_thumbnail': preview_thumbnail
+                    }}
+                )
+
+        task_edit_video.delay(file_path, json_util.dumps(doc), updates)
+
         activity = {
             "action": "EDIT PUT",
             "file_id": doc.get('_id'),
@@ -673,9 +690,19 @@ class RetrieveEditDestroyProject(MethodView):
                       example: 5cbd5acfe24f6045607e51aa
         """
         user_agent = self._check_user_agent()
+        self._check_request_validity()
         doc = app.mongo.db.projects.find_one_or_404({'_id': format_id(project_id)})
         if doc.get('processing') is True:
             return forbidden('this video is still processing, please wait.')
+        updates = request.get_json()
+        file_path = os.path.join(doc['folder'], doc['filename'])
+
+        preview_thumbnail = {}
+        if updates.get('thumbnail'):
+            preview_thumbnail = self._set_thumbnail(file_path, updates['thumbnail'], json_util.dumps(doc))
+            if not preview_thumbnail:
+                return bad_request('Invalid request')
+
         filename, ext = os.path.splitext(doc['filename'])
         version = doc.get('version', 1) + 1
         new_file_name = f'{filename}_v{version}{ext}'
@@ -693,11 +720,13 @@ class RetrieveEditDestroyProject(MethodView):
             'parent': {
                 '_id': doc['_id'],
             },
-            'thumbnails': {}
+            'thumbnails': {},
+            'preview_thumbnail': preview_thumbnail,
         }
         app.mongo.db.projects.insert_one(new_doc)
 
-        self._edit_video(doc['filename'], new_doc)
+        task_edit_video.delay(file_path, json_util.dumps(new_doc), updates)
+
         activity = {
             "action": "EDIT POST",
             "file_id": doc.get('_id'),
@@ -706,22 +735,6 @@ class RetrieveEditDestroyProject(MethodView):
         }
         app.mongo.db.activity.insert_one(activity)
         return json_response(new_doc)
-
-    def _edit_video(self, current_file_name, doc):
-        updates = request.get_json()
-        validator = Validator(self.SCHEMA_EDIT)
-        if not validator.validate(updates):
-            return bad_request(validator.errors)
-
-        actions = updates.keys()
-        supported_action = ('cut', 'crop', 'rotate')
-        for action in actions:
-            if action not in supported_action:
-                return bad_request("Action is not supported")
-
-        file_path = os.path.join(doc['folder'], current_file_name)
-
-        task_edit_video.delay(file_path, json_util.dumps(doc), updates)
 
     def delete(self, project_id):
         """
@@ -762,6 +775,47 @@ class RetrieveEditDestroyProject(MethodView):
         if client_name.lower() not in app.config.get('AGENT_ALLOW'):
             return bad_request("client is not allow to edit")
         return user_agent
+
+    def _check_request_validity(self):
+        request_schema = request.get_json()
+        validator = Validator(self.SCHEMA_EDIT)
+        if not validator.validate(request_schema):
+            return bad_request(validator.errors)
+
+    def _set_thumbnail(self, video_path, schema, doc):
+        action = schema.get('type')
+        thumbnail_stream, thumbnail_metadata = None, None
+        doc = json_util.loads(doc)
+
+        if action == 'upload':
+            thumbnail_stream = schema.get('data')
+            thumbnail_metadata = app.fs.get_meta(thumbnail_stream)
+        elif action == 'capture':
+            time = schema.get('time')
+            video_stream = app.fs.get(video_path)
+            video_editor = get_video_editor()
+            thumbnail_stream, thumbnail_metadata = video_editor.capture_thumnail(
+                video_stream, doc['filename'], doc['metadata'], time
+            )
+
+        if thumbnail_stream and thumbnail_metadata:
+            try:
+                filename, ext = os.path.splitext(doc['filename'])
+                thumbnail_filename = f"{filename}_thumbnail.png"
+                app.fs.put(thumbnail_stream, f"{doc['folder']}/{thumbnail_filename}")
+                return {
+                    'filename': thumbnail_filename,
+                    'folder': doc.get('folder'),
+                    'mimetype': 'image/bmp',
+                    'width': thumbnail_metadata.get('width'),
+                    'height': thumbnail_metadata.get('height'),
+                    'size': thumbnail_metadata.get('size'),
+                }
+            except Exception as exc:
+                logger.exception(exc)
+        else:
+            return {}
+
 
 """
 class UploadProject(MethodView):
