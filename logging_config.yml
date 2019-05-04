@@ -14,12 +14,17 @@ handlers:
   console:
     class: logging.StreamHandler
     stream  : ext://sys.stdout
+  file:
+    class : logging.handlers.RotatingFileHandler
+    filename: logfile.log
+    maxBytes: 10485760
+    backupCount: 5
 loggers:
   video-server.ws:
-    handlers: [console]
+    handlers: [console, file]
     level: DEBUG
   worker:
-    handlers: [console]
+    handlers: [console, file]
     level: WARN
   root:
-    handlers: [console]
+    handlers: [console, file]
