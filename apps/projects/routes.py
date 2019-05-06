@@ -5,7 +5,7 @@ from tempfile import gettempdir
 
 from bson import json_util
 from flask import current_app as app
-from flask import jsonify, request
+from flask import abort, jsonify, request
 from flask.views import MethodView
 
 from lib.errors import bad_request, forbidden, not_found
@@ -17,6 +17,21 @@ from . import bp
 from .tasks import get_list_thumbnails, task_edit_video
 
 logger = logging.getLogger(__name__)
+
+
+def check_user_agent():
+    user_agent = request.headers.environ.get('HTTP_USER_AGENT')
+
+    client_name = user_agent.split('/')[0]
+    if client_name.lower() not in app.config.get('AGENT_ALLOW'):
+        abort(bad_request("client is not allow to edit"))
+    return user_agent
+
+
+def check_request_schema_validity(request_schema, schema):
+    validator = Validator(schema)
+    if not validator.validate(request_schema):
+        abort(bad_request(validator.errors))
 
 
 class UploadProject(MethodView):
@@ -115,16 +130,8 @@ class UploadProject(MethodView):
                       example: 5cbd5acfe24f6045607e51aa
         """
 
-        # validate request
-        v = Validator(self.SCHEMA_UPLOAD)
-        if not v.validate(request.files):
-            return bad_request(v.errors)
-
-        # validate user-agent
-        user_agent = request.headers.environ['HTTP_USER_AGENT']
-        client_name = user_agent.split('/')[0]
-        if client_name.lower() not in app.config.get('AGENT_ALLOW'):
-            return bad_request("client is not allow to edit")
+        user_agent = check_user_agent()
+        check_request_schema_validity(request.files, self.SCHEMA_UPLOAD)
 
         # validate codec
         video_editor = get_video_editor()
@@ -554,8 +561,9 @@ class RetrieveEditDestroyProject(MethodView):
                       type: string
                       example: 5cbd5acfe24f6045607e51aa
         """
-        self._check_user_agent()
-        self._check_request_validity()
+        check_user_agent()
+        check_request_schema_validity(request.get_json(), self.SCHEMA_EDIT)
+
         doc = app.mongo.db.projects.find_one_or_404({'_id': format_id(project_id)})
         if doc.get('processing') is True:
             return forbidden('this video is still processing, please wait.')
@@ -689,8 +697,9 @@ class RetrieveEditDestroyProject(MethodView):
                       type: string
                       example: 5cbd5acfe24f6045607e51aa
         """
-        user_agent = self._check_user_agent()
-        self._check_request_validity()
+        user_agent = check_user_agent()
+        check_request_schema_validity(request.get_json(), self.SCHEMA_EDIT)
+
         doc = app.mongo.db.projects.find_one_or_404({'_id': format_id(project_id)})
         if doc.get('processing') is True:
             return forbidden('this video is still processing, please wait.')
@@ -767,20 +776,6 @@ class RetrieveEditDestroyProject(MethodView):
             'status': True,
             'message': 'Delete successfully'
         })
-
-    def _check_user_agent(self):
-        user_agent = request.headers.environ.get('HTTP_USER_AGENT')
-
-        client_name = user_agent.split('/')[0]
-        if client_name.lower() not in app.config.get('AGENT_ALLOW'):
-            return bad_request("client is not allow to edit")
-        return user_agent
-
-    def _check_request_validity(self):
-        request_schema = request.get_json()
-        validator = Validator(self.SCHEMA_EDIT)
-        if not validator.validate(request_schema):
-            return bad_request(validator.errors)
 
     def _set_thumbnail(self, video_path, schema, doc):
         action = schema.get('type')
