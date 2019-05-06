@@ -14,7 +14,7 @@ from lib.validator import Validator
 from lib.video_editor import get_video_editor
 
 from . import bp
-from .tasks import get_list_thumbnails, task_edit_video
+from .tasks import task_get_list_thumbnails, task_edit_video
 
 logger = logging.getLogger(__name__)
 
@@ -116,6 +116,10 @@ class UploadProject(MethodView):
         """
 
         # validate request
+        if 'file' not in request.files:
+            # to avoid TypeError: cannot serialize '_io.BufferedRandom' error
+            return bad_request({"file": ["required field"]})
+
         v = Validator(self.SCHEMA_UPLOAD)
         if not v.validate(request.files):
             return bad_request(v.errors)
@@ -135,24 +139,22 @@ class UploadProject(MethodView):
         if codec_name not in app.config.get('CODEC_SUPPORT'):
             return bad_request("Codec: {} is not supported.".format(codec_name))
 
-        # put file into storage
+        # generate file path
         file_name = create_file_name(ext=file.filename.split('.')[1])
-        mime_type = file.mimetype
+        utcnow = datetime.utcnow()
+        folder = f'{utcnow.year}/{utcnow.month}'
+        file_path = os.path.join(app.config.get('FS_MEDIA_STORAGE_PATH'), folder, file_name)
 
-        # get path group by year month
-        create_date = datetime.utcnow()
-        folder = f'{create_date.year}/{create_date.month}'
-
-        # put stream file into storage
-        if app.fs.put(file_stream, f'{folder}/{file_name}'):
+        # put file stream into storage
+        if app.fs.put(file_stream, file_path=file_path):
             try:
                 # add record to database
                 doc = {
                     'filename': file_name,
                     'folder': folder,
                     'metadata': metadata,
-                    'create_date': create_date,
-                    'mime_type': mime_type,
+                    'create_date': utcnow,
+                    'mime_type': file.mimetype,
                     'version': 1,
                     'processing': False,
                     'parent': None,
@@ -165,17 +167,15 @@ class UploadProject(MethodView):
                     "action": "UPLOAD",
                     "file_id": doc.get('_id'),
                     "payload": {"file": doc.get(file.filename)},
-                    "create_date": create_date
+                    "create_date": utcnow
                 }
                 app.mongo.db.activity.insert_one(activity)
             except Exception as ex:
+                # remove file from storage
                 app.fs.delete(file_name)
-                return forbidden("Can not connect database")
+                return forbidden("Can not insert a record to database: {}".format(ex))
         else:
             return forbidden("Can not store file")
-        # Run get list thumbnail for video in celery
-        res = json_util.dumps(doc)
-        get_list_thumbnails.delay(res)
         return json_response(doc, status=201)
 
     def get(self):
@@ -425,8 +425,13 @@ class RetrieveEditDestroyProject(MethodView):
                       example: 5cbd5acfe24f6045607e51aa
         """
 
-        doc = app.mongo.db.projects.find_one_or_404({'_id': format_id(project_id)})
+        doc = app.mongo.db.projects.find_one({'_id': format_id(project_id)})
+        if not doc:
+            return not_found("Project with id: {} was not found.".format(project_id))
 
+        # Run get list thumbnails of timeline for video in celery
+        if not doc.get('thumbnails'):
+            task_get_list_thumbnails.delay(json_util.dumps(doc))
         return json_response(doc)
 
     def put(self, project_id):
@@ -554,11 +559,16 @@ class RetrieveEditDestroyProject(MethodView):
                       type: string
                       example: 5cbd5acfe24f6045607e51aa
         """
-        user_agent = self._check_user_agent()
-        doc = app.mongo.db.projects.find_one_or_404({'_id': format_id(project_id)})
+        self._check_user_agent()
+        doc = app.mongo.db.projects.find_one({'_id': format_id(project_id)})
+        if not doc:
+            return not_found("Project with id: {} was not found.".format(project_id))
         if doc.get('processing') is True:
             return forbidden('this video is still processing, please wait.')
-        self._edit_video(doc['filename'], doc)
+        if not doc.get('version') >= 2:
+            return bad_request("Only PUT action for edited video version 2")
+        file_path = os.path.join(app.config.get('FS_MEDIA_STORAGE_PATH'), doc.get('folder'), doc.get('filename'))
+        self._edit_video(file_path, doc)
         activity = {
             "action": "EDIT PUT",
             "file_id": doc.get('_id'),
@@ -673,10 +683,13 @@ class RetrieveEditDestroyProject(MethodView):
                       example: 5cbd5acfe24f6045607e51aa
         """
         user_agent = self._check_user_agent()
-        doc = app.mongo.db.projects.find_one_or_404({'_id': format_id(project_id)})
-        if doc.get('processing') is True:
-            return forbidden('this video is still processing, please wait.')
+        doc = app.mongo.db.projects.find_one({'_id': format_id(project_id)})
+        if not doc:
+            return not_found("Project with id: {} was not found.".format(project_id))
+
         filename, ext = os.path.splitext(doc['filename'])
+        if doc.get('version') >= 2:
+            return bad_request("Only POST action for original video version 1")
         version = doc.get('version', 1) + 1
         new_file_name = f'{filename}_v{version}{ext}'
         if doc.get('version') >= 2:
@@ -696,8 +709,8 @@ class RetrieveEditDestroyProject(MethodView):
             'thumbnails': {}
         }
         app.mongo.db.projects.insert_one(new_doc)
-
-        self._edit_video(doc['filename'], new_doc)
+        file_path = os.path.join(app.config.get('FS_MEDIA_STORAGE_PATH'), doc.get('folder'), doc.get('filename'))
+        self._edit_video(file_path, new_doc)
         activity = {
             "action": "EDIT POST",
             "file_id": doc.get('_id'),
@@ -707,7 +720,7 @@ class RetrieveEditDestroyProject(MethodView):
         app.mongo.db.activity.insert_one(activity)
         return json_response(new_doc)
 
-    def _edit_video(self, current_file_name, doc):
+    def _edit_video(self, file_path, doc):
         updates = request.get_json()
         validator = Validator(self.SCHEMA_EDIT)
         if not validator.validate(updates):
@@ -718,8 +731,6 @@ class RetrieveEditDestroyProject(MethodView):
         for action in actions:
             if action not in supported_action:
                 return bad_request("Action is not supported")
-
-        file_path = os.path.join(doc['folder'], current_file_name)
 
         task_edit_video.delay(file_path, json_util.dumps(doc), updates)
 
@@ -747,13 +758,17 @@ class RetrieveEditDestroyProject(MethodView):
                   example: Delete successfully
         """
 
-        doc = app.mongo.db.projects.find_one_or_404({'_id': format_id(project_id)})
-        app.fs.delete(f"{doc.get('folder')}/{doc.get('filename')}")
+        item = app.mongo.db.projects.find_one({'_id': format_id(project_id)})
+        if not item:
+            return not_found("Project with id: {} was not found.".format(project_id))
+        # remove record from db
         app.mongo.db.projects.delete_one({'_id': format_id(project_id)})
-        return jsonify({
-            'status': True,
-            'message': 'Delete successfully'
-        })
+        # remove file from storage
+        file_path = os.path.join(app.config.get('FS_MEDIA_STORAGE_PATH'), item.get('folder'), item.get('filename'))
+        if app.fs.delete(file_path):
+            return json_response(status=204)
+        else:
+            return json_response(status=500)
 
     def _check_user_agent(self):
         user_agent = request.headers.environ.get('HTTP_USER_AGENT')
@@ -763,32 +778,6 @@ class RetrieveEditDestroyProject(MethodView):
             return bad_request("client is not allow to edit")
         return user_agent
 
-"""
-class UploadProject(MethodView):
-    def get(self, project_id):
-        doc = app.mongo.db.projects.find_one({'_id': format_id(project_id)})
-        if not doc:
-            return not_found("Project with id: {} was not found.".format(project_id))
-        media_file = app.fs.get('%s/%s')
-        if media_file:
-            data = wrap_file(request.environ, media_file, buffer_size=1024 * 256)
-            response = app.response_class(
-                data,
-                mimetype=media_file.content_type,
-                direct_passthrough=True)
-            response.content_length = media_file.length
-            response.last_modified = media_file.upload_date
-            response.set_etag(media_file.md5)
-            response.cache_control.max_age = cache_for
-            response.cache_control.s_max_age = cache_for
-            response.cache_control.public = True
-            response.make_conditional(request)
-            response.headers['Content-Disposition'] = 'inline'
-            return response
-        raise SuperdeskApiError.notFoundError('File not found on media storage.')
-
-        pass
-"""
 
 # register all urls
 bp.add_url_rule('/', view_func=UploadProject.as_view('upload_project'))

@@ -16,5 +16,5 @@ class MediaStorageInterface(metaclass=abc.ABCMeta):
         pass
 
     @abc.abstractmethod
-    def delete(self, _id):
+    def delete(self, file_path):
         pass

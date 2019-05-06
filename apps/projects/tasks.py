@@ -41,7 +41,7 @@ def task_edit_video(file_path, doc, updates, retry=0):
             f"{doc['folder']}/{doc['filename']}"
         )
 
-        updated_doc = app.mongo.db.projects.find_one_and_update(
+        app.mongo.db.projects.find_one_and_update(
             {'_id': doc['_id']},
             {'$set': {
                 'processing': False,
@@ -50,8 +50,6 @@ def task_edit_video(file_path, doc, updates, retry=0):
             }},
             return_document=ReturnDocument.AFTER
         )
-
-        get_list_thumbnails.delay(json_util.dumps(updated_doc))
     except Exception as exc:
         logger.exception(exc)
         if retry < app.config.get('NUMBER_RETRY', 3):
@@ -69,7 +67,7 @@ def task_edit_video(file_path, doc, updates, retry=0):
 
 
 @celery.task
-def get_list_thumbnails(sdoc, retry=0):
+def task_get_list_thumbnails(sdoc, retry=0):
     update_thumbnails = []
     try:
         doc = json_util.loads(sdoc)
@@ -80,8 +78,9 @@ def get_list_thumbnails(sdoc, retry=0):
             }},
             upsert=False
         )
+        # get full path file of video
+        file_path = os.path.join(app.config.get('FS_MEDIA_STORAGE_PATH'), doc.get('folder'), doc.get('filename'))
 
-        file_path = '%s/%s' % (doc.get('folder'), doc.get('filename'))
         stream_file = app.fs.get(file_path)
         video_editor = get_video_editor()
         count = 0
@@ -123,7 +122,7 @@ def get_list_thumbnails(sdoc, retry=0):
             for thumbnail in update_thumbnails:
                 os.remove('%s/%s' % (thumbnail.get('folder'), thumbnail.get('filename')))
         if retry < app.config.get('NUMBER_RETRY', 3):
-            get_list_thumbnails.delay(sdoc, retry=retry + 1)
+            task_get_list_thumbnails.delay(sdoc, retry=retry + 1)
         else:
             app.mongo.db.projects.update_one(
                 {'_id': format_id(doc.get('_id'))},

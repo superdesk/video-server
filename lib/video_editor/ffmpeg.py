@@ -32,11 +32,9 @@ class FFMPEGVideoEditor(VideoEditorInterface):
                    video_quality=None):
         """
         Use ffmpeg tool for edit video
-        Support: cut, crop, rotate, quality
         :param stream_file:
         :param filename:
         :param metadata:
-        :param media_id:
         :param video_cut:
         :param video_crop:
         :param video_rotate:
@@ -55,9 +53,10 @@ class FFMPEGVideoEditor(VideoEditorInterface):
                     and not video_crop \
                     and (not video_rotate or int(video_rotate['degree']) % 360 == 0) \
                     and not video_quality:
-                return {}
+                return None, {}
             path_output = path_video + "_edit" + os.path.splitext(filename)[1]
             # use copy data
+            # set option and run cut first
             if video_cut:
                 path_video = self._edit_video(path_video, path_output,
                                               ["-ss", str(video_cut["start"]), "-t",
@@ -65,6 +64,7 @@ class FFMPEGVideoEditor(VideoEditorInterface):
 
             # use filter data
             str_filter = ""
+            # set option for crop
             if video_crop:
                 # get max width, height if crop over the video
                 if video_crop.get('width') > int(metadata.get('width')):
@@ -73,6 +73,7 @@ class FFMPEGVideoEditor(VideoEditorInterface):
                     video_crop['height'] = metadata.get('height')
                 str_filter += "crop=%s:%s:%s:%s" % (
                     video_crop["width"], video_crop["height"], video_crop["x"], video_crop["y"])
+            # set option for rotate
             if video_rotate:
                 delta90 = round((int(video_rotate['degree'] % 360) / 90))
                 if delta90 != 0:
@@ -85,6 +86,7 @@ class FFMPEGVideoEditor(VideoEditorInterface):
                         rotate_string = "transpose=2"
                     str_filter += "," if str_filter != "" else ''
                     str_filter += rotate_string
+            # set option for quality
             if video_quality:
                 str_filter += "," if str_filter != "" else ''
                 str_filter += "scale=%s:-2" % video_quality['quality']
@@ -99,14 +101,24 @@ class FFMPEGVideoEditor(VideoEditorInterface):
                 os.remove(path_video)
         return content, metadata_edit_file
 
-    def capture_thumnail(self, stream_file, filename, metadata, capture_time):
+    def capture_thumbnail(self, stream_file, filename, metadata, capture_time):
+        """
+        Use ffmpeg tool to capture video at a time.
+        :param stream_file: binary file stream
+        :param filename: name of edit video, not path
+        :param metadata: a dictionary, contain metadata edited video
+        :param capture_time: type int, time for capture
+        :return: stream file and dictionary info of metadata of edit video
+        """
+        path_video = ''
         try:
             path_video = self._create_temp_file(stream_file, filename)
             duration = float(metadata['duration'])
-            path_output = path_video + "_thumnail.png"
+            path_output = path_video + "_thumbnail.png"
+            # -0.1 for avoid the end frame, is null
             if int(duration) <= int(capture_time):
                 capture_time = int(duration) - 0.1
-            content = self._capture_thumnail(path_video, path_output, capture_time)
+            content = self._capture_thumbnail(path_video, path_output, capture_time)
             thumbnail_metadata = self._get_meta(path_output)
         finally:
             if path_video:
@@ -115,17 +127,18 @@ class FFMPEGVideoEditor(VideoEditorInterface):
 
     def capture_list_timeline_thumbnails(self, stream_file, filename, metadata, number_frames):
         """
-            capture a list frames in video and store it to resource.
-        :param metadata:
-        :param path_video:
-        :param number_frames:
-        :param item_id:
+        Capture a list frames in all play time of video.
+        :param stream_file: binary file stream
+        :param filename: name of edit video, not path
+        :param metadata:  a dictionary, contain metadata edited video
+        :param number_frames: total number frames capture
         :return:
         """
         path_video = ''
         try:
             path_video = self._create_temp_file(stream_file, filename)
             duration = float(metadata['duration'])
+            # period time between two frames
             frame_per_second = (duration - 1) / number_frames
 
             # capture list frame via script capture_list_frames.sh
@@ -143,7 +156,7 @@ class FFMPEGVideoEditor(VideoEditorInterface):
             if path_video:
                 os.remove(path_video)
 
-    def _capture_thumnail(self, path_video, path_output, time_capture=0):
+    def _capture_thumbnail(self, path_video, path_output, time_capture=0):
         """
             Use ffmpeg to capture video at a time.
         :param path_video:

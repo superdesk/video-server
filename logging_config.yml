@@ -10,34 +10,16 @@
 
 version: 1
 disable_existing_loggers: False
-formatters:
-  simple:
-    format: "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
-
 handlers:
   console:
     class: logging.StreamHandler
     stream  : ext://sys.stdout
-  file:
-    class : logging.handlers.RotatingFileHandler
-    filename: logfile.log
-    formatter: simple
-    maxBytes: 10485760
-    backupCount: 5
-  file_error:
-    class : logging.handlers.RotatingFileHandler
-    level: ERROR
-    filename: logfile_error.log
-    formatter: simple
-    maxBytes: 10485760
-    backupCount: 5
 loggers:
   video-server.ws:
-    handlers: [console, file, file_error]
+    handlers: [console]
     level: DEBUG
   worker:
-    handlers: [console, file, file_error]
+    handlers: [console]
     level: WARN
-
-root:
-  handlers: [console, file, file_error]
+  root:
+    handlers: [console]
