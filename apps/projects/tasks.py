@@ -13,11 +13,20 @@ logger = logging.getLogger(__name__)
 
 
 @celery.task
-def task_edit_video(file_path, doc, updates, retry=0):
+def task_edit_video(file_path, sdoc, updates, retry=0):
+    """
+    Task use tool for edit video and record the data and update status after finished,
+    :param file_path: full path edit video
+    :param sdoc: type json string, data info edit video
+    :param updates: type dictionary, the actions for edit video
+    :param retry:
+    :return:
+    """
     try:
         video_stream = app.fs.get(file_path)
 
-        doc = json_util.loads(doc)
+        doc = json_util.loads(sdoc)
+        # Update processing is True when begin edit video
         app.mongo.db.projects.update_one(
             {'_id': doc['_id']},
             {'$set': {
@@ -25,6 +34,7 @@ def task_edit_video(file_path, doc, updates, retry=0):
             }}
         )
 
+        # Use tool for editing video
         video_editor = get_video_editor()
         edited_video_stream, metadata = video_editor.edit_video(
             video_stream,
@@ -41,6 +51,7 @@ def task_edit_video(file_path, doc, updates, retry=0):
             f"{doc['folder']}/{doc['filename']}"
         )
 
+        # Update data status is True and data video when edit was finished
         app.mongo.db.projects.find_one_and_update(
             {'_id': doc['_id']},
             {'$set': {
@@ -105,7 +116,7 @@ def task_get_list_thumbnails(sdoc, retry=0):
                 }
             )
             count += 1
-
+        # Update data status is True and data video when getting thumbnails was finished.
         app.mongo.db.projects.update_one(
             {'_id': format_id(doc.get('_id'))},
             {"$set": {
