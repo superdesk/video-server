@@ -1,11 +1,12 @@
 import logging
 import os
+import re
 from datetime import datetime
 from tempfile import gettempdir
 
 from bson import json_util
 from flask import current_app as app
-from flask import abort, jsonify, request
+from flask import abort, jsonify, request, make_response
 from flask.views import MethodView
 
 from lib.errors import bad_request, forbidden, not_found
@@ -812,6 +813,31 @@ class RetrieveEditDestroyProject(MethodView):
             return {}
 
 
+class GetRawVideo(MethodView):
+    def get(self, project_id):
+        video_range = request.headers.environ.get('HTTP_RANGE')
+        doc = app.mongo.db.projects.find_one_or_404({'_id': format_id(project_id)})
+        stream = app.fs.get(doc['folder'] + '/' + doc['filename'])
+
+        length = len(stream)
+        if video_range:
+            start = int(re.split('[= | -]', video_range)[1])
+        else:
+            start = 0
+        end = length - 1
+        chunksize = end - start + 1
+        headers = {
+            'Content-Range': f'bytes {start}-{end}/{length}',
+            'Accept-Ranges': 'bytes',
+            'Content-Length': chunksize,
+            'Content-Type': 'video/mp4',
+        }
+
+        res = make_response(stream[start:end])
+        res.headers = headers
+        return res, 206
+
+
 """
 class UploadProject(MethodView):
     def get(self, project_id):
@@ -842,3 +868,4 @@ class UploadProject(MethodView):
 # register all urls
 bp.add_url_rule('/', view_func=UploadProject.as_view('upload_project'))
 bp.add_url_rule('/<path:project_id>', view_func=RetrieveEditDestroyProject.as_view('retrieve_edit_destroy_project'))
+bp.add_url_rule('/url_raw/<path:project_id>', view_func=GetRawVideo.as_view('get_raw_video'))
