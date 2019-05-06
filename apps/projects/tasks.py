@@ -26,13 +26,6 @@ def task_edit_video(file_path, sdoc, updates, retry=0):
         video_stream = app.fs.get(file_path)
 
         doc = json_util.loads(sdoc)
-        # Update processing is True when begin edit video
-        app.mongo.db.projects.update_one(
-            {'_id': doc['_id']},
-            {'$set': {
-                'processing': True,
-            }}
-        )
 
         # Use tool for editing video
         video_editor = get_video_editor()
@@ -45,10 +38,9 @@ def task_edit_video(file_path, sdoc, updates, retry=0):
             updates.get('rotate'),
             updates.get('quality')
         )
-
         app.fs.put(
             edited_video_stream,
-            f"{doc['folder']}/{doc['filename']}"
+            os.path.join(app.config.get('FS_MEDIA_STORAGE_PATH'), doc.get('folder'), doc.get('filename'))
         )
 
         # Update data status is True and data video when edit was finished
@@ -82,13 +74,7 @@ def task_get_list_thumbnails(sdoc, retry=0):
     update_thumbnails = []
     try:
         doc = json_util.loads(sdoc)
-        app.mongo.db.projects.update_one(
-            {'_id': format_id(doc.get('_id'))},
-            {"$set": {
-                'processing': True,
-            }},
-            upsert=False
-        )
+
         # get full path file of video
         file_path = os.path.join(app.config.get('FS_MEDIA_STORAGE_PATH'), doc.get('folder'), doc.get('filename'))
 

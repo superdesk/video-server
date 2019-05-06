@@ -67,10 +67,10 @@ class FFMPEGVideoEditor(VideoEditorInterface):
             # set option for crop
             if video_crop:
                 # get max width, height if crop over the video
-                if video_crop.get('width') > int(metadata.get('width')):
-                    video_crop['width'] = metadata.get('width')
-                if video_crop.get('height') > int(metadata.get('height')):
-                    video_crop['height'] = metadata.get('height')
+                if int(video_crop.get('width')) > int(metadata.get('width')):
+                    video_crop['width'] = int(metadata.get('width'))
+                if int(video_crop.get('height')) > int(metadata.get('height')):
+                    video_crop['height'] = int(metadata.get('height'))
                 str_filter += "crop=%s:%s:%s:%s" % (
                     video_crop["width"], video_crop["height"], video_crop["x"], video_crop["y"])
             # set option for rotate

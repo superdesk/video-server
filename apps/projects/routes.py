@@ -429,8 +429,17 @@ class RetrieveEditDestroyProject(MethodView):
         if not doc:
             return not_found("Project with id: {} was not found.".format(project_id))
 
-        # Run get list thumbnails of timeline for video in celery
-        if not doc.get('thumbnails'):
+        # Only get thumbnails when list thumbnail 've not create yet (null) and video is not processed any task
+        if not doc.get('thumbnails') and doc.get('processing') is False:
+            # Update processing is True when begin edit video
+            app.mongo.db.projects.update_one(
+                {'_id': doc['_id']},
+                {'$set': {
+                    'processing': True,
+                }}
+            )
+            doc['processing'] = True
+            # Run get list thumbnails of timeline for video in celery
             task_get_list_thumbnails.delay(json_util.dumps(doc))
         return json_response(doc)
 
@@ -568,10 +577,18 @@ class RetrieveEditDestroyProject(MethodView):
         if not doc.get('version') >= 2:
             return bad_request("Only PUT action for edited video version 2")
         file_path = os.path.join(app.config.get('FS_MEDIA_STORAGE_PATH'), doc.get('folder'), doc.get('filename'))
+        # Update processing is True when begin edit video
+        app.mongo.db.projects.update_one(
+            {'_id': doc['_id']},
+            {'$set': {
+                'processing': True,
+            }}
+        )
+        doc['processing'] = True
         self._edit_video(file_path, doc)
         activity = {
             "action": "EDIT PUT",
-            "file_id": doc.get('_id'),
+            "project_id": doc.get('_id'),
             "payload": request.get_json(),
             "create_date": datetime.utcnow()
         }
@@ -701,7 +718,7 @@ class RetrieveEditDestroyProject(MethodView):
             'metadata': None,
             'client_info': user_agent,
             'version': version,
-            'processing': False,
+            'processing': True,
             'mime_type': doc['mime_type'],
             'parent': {
                 '_id': doc['_id'],
