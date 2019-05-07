@@ -772,14 +772,18 @@ class RetrieveEditDestroyProject(MethodView):
                   example: Delete successfully
         """
 
-        item = app.mongo.db.projects.find_one({'_id': format_id(project_id)})
-        if not item:
+        doc = app.mongo.db.projects.find_one({'_id': format_id(project_id)})
+        if not doc:
             return not_found("Project with id: {} was not found.".format(project_id))
         # remove record from db
         app.mongo.db.projects.delete_one({'_id': format_id(project_id)})
         # remove file from storage
-        file_path = os.path.join(app.config.get('FS_MEDIA_STORAGE_PATH'), item.get('folder'), item.get('filename'))
+        file_path = os.path.join(app.config.get('FS_MEDIA_STORAGE_PATH'), doc.get('folder'), doc.get('filename'))
         if app.fs.delete(file_path):
+            path = app.config['FS_MEDIA_STORAGE_PATH']
+            thumbnail_lists = doc['thumbnails'].get('40', [])
+            for thumbnail in thumbnail_lists:
+                app.fs.delete(os.path.join(path, thumbnail['folder'], thumbnail['filename']))
             return jsonify(), 204
         else:
             return jsonify(), 500
