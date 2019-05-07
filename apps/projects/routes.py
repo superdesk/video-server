@@ -142,7 +142,7 @@ class UploadProject(MethodView):
         # generate file path
         file_name = create_file_name(ext=file.filename.split('.')[1])
         utcnow = datetime.utcnow()
-        folder = f'{utcnow.year}/{utcnow.month}'
+        folder = f'{utcnow.year}/{utcnow.month}/{utcnow.day}'
         file_path = os.path.join(app.config.get('FS_MEDIA_STORAGE_PATH'), folder, file_name)
 
         # put file stream into storage
