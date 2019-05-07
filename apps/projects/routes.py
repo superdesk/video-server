@@ -5,7 +5,7 @@ from tempfile import gettempdir
 
 from bson import json_util
 from flask import current_app as app
-from flask import jsonify, request
+from flask import abort, jsonify, request
 from flask.views import MethodView
 
 from lib.errors import bad_request, forbidden, not_found
@@ -17,6 +17,21 @@ from . import bp
 from .tasks import task_get_list_thumbnails, task_edit_video
 
 logger = logging.getLogger(__name__)
+
+
+def check_user_agent():
+    user_agent = request.headers.environ.get('HTTP_USER_AGENT')
+
+    client_name = user_agent.split('/')[0]
+    if client_name.lower() not in app.config.get('AGENT_ALLOW'):
+        abort(bad_request("client is not allow to edit"))
+    return user_agent
+
+
+def check_request_schema_validity(request_schema, schema):
+    validator = Validator(schema)
+    if not validator.validate(request_schema):
+        abort(bad_request(validator.errors))
 
 
 class UploadProject(MethodView):
@@ -123,15 +138,8 @@ class UploadProject(MethodView):
             # to avoid TypeError: cannot serialize '_io.BufferedRandom' error
             return bad_request({"file": ["required field"]})
 
-        v = Validator(self.SCHEMA_UPLOAD)
-        if not v.validate(request.files):
-            return bad_request(v.errors)
-
-        # validate user-agent
-        user_agent = request.headers.environ['HTTP_USER_AGENT']
-        client_name = user_agent.split('/')[0]
-        if client_name.lower() not in app.config.get('AGENT_ALLOW'):
-            return bad_request("client is not allow to edit")
+        user_agent = check_user_agent()
+        check_request_schema_validity(request.files, self.SCHEMA_UPLOAD)
 
         # validate codec
         video_editor = get_video_editor()
@@ -437,19 +445,6 @@ class RetrieveEditDestroyProject(MethodView):
         doc = app.mongo.db.projects.find_one({'_id': format_id(project_id)})
         if not doc:
             return not_found("Project with id: {} was not found.".format(project_id))
-
-        # Only get thumbnails when list thumbnail 've not create yet (null) and video is not processed any task
-        if not doc.get('thumbnails') and doc.get('processing') is False:
-            # Update processing is True when begin edit video
-            app.mongo.db.projects.update_one(
-                {'_id': doc['_id']},
-                {'$set': {
-                    'processing': True,
-                }}
-            )
-            doc['processing'] = True
-            # Run get list thumbnails of timeline for video in celery
-            task_get_list_thumbnails.delay(json_util.dumps(doc))
         return json_response(doc)
 
     def put(self, project_id):
@@ -580,7 +575,9 @@ class RetrieveEditDestroyProject(MethodView):
                       type: string
                       example: 5cbd5acfe24f6045607e51aa
         """
-        self._check_user_agent()
+        check_user_agent()
+        check_request_schema_validity(request.get_json(), self.SCHEMA_EDIT)
+
         doc = app.mongo.db.projects.find_one({'_id': format_id(project_id)})
         if not doc:
             return not_found("Project with id: {} was not found.".format(project_id))
@@ -597,7 +594,7 @@ class RetrieveEditDestroyProject(MethodView):
             }}
         )
         doc['processing'] = True
-        self._edit_video(file_path, doc)
+        task_edit_video.delay(file_path, json_util.dumps(doc), request.get_json())
         activity = {
             "action": "EDIT PUT",
             "project_id": doc.get('_id'),
@@ -711,7 +708,9 @@ class RetrieveEditDestroyProject(MethodView):
                       type: string
                       example: 5cbd5acfe24f6045607e51aa
         """
-        user_agent = self._check_user_agent()
+        user_agent = check_user_agent()
+        check_request_schema_validity(request.get_json(), self.SCHEMA_EDIT)
+
         doc = app.mongo.db.projects.find_one({'_id': format_id(project_id)})
         if not doc:
             return not_found("Project with id: {} was not found.".format(project_id))
@@ -735,11 +734,11 @@ class RetrieveEditDestroyProject(MethodView):
             'parent': {
                 '_id': doc['_id'],
             },
-            'thumbnails': {}
+            'thumbnails': {},
         }
         app.mongo.db.projects.insert_one(new_doc)
         file_path = os.path.join(app.config.get('FS_MEDIA_STORAGE_PATH'), doc.get('folder'), doc.get('filename'))
-        self._edit_video(file_path, new_doc)
+        task_edit_video.delay(file_path, json_util.dumps(new_doc), request.get_json())
         activity = {
             "action": "EDIT POST",
             "file_id": doc.get('_id'),
@@ -748,20 +747,6 @@ class RetrieveEditDestroyProject(MethodView):
         }
         app.mongo.db.activity.insert_one(activity)
         return json_response(new_doc)
-
-    def _edit_video(self, file_path, doc):
-        updates = request.get_json()
-        validator = Validator(self.SCHEMA_EDIT)
-        if not validator.validate(updates):
-            return bad_request(validator.errors)
-
-        actions = updates.keys()
-        supported_action = ('cut', 'crop', 'rotate')
-        for action in actions:
-            if action not in supported_action:
-                return bad_request("Action is not supported")
-
-        task_edit_video.delay(file_path, json_util.dumps(doc), updates)
 
     def delete(self, project_id):
         """
@@ -798,14 +783,6 @@ class RetrieveEditDestroyProject(MethodView):
             return jsonify(), 204
         else:
             return jsonify(), 500
-
-    def _check_user_agent(self):
-        user_agent = request.headers.environ.get('HTTP_USER_AGENT')
-
-        client_name = user_agent.split('/')[0]
-        if client_name.lower() not in app.config.get('AGENT_ALLOW'):
-            return bad_request("client is not allow to edit")
-        return user_agent
 
 
 # register all urls
