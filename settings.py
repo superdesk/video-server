@@ -71,7 +71,7 @@ BROKER_CONNECTION_MAX_RETRIES = NUMBER_RETRY
 #: allow agent
 AGENT_ALLOW = json.loads(env('AGENT_ALLOW', '["superdesk", "postmanruntime", "mozilla"]'))
 #: Codec support
-CODEC_SUPPORT = json.loads(env('CODEC_SUPPORT', '["vp8", "vp9", "h264", "aac", "flac", "ogg", "vorbis"]'))
+CODEC_SUPPORT = json.loads(env('CODEC_SUPPORT', '["vp8", "vp9", "h264", "theora", "av1"]'))
 
 #: media storage
 MEDIA_STORAGE = env('MEDIA_STORAGE', 'filesystem')

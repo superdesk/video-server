@@ -74,6 +74,9 @@ class UploadProject(MethodView):
                     nb_frames:
                       type: string
                       example: 7654
+                    r_frame_rate:
+                      type: string
+                      example: 24/1
                     format_name:
                       type: string
                       example: mov,mp4,m4a,3gp,3g2,mj2
@@ -241,6 +244,9 @@ class UploadProject(MethodView):
                           nb_frames:
                             type: string
                             example: 7654
+                          r_frame_rate:
+                            type: string
+                            example: 24/1
                           format_name:
                             type: string
                             example: mov,mp4,m4a,3gp,3g2,mj2
@@ -384,6 +390,9 @@ class RetrieveEditDestroyProject(MethodView):
                     nb_frames:
                       type: string
                       example: 7654
+                    r_frame_rate:
+                      type: string
+                      example: 24/1
                     format_name:
                       type: string
                       example: mov,mp4,m4a,3gp,3g2,mj2
@@ -528,6 +537,9 @@ class RetrieveEditDestroyProject(MethodView):
                     nb_frames:
                       type: string
                       example: 7654
+                    r_frame_rate:
+                      type: string
+                      example: 24/1
                     format_name:
                       type: string
                       example: mov,mp4,m4a,3gp,3g2,mj2
