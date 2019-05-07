@@ -12,7 +12,7 @@ class MediaStorageInterface(metaclass=abc.ABCMeta):
         pass
 
     @abc.abstractmethod
-    def replace(self, file_path):
+    def url_for_media(self, project_id):
         pass
 
     @abc.abstractmethod

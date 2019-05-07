@@ -82,3 +82,7 @@ DEFAULT_MEDIA_TOOL = env('DEFAULT_MEDIA_TOOL', 'ffmpeg')
 
 #: number frame capture in video
 AMOUNT_FRAMES = env('AMOUNT_FRAMES', 40)
+
+
+VIDEO_SERVER_URL = env('VIDEO_SERVER_URL', 'http://localhost:5050/projects')
+VIDEO_MEDIA_PREFIX = env('VIDEO_MEDIA_PREFIX', '%s/url_raw' % VIDEO_SERVER_URL.rstrip('/'))

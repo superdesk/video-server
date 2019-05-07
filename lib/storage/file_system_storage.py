@@ -1,6 +1,7 @@
 import glob
 import logging
 import os
+from flask import current_app as app
 
 from .interface import MediaStorageInterface
 
@@ -43,8 +44,13 @@ class FileSystemStorage(MediaStorageInterface):
             logger.error('Cannot put file %s ex: %s' % (file_path, ex))
             return False
 
-    def replace(self, file_path):
-        pass
+    def url_for_media(self, project_id):
+        """
+        get url project for reviewing
+        :param project_id:
+        :return:
+        """
+        return f'{app.config.get("VIDEO_MEDIA_PREFIX")}/{str(project_id)}'
 
     def delete(self, file_path):
         try:

@@ -177,6 +177,7 @@ class UploadProject(MethodView):
                     'original_filename': file.filename
                 }
                 app.mongo.db.projects.insert_one(doc)
+                doc['url'] = app.fs.url_for_media(doc.get('_id'))
                 activity = {
                     "action": "UPLOAD",
                     "file_id": doc.get('_id'),
