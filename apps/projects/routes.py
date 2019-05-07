@@ -838,6 +838,20 @@ class GetRawVideo(MethodView):
         return res, 206
 
 
+class GetRawImage(MethodView):
+    def get(self, project_id, name):
+        video_range = request.headers.environ.get('HTTP_RANGE')
+        doc = app.mongo.db.projects.find_one_or_404({
+            '_id': format_id(project_id),
+            'thumbnails.40.filename': name
+        })
+        byte = app.fs.get(doc['folder'] + '/' + name)
+
+        res = make_response(byte)
+        res.headers['Content-Type'] = 'image/png'
+        return res
+
+
 """
 class UploadProject(MethodView):
     def get(self, project_id):
@@ -869,3 +883,4 @@ class UploadProject(MethodView):
 bp.add_url_rule('/', view_func=UploadProject.as_view('upload_project'))
 bp.add_url_rule('/<path:project_id>', view_func=RetrieveEditDestroyProject.as_view('retrieve_edit_destroy_project'))
 bp.add_url_rule('/url_raw/<path:project_id>', view_func=GetRawVideo.as_view('get_raw_video'))
+bp.add_url_rule('/url_raw/<path:project_id>/thumbnail/<name>', view_func=GetRawImage.as_view('get_raw_image'))
