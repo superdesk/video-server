@@ -815,15 +815,12 @@ class RetrieveEditDestroyProject(MethodView):
 
 class GetRawVideo(MethodView):
     def get(self, project_id):
-        video_range = request.headers.environ.get('HTTP_RANGE')
+        video_range = request.headers.environ.get('HTTP_RANGE', 'byte=0-')
         doc = app.mongo.db.projects.find_one_or_404({'_id': format_id(project_id)})
         stream = app.fs.get(doc['folder'] + '/' + doc['filename'])
 
         length = len(stream)
-        if video_range:
-            start = int(re.split('[= | -]', video_range)[1])
-        else:
-            start = 0
+        start = int(re.split('[= | -]', video_range)[1])
         end = length - 1
         chunksize = end - start + 1
         headers = {
@@ -832,6 +829,8 @@ class GetRawVideo(MethodView):
             'Content-Length': chunksize,
             'Content-Type': 'video/mp4',
         }
+        if start == end:
+            start = start - 1
 
         res = make_response(stream[start:end])
         res.headers = headers
