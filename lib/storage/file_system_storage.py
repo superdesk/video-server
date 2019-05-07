@@ -1,5 +1,6 @@
-import os
+import glob
 import logging
+import os
 
 from .interface import MediaStorageInterface
 
@@ -47,8 +48,11 @@ class FileSystemStorage(MediaStorageInterface):
 
     def delete(self, file_path):
         try:
-            if os.path.exists(file_path):
-                os.remove(file_path)
+            filename, ext = os.path.splitext(file_path)
+            file_lists = [file_path] + glob.glob(f'{filename}_timeline_*.png')
+            for path in file_lists:
+                if os.path.exists(path):
+                    os.remove(path)
             logger.info('Deleted media file %s from storage' % file_path)
             return True
         except Exception as ex:
