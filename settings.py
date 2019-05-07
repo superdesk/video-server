@@ -80,5 +80,5 @@ FS_MEDIA_STORAGE_PATH = os.path.join(BASE_PATH, 'media', 'projects')
 #: media tool
 DEFAULT_MEDIA_TOOL = env('DEFAULT_MEDIA_TOOL', 'ffmpeg')
 
-#: number frame capture in video
-AMOUNT_FRAMES = env('AMOUNT_FRAMES', 40)
+#: pagination, items per page
+ITEMS_PER_PAGE = env('ITEMS_PER_PAGE', 25)
