@@ -854,17 +854,17 @@ class GetRawVideoThumbnail(MethodView):
         video_range = request.headers.environ.get('HTTP_RANGE', 'byte=0-')
         doc = app.mongo.db.projects.find_one_or_404({'_id': format_id(project_id)})
 
+        folder_path = os.path.join(app.config['FS_MEDIA_STORAGE_PATH'], doc['folder'])
         if request.args.get('thumbnail'):
             thumbnail = request.args.get('thumbnail', type=int)
-            print(len(doc['thumbnails']['40']))
             if not thumbnail or thumbnail >= len(doc['thumbnails']['40']):
                 return not_found('')
-            byte = app.fs.get(doc['folder'] + '/' + doc['thumbnails']['40'][thumbnail]['filename'])
+            byte = app.fs.get(folder_path + '/' + doc['thumbnails']['40'][thumbnail]['filename'])
             res = make_response(byte)
             res.headers['Content-Type'] = 'image/png'
             return res
 
-        stream = app.fs.get(doc['folder'] + '/' + doc['filename'])
+        stream = app.fs.get(folder_path + '/' + doc['filename'])
         length = len(stream)
         start = int(re.split('[= | -]', video_range)[1])
         end = length - 1
