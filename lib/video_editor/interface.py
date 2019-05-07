@@ -13,7 +13,7 @@ class VideoEditorInterface(metaclass=abc.ABCMeta):
         pass
 
     @abc.abstractmethod
-    def capture_thumnail(self, stream_file, filename, metadata, capture_time):
+    def capture_thumbnail(self, stream_file, filename, metadata, capture_time):
         pass
 
     @abc.abstractmethod
