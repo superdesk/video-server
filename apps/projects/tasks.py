@@ -76,9 +76,9 @@ def task_get_list_thumbnails(sdoc, retry=0):
         doc = json_util.loads(sdoc)
 
         # get full path file of video
-        file_path = os.path.join(app.config.get('FS_MEDIA_STORAGE_PATH'), doc.get('folder'), doc.get('filename'))
-
-        stream_file = app.fs.get(file_path)
+        filename, ext = os.path.splitext(doc.get('filename'))
+        file_path = os.path.join(app.config.get('FS_MEDIA_STORAGE_PATH'), doc.get('folder'), filename)
+        stream_file = app.fs.get(file_path + ext)
         video_editor = get_video_editor()
         count = 0
         amount = app.config.get('AMOUNT_FRAMES', 40)
@@ -89,10 +89,9 @@ def task_get_list_thumbnails(sdoc, retry=0):
                                                                             amount):
             thumbnail_path = '%s_timeline_%02d.png' % (file_path, count)
             app.fs.put(thumbnail_stream, thumbnail_path)
-            filename, ext = os.path.splitext(doc.get('filename'))
             update_thumbnails.append(
                 {
-                    'filename': '%s_timeline_%0d.png' % (filename, count),
+                    'filename': '%s_timeline_%02d.png' % (filename, count),
                     'folder': doc.get('folder'),
                     'mimetype': 'image/bmp',
                     'width': thumbnail_meta.get('width'),
@@ -117,7 +116,10 @@ def task_get_list_thumbnails(sdoc, retry=0):
 
         if update_thumbnails:
             for thumbnail in update_thumbnails:
-                os.remove('%s/%s' % (thumbnail.get('folder'), thumbnail.get('filename')))
+                path_thumbnail = os.path.join(app.config.get('FS_MEDIA_STORAGE_PATH'),
+                                              thumbnail.get('folder'), thumbnail.get('filename'))
+                if os.path.exists(path_thumbnail):
+                    os.remove(path_thumbnail)
         if retry < app.config.get('NUMBER_RETRY', 3):
             task_get_list_thumbnails.delay(sdoc, retry=retry + 1)
         else:
