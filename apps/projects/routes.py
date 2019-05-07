@@ -783,9 +783,9 @@ class RetrieveEditDestroyProject(MethodView):
         # remove file from storage
         file_path = os.path.join(app.config.get('FS_MEDIA_STORAGE_PATH'), item.get('folder'), item.get('filename'))
         if app.fs.delete(file_path):
-            return '', 204
+            return jsonify(), 204
         else:
-            return '', 500
+            return jsonify(), 500
 
     def _check_user_agent(self):
         user_agent = request.headers.environ.get('HTTP_USER_AGENT')
