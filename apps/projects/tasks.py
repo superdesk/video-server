@@ -42,6 +42,13 @@ def task_edit_video(file_path, sdoc, updates, retry=0):
             edited_video_stream,
             os.path.join(app.config.get('FS_MEDIA_STORAGE_PATH'), doc.get('folder'), doc.get('filename'))
         )
+        # Delete old thumbnails
+        thumbnails = []
+        for key in doc['thumbnails'].keys():
+            thumbnails = doc['thumbnails'][str(key)]
+        for thumbnail in thumbnails:
+            path = os.path.join(app.config['FS_MEDIA_STORAGE_PATH'], thumbnail['folder'], thumbnail['filename'])
+            app.fs.delete(path)
 
         # Update data status is True and data video when edit was finished
         app.mongo.db.projects.find_one_and_update(
@@ -70,7 +77,7 @@ def task_edit_video(file_path, sdoc, updates, retry=0):
 
 
 @celery.task
-def task_get_list_thumbnails(sdoc, retry=0):
+def task_get_list_thumbnails(sdoc, amount, retry=0):
     update_thumbnails = []
     try:
         doc = json_util.loads(sdoc)
@@ -81,12 +88,11 @@ def task_get_list_thumbnails(sdoc, retry=0):
         stream_file = app.fs.get(file_path + ext)
         video_editor = get_video_editor()
         count = 0
-        amount = app.config.get('AMOUNT_FRAMES', 40)
         for thumbnail_stream, \
             thumbnail_meta in video_editor.capture_list_timeline_thumbnails(stream_file,
                                                                             doc.get('filename'),
                                                                             doc.get('metadata'),
-                                                                            amount):
+                                                                            int(amount)):
             thumbnail_path = '%s_timeline_%02d.png' % (file_path, count)
             app.fs.put(thumbnail_stream, thumbnail_path)
             update_thumbnails.append(

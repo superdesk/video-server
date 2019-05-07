@@ -198,10 +198,6 @@ class UploadProject(MethodView):
           in: query
           type: integer
           description: Page number
-        - name: size
-          in: query
-          type: integer
-          description: Number of items per page
         responses:
           200:
             description: OK
@@ -296,16 +292,17 @@ class UploadProject(MethodView):
                             example: 5cbd5acfe24f6045607e51aa
         """
         offset = int(request.args.get('offset', 0))
-        size = int(request.args.get('size', 25))
+        max_size = app.config.get('ITEMS_PER_PAGE', 25)
+        # get all projects
         docs = list(app.mongo.db.projects.find())
-        list_pages = list(paginate(docs, size))
+        list_pages = list(paginate(docs, max_size))
         if offset >= len(list_pages):
             offset = len(list_pages) - 1
         res = {
             'items': list_pages[offset],
             'offset': offset,
             'size': len(list_pages[offset]),
-            'max_size': size
+            'max_size': max_size
         }
         return json_response(res)
 
@@ -575,7 +572,9 @@ class RetrieveEditDestroyProject(MethodView):
                       type: string
                       example: 5cbd5acfe24f6045607e51aa
         """
+        # validate user-agent
         check_user_agent()
+        # validate request
         check_request_schema_validity(request.get_json(), self.SCHEMA_EDIT)
 
         doc = app.mongo.db.projects.find_one({'_id': format_id(project_id)})
@@ -708,7 +707,9 @@ class RetrieveEditDestroyProject(MethodView):
                       type: string
                       example: 5cbd5acfe24f6045607e51aa
         """
+        # validate user-agent
         user_agent = check_user_agent()
+        # validate request
         check_request_schema_validity(request.get_json(), self.SCHEMA_EDIT)
 
         doc = app.mongo.db.projects.find_one({'_id': format_id(project_id)})
@@ -720,9 +721,6 @@ class RetrieveEditDestroyProject(MethodView):
             return bad_request("Only POST action for original video version 1")
         version = doc.get('version', 1) + 1
         new_file_name = f'{filename}_v{version}{ext}'
-        if doc.get('version') >= 2:
-            return bad_request("Only POST original video version 1")
-
         new_doc = {
             'filename': new_file_name,
             'folder': doc['folder'],
@@ -780,15 +778,93 @@ class RetrieveEditDestroyProject(MethodView):
         # remove file from storage
         file_path = os.path.join(app.config.get('FS_MEDIA_STORAGE_PATH'), doc.get('folder'), doc.get('filename'))
         if app.fs.delete(file_path):
-            path = app.config['FS_MEDIA_STORAGE_PATH']
-            thumbnail_lists = doc['thumbnails'].get('40', [])
-            for thumbnail in thumbnail_lists:
-                app.fs.delete(os.path.join(path, thumbnail['folder'], thumbnail['filename']))
-            return jsonify(), 204
+            for key in doc['thumbnails'].keys():
+                thumbnails = doc['thumbnails'][str(key)]
+            for thumbnail in thumbnails:
+                path = os.path.join(app.config.get('FS_MEDIA_STORAGE_PATH'), thumbnail['folder'], thumbnail['filename'])
+                app.fs.delete(path)
+            return json_response(status=204)
         else:
-            return jsonify(), 500
+            return json_response(status=500)
 
 
-# register all urls
+class ThumbnailsTimelineProject(MethodView):
+    SCHEMA_THUMBNAILS = {
+        'amount': {
+            'type': 'integer',
+            'required': True,
+            'empty': False,
+        },
+    }
+
+    def get(self, project_id):
+        """
+        Edit video. This method creates a new project.
+        ---
+        consumes:
+        - application/json
+        parameters:
+        - in: path
+          name: project_id
+          type: string
+          required: True
+          description: Unique project id
+        - name: amount
+          in: query
+          type: integer
+          description: number thumbnails to create
+        responses:
+          200:
+            description: OK
+            schema:
+              type: object
+              properties:
+                processing:
+                  type: boolean
+                  example: True
+                thumbnails:
+                  type: object
+                  example: {}
+        """
+        # validate user-agent
+        check_user_agent()
+
+        amount = int(request.args.get('amount', app.config.get('THUMBNAILS_AMOUNT')))
+
+        doc = app.mongo.db.projects.find_one({'_id': format_id(project_id)})
+        if not doc:
+            return not_found("Project with id: {} was not found.".format(project_id))
+
+        # Only get thumbnails when list thumbnail 've not created yet (empty) and video is not processed any task
+        data = doc.get('thumbnails')
+        if (not data or not data.get(str(amount))) \
+                and doc.get('processing') is False:
+            # Update processing is True when begin edit video
+            app.mongo.db.projects.update_one(
+                {'_id': doc['_id']},
+                {'$set': {
+                    'processing': True,
+                    'thumbnails': {}
+                }}
+            )
+            # Delete old thumbnails
+            thumbnails = []
+            for key in doc['thumbnails'].keys():
+                thumbnails = doc['thumbnails'][str(key)]
+            for thumbnail in thumbnails:
+                path = os.path.join(app.config['FS_MEDIA_STORAGE_PATH'], thumbnail['folder'], thumbnail['filename'])
+                app.fs.delete(path)
+            doc['processing'] = True
+            doc['thumbnails'] = {}
+
+            # Run get list thumbnails of timeline for video in celery
+            task_get_list_thumbnails.delay(json_util.dumps(doc), amount)
+        return json_response({"processing": doc.get('processing'), "thumbnails": doc['thumbnails']})
+
+    # register all urls
+
+
 bp.add_url_rule('/', view_func=UploadProject.as_view('upload_project'))
 bp.add_url_rule('/<path:project_id>', view_func=RetrieveEditDestroyProject.as_view('retrieve_edit_destroy_project'))
+bp.add_url_rule('/<path:project_id>/thumbnails',
+                view_func=ThumbnailsTimelineProject.as_view('thumbnails_timeline_project'))
