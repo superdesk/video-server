@@ -23,6 +23,23 @@ class FileSystemStorage(MediaStorageInterface):
             media_file = None
         return media_file
 
+    def get_range(self, file_path, start, end):
+        """
+        Get a range of stream file
+        :param file_path: full file path
+        :param start: start index stream
+        :param end: end index stream
+        :return:
+        """
+        try:
+            file = (open(file_path, 'rb'))
+            file.seek(start)
+            media_file = file.read(end - start + 1)
+        except Exception as ex:
+            logger.error('Cannot get data file %s ex: %s' % (file_path, ex))
+            media_file = None
+        return media_file
+
     def put(self, content, file_path):
         """
         Put a file into storage

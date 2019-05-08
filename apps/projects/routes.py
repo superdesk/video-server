@@ -888,9 +888,9 @@ class ThumbnailsTimelineProject(MethodView):
 
 class GetRawVideoThumbnail(MethodView):
     def get(self, project_id):
+        # get range of video
         video_range = request.headers.environ.get('HTTP_RANGE', 'byte=0-')
         doc = app.mongo.db.projects.find_one_or_404({'_id': format_id(project_id)})
-
         folder_path = os.path.join(app.config['FS_MEDIA_STORAGE_PATH'], doc['folder'])
         if request.args.get('thumbnail'):
             thumbnail = request.args.get('thumbnail', -1, type=int)
@@ -900,9 +900,7 @@ class GetRawVideoThumbnail(MethodView):
             res = make_response(byte)
             res.headers['Content-Type'] = 'image/png'
             return res
-
-        stream = app.fs.get(folder_path + '/' + doc['filename'])
-        length = len(stream)
+        length = int(doc['metadata'].get('size'))
         start = int(re.split('[= | -]', video_range)[1])
         end = length - 1
         chunksize = end - start + 1
@@ -912,7 +910,9 @@ class GetRawVideoThumbnail(MethodView):
             'Content-Length': chunksize,
             'Content-Type': 'video/mp4',
         }
-        res = make_response(stream[start:(end + 1)])
+        # get a stack of bytes push to client
+        stream = app.fs.get_range(folder_path + '/' + doc['filename'], start, end)
+        res = make_response(stream)
         res.headers = headers
         return res, 206
 
