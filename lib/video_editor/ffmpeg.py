@@ -1,8 +1,9 @@
+import json
 import os
 import subprocess as cmd
 import tempfile
-
 from io import BytesIO
+
 from lib.utils import create_file_name
 
 from .interface import VideoEditorInterface
@@ -197,17 +198,22 @@ class FFMPEGVideoEditor(VideoEditorInterface):
         :return:
         """
         res = cmd.Popen(
-            ['ffprobe', '-show_streams', '-show_format', path_video],
+            ['ffprobe', '-v', 'quiet', '-print_format', 'json', '-show_streams', '-show_format', path_video],
             stdout=cmd.PIPE)
-        data = res.communicate()[0].decode("utf-8").split('\n')
-        metadata = {}
-        list_meta = ['height', 'width', 'size', 'bit_rate', 'duration', 'codec_name', 'codec_long_name', 'format_name',
-                     'nb_frames']
-        for text in data:
-            if text.count('=') == 1:
-                key, value = text.split('=')
-                if key in list_meta and not metadata.get('key') and value != 'N/A':
-                    metadata[key] = value
+        result = res.communicate()[0].decode("utf-8")
+        video_data = json.loads(result)
+        for stream in video_data['streams']:
+            if stream['codec_type'] == 'video':
+                data = stream
+
+        format_meta = ('format_name', 'size')
+        video_meta = ('codec_name', 'codec_long_name', 'width', 'height', 'r_frame_rate', 'bit_rate',
+                      'nb_frames', 'duration')
+
+        metadata = {key: data.get(key) for key in video_meta}
+        metadata['format_name'] = video_data['format']['format_name']
+        metadata['size'] = video_data['format']['size']
+
         return metadata
 
     def _create_temp_file(self, file_stream, file_name):

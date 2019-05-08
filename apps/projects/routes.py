@@ -90,6 +90,9 @@ class UploadProject(MethodView):
                     nb_frames:
                       type: string
                       example: 7654
+                    r_frame_rate:
+                      type: string
+                      example: 24/1
                     format_name:
                       type: string
                       example: mov,mp4,m4a,3gp,3g2,mj2
@@ -136,12 +139,10 @@ class UploadProject(MethodView):
             # to avoid TypeError: cannot serialize '_io.BufferedRandom' error
             return bad_request({"file": ["required field"]})
 
-        v = Validator(self.SCHEMA_UPLOAD)
-        if not v.validate(request.files):
-            return bad_request(v.errors)
-
         # validate user-agent
         user_agent = check_user_agent()
+
+        # validate request
         check_request_schema_validity(request.files, self.SCHEMA_UPLOAD)
 
         # validate codec
@@ -202,10 +203,6 @@ class UploadProject(MethodView):
           in: query
           type: integer
           description: Page number
-        - name: size
-          in: query
-          type: integer
-          description: Number of items per page
         responses:
           200:
             description: OK
@@ -256,6 +253,9 @@ class UploadProject(MethodView):
                           nb_frames:
                             type: string
                             example: 7654
+                          r_frame_rate:
+                            type: string
+                            example: 24/1
                           format_name:
                             type: string
                             example: mov,mp4,m4a,3gp,3g2,mj2
@@ -297,16 +297,17 @@ class UploadProject(MethodView):
                             example: 5cbd5acfe24f6045607e51aa
         """
         offset = int(request.args.get('offset', 0))
-        size = int(request.args.get('size', 25))
+        max_size = app.config.get('ITEMS_PER_PAGE', 25)
+        # get all projects
         docs = list(app.mongo.db.projects.find())
-        list_pages = list(paginate(docs, size))
+        list_pages = list(paginate(docs, max_size))
         if offset >= len(list_pages):
             offset = len(list_pages) - 1
         res = {
             'items': list_pages[offset],
             'offset': offset,
             'size': len(list_pages[offset]),
-            'max_size': size
+            'max_size': max_size
         }
         return json_response(res)
 
@@ -399,6 +400,9 @@ class RetrieveEditDestroyProject(MethodView):
                     nb_frames:
                       type: string
                       example: 7654
+                    r_frame_rate:
+                      type: string
+                      example: 24/1
                     format_name:
                       type: string
                       example: mov,mp4,m4a,3gp,3g2,mj2
@@ -443,19 +447,6 @@ class RetrieveEditDestroyProject(MethodView):
         doc = app.mongo.db.projects.find_one({'_id': format_id(project_id)})
         if not doc:
             return not_found("Project with id: {} was not found.".format(project_id))
-
-        # Only get thumbnails when list thumbnail 've not create yet (null) and video is not processed any task
-        if not doc.get('thumbnails') and doc.get('processing') is False:
-            # Update processing is True when begin edit video
-            app.mongo.db.projects.update_one(
-                {'_id': doc['_id']},
-                {'$set': {
-                    'processing': True,
-                }}
-            )
-            doc['processing'] = True
-            # Run get list thumbnails of timeline for video in celery
-            task_get_list_thumbnails.delay(json_util.dumps(doc))
         return json_response(doc)
 
     def put(self, project_id):
@@ -543,6 +534,9 @@ class RetrieveEditDestroyProject(MethodView):
                     nb_frames:
                       type: string
                       example: 7654
+                    r_frame_rate:
+                      type: string
+                      example: 24/1
                     format_name:
                       type: string
                       example: mov,mp4,m4a,3gp,3g2,mj2
@@ -583,7 +577,11 @@ class RetrieveEditDestroyProject(MethodView):
                       type: string
                       example: 5cbd5acfe24f6045607e51aa
         """
-        self._check_user_agent()
+        # validate user-agent
+        check_user_agent()
+        # validate request
+        check_request_schema_validity(request.get_json(), self.SCHEMA_EDIT)
+
         doc = app.mongo.db.projects.find_one({'_id': format_id(project_id)})
         if not doc:
             return not_found("Project with id: {} was not found.".format(project_id))
@@ -731,7 +729,9 @@ class RetrieveEditDestroyProject(MethodView):
                       type: string
                       example: 5cbd5acfe24f6045607e51aa
         """
+        # validate user-agent
         user_agent = check_user_agent()
+        # validate request
         check_request_schema_validity(request.get_json(), self.SCHEMA_EDIT)
 
         doc = app.mongo.db.projects.find_one_or_404({'_id': format_id(project_id)})
@@ -802,17 +802,22 @@ class RetrieveEditDestroyProject(MethodView):
                   example: Delete successfully
         """
 
-        item = app.mongo.db.projects.find_one({'_id': format_id(project_id)})
-        if not item:
+        doc = app.mongo.db.projects.find_one({'_id': format_id(project_id)})
+        if not doc:
             return not_found("Project with id: {} was not found.".format(project_id))
         # remove record from db
         app.mongo.db.projects.delete_one({'_id': format_id(project_id)})
         # remove file from storage
-        file_path = os.path.join(app.config.get('FS_MEDIA_STORAGE_PATH'), item.get('folder'), item.get('filename'))
+        file_path = os.path.join(app.config.get('FS_MEDIA_STORAGE_PATH'), doc.get('folder'), doc.get('filename'))
         if app.fs.delete(file_path):
-            return jsonify(), 204
+            path = app.config['FS_MEDIA_STORAGE_PATH']
+            for key in doc['thumbnails'].key():
+                thumbnail_lists = doc['thumbnails'][str(key)]
+            for thumbnail in thumbnail_lists:
+                app.fs.delete(os.path.join(path, thumbnail['folder'], thumbnail['filename']))
+            return json_response(status=204)
         else:
-            return jsonify(), 500
+            return json_response(status=500)
 
     def _set_thumbnail(self, video_path, schema, doc):
         action = schema.get('type')
@@ -847,6 +852,80 @@ class RetrieveEditDestroyProject(MethodView):
                 logger.exception(exc)
         else:
             return {}
+
+
+class ThumbnailsTimelineProject(MethodView):
+    SCHEMA_THUMBNAILS = {
+        'amount': {
+            'type': 'integer',
+            'required': True,
+            'empty': False,
+        },
+    }
+
+    def get(self, project_id):
+        """
+        Edit video. This method creates a new project.
+        ---
+        consumes:
+        - application/json
+        parameters:
+        - in: path
+          name: project_id
+          type: string
+          required: True
+          description: Unique project id
+        - name: amount
+          in: query
+          type: integer
+          description: number thumbnails to create
+        responses:
+          200:
+            description: OK
+            schema:
+              type: object
+              properties:
+                processing:
+                  type: boolean
+                  example: True
+                thumbnails:
+                  type: object
+                  example: {}
+        """
+        # validate user-agent
+        check_user_agent()
+
+        amount = int(request.args.get('offset', 40))
+
+        doc = app.mongo.db.projects.find_one({'_id': format_id(project_id)})
+        if not doc:
+            return not_found("Project with id: {} was not found.".format(project_id))
+
+        # Only get thumbnails when list thumbnail 've not created yet (empty) and video is not processed any task
+        thumbnails = doc.get('thumbnails')
+        if (not thumbnails or not thumbnails.get(str(amount))) \
+                and doc.get('processing') is False:
+            # Update processing is True when begin edit video
+            app.mongo.db.projects.update_one(
+                {'_id': doc['_id']},
+                {'$set': {
+                    'processing': True,
+                    'thumbnails': {}
+                }}
+            )
+            doc['processing'] = True
+            doc['thumbnails'] = {}
+
+            # Delete all old thumbnails
+            thumbnail_lists = []
+            path = app.config['FS_MEDIA_STORAGE_PATH']
+            for key in doc['thumbnails'].key():
+                thumbnail_lists = doc['thumbnails'][str(key)]
+            for thumbnail in thumbnail_lists:
+                app.fs.delete(os.path.join(path, thumbnail['folder'], thumbnail['filename']))
+            # Run get list thumbnails of timeline for video in celery
+            task_get_list_thumbnails.delay(json_util.dumps(doc), amount)
+        return json_response({"processing": doc.get('processing'), "thumbnails": doc['thumbnails']})
 
 
 class GetRawVideoThumbnail(MethodView):
@@ -887,3 +966,5 @@ class GetRawVideoThumbnail(MethodView):
 bp.add_url_rule('/', view_func=UploadProject.as_view('upload_project'))
 bp.add_url_rule('/<path:project_id>', view_func=RetrieveEditDestroyProject.as_view('retrieve_edit_destroy_project'))
 bp.add_url_rule('/url_raw/<path:project_id>', view_func=GetRawVideoThumbnail.as_view('get_raw_video_thumbnail'))
+bp.add_url_rule('/<path:project_id>/thumbnails',
+                view_func=ThumbnailsTimelineProject.as_view('thumbnails_timeline_project'))

@@ -26,7 +26,7 @@ def paginate(iterable, page_size):
         yield page
 
 
-def json_response(doc, status=200):
+def json_response(doc=None, status=200):
     """
     Serialize mongodb documents and return Response with applicaton/json mimetype
     """
