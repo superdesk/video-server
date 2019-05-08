@@ -42,7 +42,8 @@ def task_edit_video(file_path, sdoc, updates, retry=0):
             edited_video_stream,
             os.path.join(app.config.get('FS_MEDIA_STORAGE_PATH'), doc.get('folder'), doc.get('filename'))
         )
-
+        # create url for preview video
+        url = app.fs.url_for_media(doc.get('_id'))
         # Update data status is True and data video when edit was finished
         app.mongo.db.projects.find_one_and_update(
             {'_id': doc['_id']},
@@ -50,9 +51,18 @@ def task_edit_video(file_path, sdoc, updates, retry=0):
                 'processing': False,
                 'metadata': metadata,
                 'thumbnails': {},
+                'url': url
             }},
             return_document=ReturnDocument.AFTER
         )
+        # Delete all old thumbnails
+        thumbnails = []
+        for key in doc['thumbnails'].keys():
+            thumbnails = doc['thumbnails'][str(key)]
+        for thumbnail in thumbnails:
+            path = os.path.join(app.config.get('FS_MEDIA_STORAGE_PATH'), thumbnail['folder'], thumbnail['filename'])
+            app.fs.delete(path)
+
     except Exception as exc:
         logger.exception(exc)
         if retry < app.config.get('NUMBER_RETRY', 3):

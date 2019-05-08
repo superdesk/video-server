@@ -85,4 +85,3 @@ VIDEO_MEDIA_PREFIX = env('VIDEO_MEDIA_PREFIX', '%s/url_raw' % VIDEO_SERVER_URL.r
 
 #: pagination, items per page
 ITEMS_PER_PAGE = env('ITEMS_PER_PAGE', 25)
-

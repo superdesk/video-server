@@ -31,3 +31,4 @@ def json_response(doc=None, status=200):
     Serialize mongodb documents and return Response with applicaton/json mimetype
     """
     return Response(bson.json_util.dumps(doc), status=status, mimetype='application/json')
+
