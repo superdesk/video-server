@@ -894,9 +894,10 @@ class GetRawVideoThumbnail(MethodView):
         folder_path = os.path.join(app.config['FS_MEDIA_STORAGE_PATH'], doc['folder'])
         if request.args.get('thumbnail'):
             thumbnail = request.args.get('thumbnail', -1, type=int)
-            if not thumbnail >= 0 or thumbnail >= len(doc['thumbnails']['40']):
+            total = list(doc['thumbnails'].keys())[0]
+            if not thumbnail >= 0 or thumbnail >= len(doc['thumbnails'][total]):
                 return not_found('')
-            byte = app.fs.get(folder_path + '/' + doc['thumbnails']['40'][thumbnail]['filename'])
+            byte = app.fs.get(folder_path + '/' + doc['thumbnails'][total][thumbnail]['filename'])
             res = make_response(byte)
             res.headers['Content-Type'] = 'image/png'
             return res
