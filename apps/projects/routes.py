@@ -802,7 +802,7 @@ class RetrieveEditDestroyProject(MethodView):
             for thumbnail in thumbnails:
                 path = os.path.join(app.config.get('FS_MEDIA_STORAGE_PATH'), thumbnail['folder'], thumbnail['filename'])
                 app.fs.delete(path)
-            preview_thumbnail = doc['preview_thumbnail']
+            preview_thumbnail = doc.get('preview_thumbnail')
             if preview_thumbnail:
                 path = os.path.join(app.config.get('FS_MEDIA_STORAGE_PATH'), preview_thumbnail['folder'],
                                     preview_thumbnail['filename'])
@@ -1102,7 +1102,7 @@ class PreviewThumbnailVideo(MethodView):
             video_stream = app.fs.get(video_path)
             video_editor = get_video_editor()
             thumbnail_stream, thumbnail_metadata = video_editor.capture_thumbnail(
-                video_stream, doc['filename'], doc['metadata'], time
+                video_stream, doc['metadata'], time
             )
 
         if thumbnail_stream and thumbnail_metadata:

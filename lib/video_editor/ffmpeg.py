@@ -17,11 +17,10 @@ class FFMPEGVideoEditor(VideoEditorInterface):
         :param filestream:
         :return:
         """
-        file_name = create_file_name('tmp')
         metadata = {}
         try:
             #: create a temp file
-            file_temp_path = self._create_temp_file(filestream, file_name)
+            file_temp_path = self._create_temp_file(filestream)
             #: get metadata
             metadata = self._get_meta(file_temp_path)
         finally:
@@ -44,7 +43,7 @@ class FFMPEGVideoEditor(VideoEditorInterface):
         """
         path_video = ''
         try:
-            path_video = self._create_temp_file(stream_file, filename)
+            path_video = self._create_temp_file(stream_file)
 
             if not metadata:
                 metadata = self._get_meta(path_video)
@@ -102,18 +101,17 @@ class FFMPEGVideoEditor(VideoEditorInterface):
                 os.remove(path_video)
         return content, metadata_edit_file
 
-    def capture_thumbnail(self, stream_file, filename, metadata, capture_time):
+    def capture_thumbnail(self, stream_file, metadata, capture_time):
         """
         Use ffmpeg tool to capture video at a time.
         :param stream_file: binary file stream
-        :param filename: name of edit video, not path
         :param metadata: a dictionary, contain metadata edited video
         :param capture_time: type int, time for capture
         :return: stream file and dictionary info of metadata of edit video
         """
         path_video = ''
         try:
-            path_video = self._create_temp_file(stream_file, filename)
+            path_video = self._create_temp_file(stream_file)
             duration = float(metadata['duration'])
             path_output = path_video + "_thumbnail.png"
             # -0.1 for avoid the end frame, is null
@@ -128,18 +126,17 @@ class FFMPEGVideoEditor(VideoEditorInterface):
                 os.remove(path_output)
         return content, thumbnail_metadata
 
-    def capture_list_timeline_thumbnails(self, stream_file, filename, metadata, number_frames):
+    def capture_list_timeline_thumbnails(self, stream_file, metadata, number_frames):
         """
         Capture a list frames in all play time of video.
         :param stream_file: binary file stream
-        :param filename: name of edit video, not path
         :param metadata:  a dictionary, contain metadata edited video
         :param number_frames: total number frames capture
         :return:
         """
         path_video = ''
         try:
-            path_video = self._create_temp_file(stream_file, filename)
+            path_video = self._create_temp_file(stream_file)
             duration = float(metadata['duration'])
             # period time between two frames
             frame_per_second = (duration - 1) / number_frames
@@ -216,13 +213,14 @@ class FFMPEGVideoEditor(VideoEditorInterface):
 
         return metadata
 
-    def _create_temp_file(self, file_stream, file_name):
+    def _create_temp_file(self, file_stream):
         """
             Get stream file from resource and save it to /tmp directory for using (cutting and capture)
         :param media_id:
         :return:
         """
-        tmp_path = tempfile.gettempdir() + "/tmp_%s" % file_name
+        file_name = create_file_name('tmp')
+        tmp_path = tempfile.gettempdir() + "/" + file_name
         with open(tmp_path, "wb") as f:
             f.write(file_stream)
         return tmp_path
