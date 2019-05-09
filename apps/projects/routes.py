@@ -61,6 +61,9 @@ class UploadProject(MethodView):
                 filename:
                   type: string
                   example: fa5079a38e0a4197864aa2ccb07f3bea.mp4
+                url:
+                  type: string
+                  example: https://example.com/url_raw/fa5079a38e0a4197864aa2ccb07f3bea4
                 folder:
                   type: string
                   example: 2019/5
@@ -74,10 +77,10 @@ class UploadProject(MethodView):
                       type: string
                       example: H.264 / AVC / MPEG-4 AVC / MPEG-4 part 10
                     width:
-                      type: string
+                      type: int
                       example: 640
                     height:
-                      type: string
+                      type: int
                       example: 360
                     duration:
                       type: string
@@ -235,6 +238,9 @@ class UploadProject(MethodView):
                       filename:
                         type: string
                         example: fa5079a38e0a4197864aa2ccb07f3bea.mp4
+                      url:
+                        type: string
+                        example: https://example.com/url_raw/fa5079a38e0a4197864aa2ccb07f3bea
                       folder:
                         type: string
                         example: 2019/5
@@ -248,10 +254,10 @@ class UploadProject(MethodView):
                             type: string
                             example: H.264 / AVC / MPEG-4 AVC / MPEG-4 part 10
                           width:
-                            type: string
+                            type: int
                             example: 640
                           height:
-                            type: string
+                            type: int
                             example: 360
                           duration:
                             type: string
@@ -382,6 +388,9 @@ class RetrieveEditDestroyProject(MethodView):
                 filename:
                   type: string
                   example: fa5079a38e0a4197864aa2ccb07f3bea.mp4
+                url:
+                  type: string
+                  example: https://example.com/url_raw/fa5079a38e0a4197864aa2ccb07f3bea
                 folder:
                   type: string
                   example: 2019/5
@@ -395,10 +404,10 @@ class RetrieveEditDestroyProject(MethodView):
                       type: string
                       example: H.264 / AVC / MPEG-4 AVC / MPEG-4 part 10
                     width:
-                      type: string
+                      type: integer
                       example: 640
                     height:
-                      type: string
+                      type: integer
                       example: 360
                     duration:
                       type: string
@@ -516,6 +525,9 @@ class RetrieveEditDestroyProject(MethodView):
                 filename:
                   type: string
                   example: fa5079a38e0a4197864aa2ccb07f3bea.mp4
+                url:
+                  type: string
+                  example: https://example.com/url_raw/fa5079a38e0a4197864aa2ccb07f3bea
                 folder:
                   type: string
                   example: 2019/5
@@ -529,10 +541,10 @@ class RetrieveEditDestroyProject(MethodView):
                       type: string
                       example: H.264 / AVC / MPEG-4 AVC / MPEG-4 part 10
                     width:
-                      type: string
+                      type: integer
                       example: 640
                     height:
-                      type: string
+                      type: integer
                       example: 360
                     duration:
                       type: string
@@ -675,6 +687,9 @@ class RetrieveEditDestroyProject(MethodView):
                 filename:
                   type: string
                   example: fa5079a38e0a4197864aa2ccb07f3bea_v2.mp4
+                url:
+                  type: string
+                  example: https://example.com/url_raw/fa5079a38e0a4197864aa2ccb07f3bea
                 folder:
                   type: string
                   example: 2019/5
@@ -772,17 +787,8 @@ class RetrieveEditDestroyProject(MethodView):
           required: true
           description: Unique project id
         responses:
-          200:
-            description: OK
-            schema:
-              type: object
-              properties:
-                status:
-                  type: boolean
-                  example: True
-                message:
-                  type: string
-                  example: Delete successfully
+          204:
+            description: NO CONTENT
         """
         doc = app.mongo.db.projects.find_one({'_id': format_id(project_id)})
         if not doc:
@@ -823,7 +829,8 @@ class ThumbnailsTimelineProject(MethodView):
 
     def get(self, project_id):
         """
-        Edit video. This method creates a new project.
+        Get video thumbnails.
+        Generate new thumbnails if null or `amount` argument different from current total thumbnails
         ---
         consumes:
         - application/json
@@ -853,7 +860,7 @@ class ThumbnailsTimelineProject(MethodView):
         # validate user-agent
         check_user_agent()
 
-        amount = int(request.args.get('amount', 40))
+        amount = request.args.get('amount', 40, int)
 
         doc = app.mongo.db.projects.find_one({'_id': format_id(project_id)})
         if not doc:
@@ -932,7 +939,7 @@ class PreviewThumbnailVideo(MethodView):
             'empty': False,
         },
         'data': {
-            'type': 'binary',
+            'type': 'string',
             'required': False,
             'empty': False,
         },
@@ -940,7 +947,7 @@ class PreviewThumbnailVideo(MethodView):
 
     def post(self, project_id):
         """
-        Edit video. This method does not create a new project.
+        Update video preview thumbnails
         ---
         consumes:
         - application/json
@@ -951,42 +958,24 @@ class PreviewThumbnailVideo(MethodView):
           required: True
           description: Unique project id
         - in: body
-          name: action
-          description: Actions want to apply to the video
+          name: body
+          description: Thumbnail data
           required: True
           schema:
             type: object
             properties:
-              cut:
-                type: object
-                properties:
-                  start:
-                    type: integer
-                    example: 5
-                  end:
-                    type: integer
-                    example: 10
-              crop:
-                type: object
-                properties:
-                  width:
-                    type: integer
-                    example: 480
-                  height:
-                    type: integer
-                    example: 360
-                  x:
-                    type: integer
-                    example: 10
-                  y:
-                    type: integer
-                    example: 10
-              rotate:
-                type: object
-                properties:
-                  degree:
-                    type: integer
-                    example: 90
+              type:
+                type: string
+                enum: [capture, upload]
+                description: action want to perform
+                example: capture
+              time:
+                type: float
+                description: time frame which want to capture
+                example: 10
+              data:
+                type: string
+                description: base64 image data want to upload
         responses:
           200:
             description: OK
@@ -996,6 +985,9 @@ class PreviewThumbnailVideo(MethodView):
                 filename:
                   type: string
                   example: fa5079a38e0a4197864aa2ccb07f3bea.mp4
+                url:
+                  type: string
+                  example: https://example.com/url_raw/fa5079a38e0a4197864aa2ccb07f3bea
                 folder:
                   type: string
                   example: 2019/5
@@ -1065,6 +1057,27 @@ class PreviewThumbnailVideo(MethodView):
                     $oid:
                       type: string
                       example: 5cbd5acfe24f6045607e51aa
+                preview_thumbnail:
+                  type: object
+                  properties:
+                    filename:
+                      type: string
+                      example: fa5079a38e0a4197864aa2ccb07f3bea_thumbnail.png
+                    folder:
+                      type: string
+                      example: 2019/5/1
+                    mimetype:
+                      type: string
+                      example: "image/png"
+                    width:
+                      type: integer
+                      example: 640
+                    height:
+                      type: integer
+                      example: 360
+                    size:
+                      type: string
+                      example: 300000
         """
         # validate user-agent
         check_user_agent()
