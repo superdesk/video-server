@@ -1,4 +1,3 @@
-import os
 from datetime import datetime
 
 from bson import json_util
@@ -73,7 +72,7 @@ class UploadProject(MethodView):
         # validate request
         if 'file' not in request.files:
             # to avoid TypeError: cannot serialize '_io.BufferedRandom' error
-            return bad_request({ "file": ["required field"]})
+            return bad_request({"file": ["required field"]})
 
         v = Validator(self.SCHEMA_UPLOAD)
         if not v.validate(request.files):
@@ -94,21 +93,18 @@ class UploadProject(MethodView):
         if codec_name not in app.config.get('CODEC_SUPPORT'):
             return bad_request("Codec: {} is not supported.".format(codec_name))
 
-        # generate file path
+        # generate file name
         file_name = create_file_name(ext=file.filename.split('.')[1])
-        utcnow = datetime.utcnow()
-        folder = f'{utcnow.year}/{utcnow.month}'
-        file_path = os.path.join(app.config.get('FS_MEDIA_STORAGE_PATH'), folder, file_name)
-
         # put file stream into storage
-        if app.fs.put(file_stream, file_path=file_path):
+        storage_id = app.fs.put(file_stream, filename=file_name, content_type=file.mimetype)
+        if storage_id:
             try:
                 # add record to database
                 doc = {
                     'filename': file_name,
-                    'folder': folder,
+                    'storage_id': storage_id,
                     'metadata': metadata,
-                    'create_time': utcnow,
+                    'create_time': datetime.utcnow(),
                     'mime_type': file.mimetype,
                     'version': 1,
                     'processing': False,
@@ -273,11 +269,11 @@ class RetrieveEditDestroyProject(MethodView):
         # remove record from db
         app.mongo.db.projects.delete_one({'_id': format_id(project_id)})
         # remove file from storage
-        file_path = os.path.join(app.config.get('FS_MEDIA_STORAGE_PATH'), item.get('folder'), item.get('filename'))
-        if app.fs.delete(file_path):
+        if app.fs.delete(item.get('storage_id')):
             return Response(status=204, mimetype='application/json')
         else:
             return Response(status=500, mimetype='application/json')
+
 
 # register all urls
 bp.add_url_rule('/', view_func=UploadProject.as_view('upload_project'))
