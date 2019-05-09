@@ -853,7 +853,7 @@ class ThumbnailsTimelineProject(MethodView):
         # validate user-agent
         check_user_agent()
 
-        amount = int(request.args.get('offset', 40))
+        amount = int(request.args.get('amount', 40))
 
         doc = app.mongo.db.projects.find_one({'_id': format_id(project_id)})
         if not doc:
@@ -923,9 +923,10 @@ class PreviewThumbnailVideo(MethodView):
             'type': 'string',
             'required': True,
             'empty': False,
+            'allowed': ['capture', 'upload'],
         },
         'time': {
-            'type': 'integer',
+            'type': 'float',
             'required': False,
             'empty': False,
         },
@@ -1096,9 +1097,13 @@ class PreviewThumbnailVideo(MethodView):
         doc = json_util.loads(doc)
         if action == 'upload':
             thumbnail_stream = schema.get('data')
+            if not thumbnail_stream:
+                abort(bad_request({'data': ['required field']}))
             thumbnail_metadata = app.fs.get_meta(thumbnail_stream)
         elif action == 'capture':
             time = schema.get('time')
+            if not time:
+                abort(bad_request({'time': ['required field']}))
             video_stream = app.fs.get(video_path)
             video_editor = get_video_editor()
             thumbnail_stream, thumbnail_metadata = video_editor.capture_thumbnail(
