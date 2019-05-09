@@ -202,8 +202,10 @@ class FFMPEGVideoEditor(VideoEditorInterface):
             stdout=cmd.PIPE)
         result = res.communicate()[0].decode("utf-8")
         video_data = json.loads(result)
+
+        data = None
         for stream in video_data['streams']:
-            if stream['codec_type'] == 'video':
+            if stream['codec_type'] == 'video' or not data:
                 data = stream
 
         format_meta = ('format_name', 'size')
