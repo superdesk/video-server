@@ -93,6 +93,7 @@ def task_get_list_thumbnails(sdoc, amount, retry=0):
         count = 0
         for thumbnail_stream, \
             thumbnail_meta in video_editor.capture_list_timeline_thumbnails(stream_file,
+                                                                            doc.get('filename'),
                                                                             doc.get('metadata'),
                                                                             int(amount)):
             thumbnail_path = '%s_timeline_%02d.png' % (file_path, count)
