@@ -1,3 +1,4 @@
+import base64
 import logging
 import os
 import re
@@ -1109,17 +1110,22 @@ class PreviewThumbnailVideo(MethodView):
         action = schema.get('type')
         thumbnail_stream, thumbnail_metadata = None, None
         doc = json_util.loads(doc)
+        video_editor = get_video_editor()
+
         if action == 'upload':
-            thumbnail_stream = schema.get('data')
-            if not thumbnail_stream:
+            base64_thumbnail = schema.get('data')
+            if not base64_thumbnail:
                 abort(bad_request({'data': ['required field']}))
-            thumbnail_metadata = app.fs.get_meta(thumbnail_stream)
+            try:
+                thumbnail_stream = base64.b64decode(base64_thumbnail)
+            except base64.binascii.Error as err:
+                abort(bad_request(str(err)))
+            thumbnail_metadata = video_editor.get_meta(thumbnail_stream, 'png')
         elif action == 'capture':
             time = schema.get('time')
             if not time:
                 abort(bad_request({'time': ['required field']}))
             video_stream = app.fs.get(video_path)
-            video_editor = get_video_editor()
             thumbnail_stream, thumbnail_metadata = video_editor.capture_thumbnail(
                 video_stream, doc['filename'], doc['metadata'], time
             )

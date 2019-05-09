@@ -11,13 +11,13 @@ from .interface import VideoEditorInterface
 
 class FFMPEGVideoEditor(VideoEditorInterface):
 
-    def get_meta(self, filestream):
+    def get_meta(self, filestream, extension='tmp'):
         """
         Use ffmpeg tool for getting metadata of video file
         :param filestream:
         :return:
         """
-        file_name = create_file_name('tmp')
+        file_name = create_file_name(extension)
         metadata = {}
         try:
             #: create a temp file
