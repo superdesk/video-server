@@ -51,7 +51,6 @@ def test_ffmpeg_video_editor_generate_thumbnails(client, filestream):
     for index, (thumbnail, thumbnail_meta) in enumerate(
         editor.capture_list_timeline_thumbnails(
             filestream,
-            filename,
             metadata,
             app.config.get('AMOUNT_FRAMES', 40))):
         app.fs.put(thumbnail, f'{fs_path}/test_generate_thumbnails/filename_{index}.png')
@@ -60,3 +59,13 @@ def test_ffmpeg_video_editor_generate_thumbnails(client, filestream):
     list_files = [fi for fi in list_files if fi.startswith(f'filename_')]
 
     assert len(list_files) == 41
+
+
+def test_ffmpeg_video_editor_capture_thumbnail(filestream):
+    metadata = editor.get_meta(filestream)
+    stream_meta, thumbnail_meta = editor.capture_thumbnail(
+        filestream, metadata, 10
+    )
+
+    assert thumbnail_meta['codec_name'] == 'png'
+    assert thumbnail_meta['size'] == '317273'
