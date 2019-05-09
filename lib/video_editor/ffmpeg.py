@@ -142,12 +142,12 @@ class FFMPEGVideoEditor(VideoEditorInterface):
             path_video = self._create_temp_file(stream_file, filename)
             duration = float(metadata['duration'])
             # period time between two frames
-            frame_per_second = (duration - 1) / number_frames
+            frame_per_second = (duration - 1) / (number_frames - 1)
 
             # capture list frame via script capture_list_frames.sh
             path_script = os.path.dirname(__file__) + '/script/capture_list_frames.sh'
-            cmd.run([path_script, path_video, path_video + "_", str(frame_per_second), str(number_frames + 1)])
-            for i in range(0, number_frames + 1):
+            cmd.run([path_script, path_video, path_video + "_", str(frame_per_second), str(number_frames)])
+            for i in range(0, number_frames):
                 path_output = path_video + '_%0d.bmp' % i
                 try:
                     thumbnail_metadata = self._get_meta(path_output)

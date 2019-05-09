@@ -862,6 +862,8 @@ class ThumbnailsTimelineProject(MethodView):
         check_user_agent()
 
         amount = request.args.get('amount', 40, int)
+        if amount < 0:
+            amount = 40
 
         doc = app.mongo.db.projects.find_one({'_id': format_id(project_id)})
         if not doc:
