@@ -13,19 +13,20 @@ logger = logging.getLogger(__name__)
 
 
 @celery.task
-def task_edit_video(file_path, sdoc, updates, retry=0):
+def task_edit_video(sdoc, updates, action='post', retry=0):
     """
     Task use tool for edit video and record the data and update status after finished,
     :param file_path: full path edit video
     :param sdoc: type json string, data info edit video
-    :param updates: type dictionary, the actions for edit video
+    :param updates: type dictionary, changes apply to the video
+    :param action: put/replace action for new edited video
     :param retry:
     :return:
     """
+    doc = json_util.loads(sdoc)
+    storage_id = doc['storage_id']
     try:
-        video_stream = app.fs.get(file_path)
-
-        doc = json_util.loads(sdoc)
+        video_stream = app.fs.get(doc['storage_id'])
 
         # Use tool for editing video
         video_editor = get_video_editor()
@@ -38,10 +39,13 @@ def task_edit_video(file_path, sdoc, updates, retry=0):
             updates.get('rotate'),
             updates.get('quality')
         )
-        app.fs.put(
-            edited_video_stream,
-            os.path.join(app.config.get('FS_MEDIA_STORAGE_PATH'), doc.get('folder'), doc.get('filename'))
-        )
+        if action == 'post':
+            new_storage_id = app.fs.put(edited_video_stream, doc.get('filename'), None)
+        elif action == 'put':
+            new_storage_id = app.fs.replace(edited_video_stream, storage_id, None)
+        else:
+            raise KeyError(f'Invalid action `{action}`')
+
         # create url for preview video
         url = app.fs.url_for_media(doc.get('_id'))
         # Update data status is True and data video when edit was finished
@@ -50,6 +54,7 @@ def task_edit_video(file_path, sdoc, updates, retry=0):
             {'$set': {
                 'processing': False,
                 'metadata': metadata,
+                'storage_id': new_storage_id,
                 'thumbnails': {},
                 'url': url
             }},
@@ -60,13 +65,12 @@ def task_edit_video(file_path, sdoc, updates, retry=0):
         for key in doc['thumbnails'].keys():
             thumbnails = doc['thumbnails'][str(key)]
         for thumbnail in thumbnails:
-            path = os.path.join(app.config.get('FS_MEDIA_STORAGE_PATH'), thumbnail['folder'], thumbnail['filename'])
-            app.fs.delete(path)
+            app.fs.delete(thumbnail['storage_id'])
 
     except Exception as exc:
         logger.exception(exc)
         if retry < app.config.get('NUMBER_RETRY', 3):
-            task_edit_video.delay(file_path, json_util.dumps(doc), updates, retry=retry + 1)
+            task_edit_video.delay(json_util.dumps(doc), updates, action, retry=retry + 1)
         else:
             if doc['version'] >= 2:
                 app.mongo.db.projects.delete_one({'_id': doc['_id']})
@@ -86,23 +90,22 @@ def task_get_list_thumbnails(sdoc, amount, retry=0):
         doc = json_util.loads(sdoc)
 
         # get full path file of video
-        filename, ext = os.path.splitext(doc.get('filename'))
-        file_path = os.path.join(app.config.get('FS_MEDIA_STORAGE_PATH'), doc.get('folder'), filename)
-        stream_file = app.fs.get(file_path + ext)
+        filename, ext = os.path.splitext(doc['filename'])
+        stream_file = app.fs.get(doc['storage_id'])
         video_editor = get_video_editor()
         count = 0
         for thumbnail_stream, \
             thumbnail_meta in video_editor.capture_list_timeline_thumbnails(stream_file,
-                                                                            doc.get('filename'),
+                                                                            filename,
                                                                             doc.get('metadata'),
                                                                             int(amount)):
-            thumbnail_path = '%s_timeline_%02d.png' % (file_path, count)
-            app.fs.put(thumbnail_stream, thumbnail_path)
+            thumbnail_filename = '%s_timeline_%02d.png' % (filename, count)
+            storage_id = app.fs.put(thumbnail_stream, thumbnail_filename, 'image/png')
             update_thumbnails.append(
                 {
                     'filename': '%s_timeline_%02d.png' % (filename, count),
-                    'folder': doc.get('folder'),
-                    'mimetype': 'image/bmp',
+                    'storage_id': storage_id,
+                    'mimetype': 'image/png',
                     'width': thumbnail_meta.get('width'),
                     'height': thumbnail_meta.get('height'),
                     'size': thumbnail_meta.get('size'),

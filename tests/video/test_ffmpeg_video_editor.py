@@ -48,23 +48,23 @@ def test_ffmpeg_video_editor_generate_thumbnails(client, filestream):
     metadata = editor.get_meta(filestream)
     fs_path = app.config['FS_MEDIA_STORAGE_PATH']
     filename = 'test_ffmpeg_video_editor_generate_thumbnails'
+    storage_id_list = set()
     for index, (thumbnail, thumbnail_meta) in enumerate(
         editor.capture_list_timeline_thumbnails(
             filestream,
+            filename,
             metadata,
             app.config.get('AMOUNT_FRAMES', 40))):
-        app.fs.put(thumbnail, f'{fs_path}/test_generate_thumbnails/filename_{index}.png')
+        storage_id = app.fs.put(thumbnail, f'test_generate_thumbnails/filename_{index}.png')
+        storage_id_list.add(storage_id)
 
-    list_files = os.listdir(f'{fs_path}/test_generate_thumbnails')
-    list_files = [fi for fi in list_files if fi.startswith(f'filename_')]
-
-    assert len(list_files) == 41
+    assert all(os.path.exists(f'{fs_path}/{storage_id}') for storage_id in storage_id_list)
 
 
 def test_ffmpeg_video_editor_capture_thumbnail(filestream):
     metadata = editor.get_meta(filestream)
     stream_meta, thumbnail_meta = editor.capture_thumbnail(
-        filestream, metadata, 10
+        filestream, 'test_ffmpeg_video_editor_capture_thumbnail', metadata, 10
     )
 
     assert thumbnail_meta['codec_name'] == 'png'

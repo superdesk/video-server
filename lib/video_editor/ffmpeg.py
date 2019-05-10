@@ -94,7 +94,8 @@ class FFMPEGVideoEditor(VideoEditorInterface):
             if str_filter != '':
                 path_video = self._edit_video(path_video, path_output,
                                               ["-filter:v", str_filter, "-max_muxing_queue_size", "1024", "-threads",
-                                               "5", "-preset", "ultrafast", "-strict", "-2", "-c:a", "copy"])
+                                               "5", "-preset", "ultrafast", "-strict", "-2", "-c:a", "copy"
+                                               ])
             content = open(path_video, "rb+").read()
             metadata_edit_file = self._get_meta(path_video)
         finally:
@@ -167,7 +168,7 @@ class FFMPEGVideoEditor(VideoEditorInterface):
         :param time_capture:
         :return:
         """
-        cmd.run(["ffmpeg", "-i", path_video, "-ss", str(time_capture), "-vframes", "1", path_output])
+        cmd.run(["ffmpeg", "-v", "error", "-i", path_video, "-ss", str(time_capture), "-vframes", "1", path_output])
         return open(path_output, "rb+").read()
 
     def _edit_video(self, path_video, path_output, para=[]):
@@ -180,7 +181,7 @@ class FFMPEGVideoEditor(VideoEditorInterface):
         """
         try:
             # cut video
-            cmd.run(["ffmpeg", "-i", path_video, *para, path_output])
+            cmd.run(["ffmpeg", "-v", "error", "-i", path_video, *para, path_output])
 
             # replace tmp origin
 
@@ -198,7 +199,7 @@ class FFMPEGVideoEditor(VideoEditorInterface):
         :return:
         """
         res = cmd.Popen(
-            ['ffprobe', '-v', 'quiet', '-print_format', 'json', '-show_streams', '-show_format', path_video],
+            ['ffprobe', '-v', 'error', '-print_format', 'json', '-show_streams', '-show_format', path_video],
             stdout=cmd.PIPE)
         result = res.communicate()[0].decode("utf-8")
         video_data = json.loads(result)

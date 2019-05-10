@@ -2,6 +2,7 @@ import base64
 import logging
 import os
 import re
+
 from datetime import datetime
 
 from bson import json_util
@@ -65,9 +66,9 @@ class UploadProject(MethodView):
                 url:
                   type: string
                   example: https://example.com/url_raw/fa5079a38e0a4197864aa2ccb07f3bea4
-                folder:
+                storage_id:
                   type: string
-                  example: 2019/5
+                  example: 2019/5/1/fa5079a38e0a4197864aa2ccb07f3bea.mp4
                 metadata:
                   type: object
                   properties:
@@ -192,8 +193,8 @@ class UploadProject(MethodView):
                 activity = {
                     "action": "UPLOAD",
                     "file_id": doc.get('_id'),
-                    "payload": {"file": doc.get(file.filename)},
-                    "create_date": utcnow
+                    "payload": {"file": doc.get('filename')},
+                    "create_date": datetime.utcnow()
                 }
                 app.mongo.db.activity.insert_one(activity)
             except Exception as ex:
@@ -239,9 +240,9 @@ class UploadProject(MethodView):
                       url:
                         type: string
                         example: https://example.com/url_raw/fa5079a38e0a4197864aa2ccb07f3bea
-                      folder:
+                      storage_id:
                         type: string
-                        example: 2019/5
+                        example: 2019/5/fa5079a38e0a4197864aa2ccb07f3bea.mp4
                       metadata:
                         type: object
                         properties:
@@ -316,6 +317,8 @@ class UploadProject(MethodView):
         list_pages = list(paginate(docs, max_size))
         if offset >= len(list_pages):
             offset = len(list_pages) - 1
+        elif offset < 0:
+            offset = 0
         res = {
             'items': list_pages[offset],
             'offset': offset,
@@ -389,9 +392,9 @@ class RetrieveEditDestroyProject(MethodView):
                 url:
                   type: string
                   example: https://example.com/url_raw/fa5079a38e0a4197864aa2ccb07f3bea
-                folder:
+                storage_id:
                   type: string
-                  example: 2019/5
+                  example: 2019/5/fa5079a38e0a4197864aa2ccb07f3bea.mp4
                 metadata:
                   type: object
                   properties:
@@ -526,9 +529,9 @@ class RetrieveEditDestroyProject(MethodView):
                 url:
                   type: string
                   example: https://example.com/url_raw/fa5079a38e0a4197864aa2ccb07f3bea
-                folder:
+                storage_id:
                   type: string
-                  example: 2019/5
+                  example: 2019/5/fa5079a38e0a4197864aa2ccb07f3bea.mp4
                 metadata:
                   type: object
                   properties:
@@ -608,7 +611,7 @@ class RetrieveEditDestroyProject(MethodView):
             return forbidden('this video is still processing, please wait.')
         if not doc.get('version') >= 2:
             return bad_request("Only PUT action for edited video version 2")
-        file_path = os.path.join(app.config.get('FS_MEDIA_STORAGE_PATH'), doc.get('folder'), doc.get('filename'))
+
         # Update processing is True when begin edit video
         app.mongo.db.projects.update_one(
             {'_id': doc['_id']},
@@ -617,7 +620,7 @@ class RetrieveEditDestroyProject(MethodView):
             }}
         )
         doc['processing'] = True
-        task_edit_video.delay(file_path, json_util.dumps(doc), request.get_json())
+        task_edit_video.delay(json_util.dumps(doc), request.get_json(), action='put')
         activity = {
             "action": "EDIT PUT",
             "project_id": doc.get('_id'),
@@ -688,9 +691,9 @@ class RetrieveEditDestroyProject(MethodView):
                 url:
                   type: string
                   example: https://example.com/url_raw/fa5079a38e0a4197864aa2ccb07f3bea
-                folder:
+                storage_id:
                   type: string
-                  example: 2019/5
+                  example: 2019/5/fa5079a38e0a4197864aa2ccb07f3bea.mp4
                 metadata:
                   type: object
                   example: {}
@@ -750,7 +753,7 @@ class RetrieveEditDestroyProject(MethodView):
         new_file_name = f'{filename}_v{version}{ext}'
         new_doc = {
             'filename': new_file_name,
-            'folder': doc.get('folder'),
+            'storage_id': doc.get('storage_id'),
             'metadata': None,
             'client_info': user_agent,
             'version': version,
@@ -763,8 +766,7 @@ class RetrieveEditDestroyProject(MethodView):
             'preview_thumbnail': doc.get('preview_thumbnail')
         }
         app.mongo.db.projects.insert_one(new_doc)
-        file_path = os.path.join(app.config.get('FS_MEDIA_STORAGE_PATH'), doc.get('folder'), doc.get('filename'))
-        task_edit_video.delay(file_path, json_util.dumps(new_doc), request.get_json())
+        task_edit_video.delay(json_util.dumps(new_doc), request.get_json())
         activity = {
             "action": "EDIT POST",
             "file_id": doc.get('_id'),
@@ -792,25 +794,19 @@ class RetrieveEditDestroyProject(MethodView):
         if not doc:
             return not_found("Project with id: {} was not found.".format(project_id))
 
-        # remove record from db
-        app.mongo.db.projects.delete_one({'_id': format_id(project_id)})
-
         # remove file from storage
-        file_path = os.path.join(app.config.get('FS_MEDIA_STORAGE_PATH'), doc.get('folder'), doc.get('filename'))
-
-        if app.fs.delete(file_path):
+        if app.fs.delete(doc['storage_id']):
             # Delete thumbnails
             thumbnails = []
             for key in doc['thumbnails'].keys():
                 thumbnails = doc['thumbnails'][str(key)]
             for thumbnail in thumbnails:
-                path = os.path.join(app.config.get('FS_MEDIA_STORAGE_PATH'), thumbnail['folder'], thumbnail['filename'])
-                app.fs.delete(path)
+                app.fs.delete(thumbnail['storage_id'])
             preview_thumbnail = doc['preview_thumbnail']
             if preview_thumbnail:
-                path = os.path.join(app.config.get('FS_MEDIA_STORAGE_PATH'), preview_thumbnail['folder'],
-                                    preview_thumbnail['filename'])
-                app.fs.delete(path)
+                app.fs.delete(preview_thumbnail['storage_id'])
+
+            app.mongo.db.projects.delete_one({'_id': format_id(project_id)})
             return json_response(status=204)
         else:
             return json_response(status=500)
@@ -886,8 +882,7 @@ class ThumbnailsTimelineProject(MethodView):
             for key in doc['thumbnails'].keys():
                 thumbnails = doc['thumbnails'][str(key)]
             for thumbnail in thumbnails:
-                path = os.path.join(app.config.get('FS_MEDIA_STORAGE_PATH'), thumbnail['folder'], thumbnail['filename'])
-                app.fs.delete(path)
+                app.fs.delete(thumbnail['storage_id'])
             # Run get list thumbnails of timeline for video in celery
             task_get_list_thumbnails.delay(json_util.dumps(doc), amount)
         return json_response({"processing": doc.get('processing'), "thumbnails": doc['thumbnails']})
@@ -898,16 +893,17 @@ class GetRawVideoThumbnail(MethodView):
         # get range of video
         video_range = request.headers.environ.get('HTTP_RANGE', 'byte=0-')
         doc = app.mongo.db.projects.find_one_or_404({'_id': format_id(project_id)})
-        folder_path = os.path.join(app.config['FS_MEDIA_STORAGE_PATH'], doc['folder'])
+
         if request.args.get('thumbnail'):
             thumbnail = request.args.get('thumbnail', -1, type=int)
             total = list(doc['thumbnails'].keys())[0]
             if not thumbnail >= 0 or thumbnail >= len(doc['thumbnails'][total]):
                 return not_found('')
-            byte = app.fs.get(folder_path + '/' + doc['thumbnails'][total][thumbnail]['filename'])
+            byte = app.fs.get(doc['thumbnails'][total][thumbnail]['storage_id'])
             res = make_response(byte)
             res.headers['Content-Type'] = 'image/png'
             return res
+
         length = int(doc['metadata'].get('size'))
         start = int(re.split('[= | -]', video_range)[1])
         end = length - 1
@@ -919,7 +915,7 @@ class GetRawVideoThumbnail(MethodView):
             'Content-Type': 'video/mp4',
         }
         # get a stack of bytes push to client
-        stream = app.fs.get_range(folder_path + '/' + doc['filename'], start, end)
+        stream = app.fs.get_range(doc['storage_id'], start, end)
         res = make_response(stream)
         res.headers = headers
         return res, 206
@@ -988,9 +984,9 @@ class PreviewThumbnailVideo(MethodView):
                 url:
                   type: string
                   example: https://example.com/url_raw/fa5079a38e0a4197864aa2ccb07f3bea
-                folder:
+                storage_id:
                   type: string
-                  example: 2019/5
+                  example: 2019/5/fa5079a38e0a4197864aa2ccb07f3bea.mp4
                 metadata:
                   type: object
                   properties:
@@ -1063,9 +1059,9 @@ class PreviewThumbnailVideo(MethodView):
                     filename:
                       type: string
                       example: fa5079a38e0a4197864aa2ccb07f3bea_thumbnail.png
-                    folder:
+                    storage_id:
                       type: string
-                      example: 2019/5/1
+                      example: 2019/5/fa5079a38e0a4197864aa2ccb07f3bea_thumbnail.png
                     mimetype:
                       type: string
                       example: "image/png"
@@ -1091,10 +1087,10 @@ class PreviewThumbnailVideo(MethodView):
         if doc.get('processing') is True:
             return forbidden('this video is still processing, please wait.')
 
-        file_path = os.path.join(app.config.get('FS_MEDIA_STORAGE_PATH'), doc.get('folder'), doc.get('filename'))
-        preview_thumbnail = self._set_thumbnail(file_path, updates, json_util.dumps(doc))
+        preview_thumbnail = self._set_thumbnail(doc['filename'], updates, json_util.dumps(doc))
         if not preview_thumbnail:
             return bad_request('Invalid request')
+
         else:
             app.mongo.db.projects.update_one(
                 {'_id': doc['_id']},
@@ -1105,7 +1101,7 @@ class PreviewThumbnailVideo(MethodView):
             doc['preview_thumbnail'] = preview_thumbnail
         return json_response(doc)
 
-    def _set_thumbnail(self, video_path, schema, doc):
+    def _set_thumbnail(self, storage_id, schema, doc):
         action = schema.get('type')
         thumbnail_stream, thumbnail_metadata = None, None
         doc = json_util.loads(doc)
@@ -1124,7 +1120,7 @@ class PreviewThumbnailVideo(MethodView):
             time = schema.get('time')
             if not time:
                 abort(bad_request({'time': ['required field']}))
-            video_stream = app.fs.get(video_path)
+            video_stream = app.fs.get(storage_id)
             thumbnail_stream, thumbnail_metadata = video_editor.capture_thumbnail(
                 video_stream, doc['filename'], doc['metadata'], time
             )
@@ -1133,11 +1129,10 @@ class PreviewThumbnailVideo(MethodView):
             try:
                 filename, ext = os.path.splitext(doc['filename'])
                 thumbnail_filename = f"{filename}_thumbnail.png"
-                path = os.path.join(app.config.get('FS_MEDIA_STORAGE_PATH'), doc.get('folder'), thumbnail_filename)
-                app.fs.put(thumbnail_stream, path)
+                storage_id = app.fs.put(thumbnail_stream, thumbnail_filename, 'image/png')
                 return {
                     'filename': thumbnail_filename,
-                    'folder': doc.get('folder'),
+                    'storage_id': storage_id,
                     'mimetype': 'image/png',
                     'width': thumbnail_metadata.get('width'),
                     'height': thumbnail_metadata.get('height'),
