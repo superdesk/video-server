@@ -1108,10 +1108,15 @@ class PreviewThumbnailVideo(MethodView):
         video_editor = get_video_editor()
 
         if action == 'upload':
-            base64_thumbnail = schema.get('data')
-            if not base64_thumbnail:
+            base64_string = schema.get('data')
+            if not base64_string:
                 abort(bad_request({'data': ['required field']}))
             try:
+                if ',' not in base64_string:
+                    base64_thumbnail = base64_string
+                else:
+                    base64_format, base64_thumbnail = base64_string.split(',', 1)
+
                 thumbnail_stream = base64.b64decode(base64_thumbnail)
             except base64.binascii.Error as err:
                 abort(bad_request(str(err)))
