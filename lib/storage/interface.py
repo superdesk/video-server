@@ -16,7 +16,7 @@ class MediaStorageInterface(metaclass=abc.ABCMeta):
         pass
 
     @abc.abstractmethod
-    def get_range(self, file_path, start, end):
+    def get_range(self, file_path, start, length):
         pass
 
     @abc.abstractmethod

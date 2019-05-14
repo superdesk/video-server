@@ -4,7 +4,6 @@ from datetime import datetime
 
 from flask import current_app as app
 
-
 from .interface import MediaStorageInterface
 
 logger = logging.getLogger(__name__)
@@ -26,19 +25,19 @@ class FileSystemStorage(MediaStorageInterface):
             media_file = None
         return media_file
 
-    def get_range(self, storage_id, start, end):
+    def get_range(self, storage_id, start, length):
         """
         Get a range of stream file
-        :param file_path: full file path
+        :param storage_id: storage_id of file
         :param start: start index stream
-        :param end: end index stream
+        :param length: end index stream
         :return:
         """
         try:
             file_path = os.path.join(app.config.get('FS_MEDIA_STORAGE_PATH'), storage_id)
             file = (open(file_path, 'rb'))
             file.seek(start)
-            media_file = file.read(end - start + 1)
+            media_file = file.read(length)
         except Exception as ex:
             logger.error('Cannot get data file %s ex: %s' % (storage_id, ex))
             media_file = None
@@ -52,7 +51,6 @@ class FileSystemStorage(MediaStorageInterface):
         :param content_type: content type of file
         :return: storage_id
         """
-        file_path = ''
         try:
             # generate storage_id
             utcnow = datetime.utcnow()
@@ -74,16 +72,21 @@ class FileSystemStorage(MediaStorageInterface):
     def url_for_media(self, project_id):
         """
         Get url project for reviewing
-        :param project_id:
+        :param project_id: id of project
         :return:
         """
         return f'{app.config.get("VIDEO_MEDIA_PREFIX")}/{str(project_id)}'
 
     def replace(self, content, storage_id, content_type=None):
-        file_path = ''
+        """
+        replace a file in storage
+        :param content: stream file
+        :param storage_id: storage_id of file
+        :param content_type: content type of file
+        :return:
+        """
         try:
             # generate storage_id
-            utcnow = datetime.utcnow()
             file_path = os.path.join(app.config.get('FS_MEDIA_STORAGE_PATH'), storage_id)
             # check if dir exists, if not create it
             file_dir = os.path.dirname(file_path)

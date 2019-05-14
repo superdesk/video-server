@@ -32,3 +32,9 @@ def json_response(doc=None, status=200):
     """
     return Response(bson.json_util.dumps(doc), status=status, mimetype='application/json')
 
+
+def represents_int(s):
+    try:
+        return int(s)
+    except ValueError:
+        return None

@@ -75,7 +75,8 @@ CODEC_SUPPORT = json.loads(env('CODEC_SUPPORT', '["vp8", "vp9", "h264", "theora"
 
 #: media storage
 MEDIA_STORAGE = env('MEDIA_STORAGE', 'filesystem')
-FS_MEDIA_STORAGE_PATH = os.path.join(BASE_PATH, 'media', 'projects')
+default_path = os.path.join(BASE_PATH, 'media', 'projects')
+FS_MEDIA_STORAGE_PATH = env('FS_MEDIA_STORAGE_PATH', default_path)
 
 #: media tool
 DEFAULT_MEDIA_TOOL = env('DEFAULT_MEDIA_TOOL', 'ffmpeg')

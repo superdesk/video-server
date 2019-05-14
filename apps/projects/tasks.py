@@ -109,6 +109,7 @@ def task_get_list_thumbnails(sdoc, amount, retry=0):
                     'width': thumbnail_meta.get('width'),
                     'height': thumbnail_meta.get('height'),
                     'size': thumbnail_meta.get('size'),
+                    'url': f"{app.fs.url_for_media(doc.get('_id'))}?thumbnail={count}"
 
                 }
             )

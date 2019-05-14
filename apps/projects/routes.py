@@ -11,7 +11,7 @@ from flask import current_app as app
 from flask.views import MethodView
 
 from lib.errors import bad_request, forbidden, not_found
-from lib.utils import create_file_name, format_id, json_response, paginate
+from lib.utils import create_file_name, format_id, json_response, represents_int
 from lib.validator import Validator
 from lib.video_editor import get_video_editor
 from . import bp
@@ -311,19 +311,15 @@ class UploadProject(MethodView):
                             example: 5cbd5acfe24f6045607e51aa
         """
         offset = request.args.get('offset', 0, type=int)
-        max_size = int(app.config.get('ITEMS_PER_PAGE', 25))
+        size = int(app.config.get('ITEMS_PER_PAGE', 25))
         # get all projects
-        docs = list(app.mongo.db.projects.find())
-        list_pages = list(paginate(docs, max_size))
-        if offset >= len(list_pages):
-            offset = len(list_pages) - 1
-        elif offset < 0:
-            offset = 0
+        docs = list(app.mongo.db.projects.find().skip(offset).limit(size))
+
         res = {
-            'items': list_pages[offset],
+            'items': docs,
             'offset': offset,
-            'size': len(list_pages[offset]),
-            'max_size': max_size
+            'max_results': size,
+            'total': app.mongo.db.projects.count()
         }
         return json_response(res)
 
@@ -891,17 +887,32 @@ class ThumbnailsTimelineProject(MethodView):
 class GetRawVideoThumbnail(MethodView):
     def get(self, project_id):
         # get range of video
+        project_id, _ = os.path.splitext(project_id)
         video_range = request.headers.environ.get('HTTP_RANGE', 'byte=0-')
         doc = app.mongo.db.projects.find_one_or_404({'_id': format_id(project_id)})
 
         if request.args.get('thumbnail'):
-            thumbnail = request.args.get('thumbnail', -1, type=int)
-            total = list(doc['thumbnails'].keys())[0]
-            if not thumbnail >= 0 or thumbnail >= len(doc['thumbnails'][total]):
-                return not_found('')
-            byte = app.fs.get(doc['thumbnails'][total][thumbnail]['storage_id'])
-            res = make_response(byte)
-            res.headers['Content-Type'] = 'image/png'
+            thumbnail = request.args.get('thumbnail')
+            if thumbnail == 'preview':
+                preview_thumbnail = doc.get('preview_thumbnail')
+                if not preview_thumbnail:
+                    return not_found('')
+                byte = app.fs.get(preview_thumbnail.get('storage_id'))
+                res = make_response(byte)
+                res.headers['Content-Type'] = 'image/png'
+
+            else:
+                thumbnail = represents_int(thumbnail)
+                if thumbnail:
+                    total = list(doc['thumbnails'].keys())[0]
+                    if not thumbnail >= 0 or thumbnail >= len(doc['thumbnails'][total]):
+                        return not_found('')
+                    byte = app.fs.get(doc['thumbnails'][total][thumbnail]['storage_id'])
+                    res = make_response(byte)
+                    res.headers['Content-Type'] = 'image/png'
+                else:
+                    bad_request("thumbnail variable must be int or 'preview'")
+
             return res
 
         length = int(doc['metadata'].get('size'))
@@ -912,10 +923,10 @@ class GetRawVideoThumbnail(MethodView):
             'Content-Range': f'bytes {start}-{end}/{length}',
             'Accept-Ranges': 'bytes',
             'Content-Length': chunksize,
-            'Content-Type': 'video/mp4',
+            'Content-Type': doc.get("mime_type"),
         }
         # get a stack of bytes push to client
-        stream = app.fs.get_range(doc['storage_id'], start, end)
+        stream = app.fs.get_range(doc['storage_id'], start, chunksize)
         res = make_response(stream)
         res.headers = headers
         return res, 206
@@ -1087,7 +1098,7 @@ class PreviewThumbnailVideo(MethodView):
         if doc.get('processing') is True:
             return forbidden('this video is still processing, please wait.')
 
-        preview_thumbnail = self._set_thumbnail(doc['filename'], updates, json_util.dumps(doc))
+        preview_thumbnail = self._set_thumbnail(doc['storage_id'], updates, json_util.dumps(doc))
         if not preview_thumbnail:
             return bad_request('Invalid request')
 
@@ -1137,6 +1148,7 @@ class PreviewThumbnailVideo(MethodView):
                 storage_id = app.fs.put(thumbnail_stream, thumbnail_filename, 'image/png')
                 return {
                     'filename': thumbnail_filename,
+                    'url': f"{app.fs.url_for_media(doc.get('_id'))}?thumbnail=preview",
                     'storage_id': storage_id,
                     'mimetype': 'image/png',
                     'width': thumbnail_metadata.get('width'),
