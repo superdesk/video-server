@@ -13,8 +13,9 @@ import os
 import settings
 import importlib
 import logging.config
-from flask import Flask
+from flask import Flask, jsonify
 from flask_pymongo import PyMongo
+from werkzeug.exceptions import HTTPException, default_exceptions
 
 from lib.celery_app import init_celery
 from lib.storage import get_media_storage
@@ -77,6 +78,16 @@ def get_app(config=None):
     app.init_db = init_db
 
     init_celery(app)
+
+    def make_json_error(ex):
+        response = jsonify(message=str(ex.description))
+        response.status_code = (ex.code
+                                if isinstance(ex, HTTPException)
+                                else 500)
+        return response
+
+    for code in default_exceptions.keys():
+        app.register_error_handler(code, make_json_error)
 
     return app
 

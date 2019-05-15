@@ -886,11 +886,9 @@ class ThumbnailsTimelineProject(MethodView):
 
 class GetRawVideoThumbnail(MethodView):
     def get(self, project_id):
-        # get range of video
         project_id, _ = os.path.splitext(project_id)
-        video_range = request.headers.environ.get('HTTP_RANGE', 'byte=0-')
         doc = app.mongo.db.projects.find_one_or_404({'_id': format_id(project_id)})
-
+        # get thumbnails of video
         if request.args.get('thumbnail'):
             thumbnail = request.args.get('thumbnail')
             if thumbnail == 'preview':
@@ -912,24 +910,37 @@ class GetRawVideoThumbnail(MethodView):
                     res.headers['Content-Type'] = 'image/png'
                 else:
                     bad_request("thumbnail variable must be int or 'preview'")
-
             return res
 
+        # get strem file for video
+        video_range = request.headers.environ.get('HTTP_RANGE')
         length = int(doc['metadata'].get('size'))
-        start = int(re.split('[= | -]', video_range)[1])
-        end = length - 1
-        chunksize = end - start + 1
-        headers = {
-            'Content-Range': f'bytes {start}-{end}/{length}',
-            'Accept-Ranges': 'bytes',
-            'Content-Length': chunksize,
-            'Content-Type': doc.get("mime_type"),
-        }
-        # get a stack of bytes push to client
-        stream = app.fs.get_range(doc['storage_id'], start, chunksize)
-        res = make_response(stream)
-        res.headers = headers
-        return res, 206
+        if video_range:
+
+            start = int(re.split('[= | -]', video_range)[1])
+            end = length - 1
+            chunksize = end - start + 1
+            headers = {
+                'Content-Range': f'bytes {start}-{end}/{length}',
+                'Accept-Ranges': 'bytes',
+                'Content-Length': chunksize,
+                'Content-Type': doc.get("mime_type"),
+            }
+            # get a stack of bytes push to client
+            stream = app.fs.get_range(doc['storage_id'], start, chunksize)
+            res = make_response(stream)
+            res.headers = headers
+            return res, 206
+        else:
+
+            headers = {
+                'Content-Length': length,
+                'Content-Type': 'video/mp4',
+            }
+            stream = app.fs.get(doc.get('storage_id'))
+            res = make_response(stream)
+            res.headers = headers
+            return res, 200
 
 
 class PreviewThumbnailVideo(MethodView):
