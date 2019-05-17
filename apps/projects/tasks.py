@@ -134,7 +134,7 @@ def task_get_list_thumbnails(sdoc, amount, retry=0):
                 if os.path.exists(path_thumbnail):
                     os.remove(path_thumbnail)
         if retry < app.config.get('NUMBER_RETRY', 3):
-            task_get_list_thumbnails.delay(sdoc, retry=retry + 1)
+            task_get_list_thumbnails.delay(sdoc, amount, retry=retry + 1)
         else:
             app.mongo.db.projects.update_one(
                 {'_id': format_id(doc.get('_id'))},

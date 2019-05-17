@@ -117,9 +117,9 @@ class FFMPEGVideoEditor(VideoEditorInterface):
             path_video = self._create_temp_file(stream_file, filename)
             duration = float(metadata['duration'])
             path_output = path_video + "_thumbnail.png"
-            # -0.1 for avoid the end frame, is null
+            # avoid the end frame, is null
             if int(duration) <= int(capture_time):
-                capture_time = int(duration) - 0.1
+                capture_time = duration - 0.1
             content = self._capture_thumbnail(path_video, path_output, capture_time)
             thumbnail_metadata = self._get_meta(path_output)
         finally:
@@ -143,7 +143,11 @@ class FFMPEGVideoEditor(VideoEditorInterface):
             path_video = self._create_temp_file(stream_file, filename)
             duration = float(metadata['duration'])
             # period time between two frames
-            frame_per_second = (duration - 1) / (number_frames - 1)
+
+            if number_frames == 1:
+                frame_per_second = (duration - 1)
+            else:
+                frame_per_second = (duration - 1) / (number_frames - 1)
 
             # capture list frame via script capture_list_frames.sh
             path_script = os.path.dirname(__file__) + '/script/capture_list_frames.sh'
@@ -168,7 +172,7 @@ class FFMPEGVideoEditor(VideoEditorInterface):
         :param time_capture:
         :return:
         """
-        cmd.run(["ffmpeg", "-v", "error", "-i", path_video, "-ss", str(time_capture), "-vframes", "1", path_output])
+        cmd.run(["ffmpeg", "-v", "error", "-y", "-accurate_seek", "-i", path_video, "-ss", str(time_capture), "-vframes", "1", path_output])
         return open(path_output, "rb+").read()
 
     def _edit_video(self, path_video, path_output, para=[]):

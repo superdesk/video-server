@@ -80,10 +80,15 @@ def get_app(config=None):
     init_celery(app)
 
     def make_json_error(ex):
-        response = jsonify(message=str(ex.description))
+        message = ex.description if hasattr(ex, 'description') else ex
+        response = jsonify(message=str(message))
+
         response.status_code = (ex.code
                                 if isinstance(ex, HTTPException)
                                 else 500)
+        if response.status_code == 500:
+            response = jsonify(message='Something went wrong')
+
         return response
 
     for code in default_exceptions.keys():
