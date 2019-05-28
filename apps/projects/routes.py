@@ -336,8 +336,8 @@ class RetrieveEditDestroyProject(MethodView):
             'required': False,
             'empty': True,
             'schema': {
-                'start': {'type': 'integer', 'required': True},
-                'end': {'type': 'integer', 'required': True},
+                'start': {'type': 'float', 'required': True},
+                'end': {'type': 'float', 'required': True},
             },
         },
         'rotate': {
@@ -762,6 +762,7 @@ class RetrieveEditDestroyProject(MethodView):
             'preview_thumbnail': doc.get('preview_thumbnail')
         }
         app.mongo.db.projects.insert_one(new_doc)
+        new_doc['predict_url']= app.fs.url_for_media(new_doc.get('_id'))
         task_edit_video.delay(json_util.dumps(new_doc), request.get_json())
         activity = {
             "action": "EDIT POST",
@@ -888,6 +889,10 @@ class GetRawVideoThumbnail(MethodView):
     def get(self, project_id):
         project_id, _ = os.path.splitext(project_id)
         doc = app.mongo.db.projects.find_one_or_404({'_id': format_id(project_id)})
+        # video is processing
+        if not doc['metadata']:
+            return not_found('Video is still processing')
+
         # get thumbnails of video
         if request.args.get('thumbnail'):
             thumbnail = request.args.get('thumbnail')
@@ -901,7 +906,7 @@ class GetRawVideoThumbnail(MethodView):
 
             else:
                 thumbnail = represents_int(thumbnail)
-                if thumbnail:
+                if thumbnail or thumbnail == 0:
                     total = list(doc['thumbnails'].keys())[0]
                     if not thumbnail >= 0 or thumbnail >= len(doc['thumbnails'][total]):
                         return not_found('')
@@ -909,7 +914,7 @@ class GetRawVideoThumbnail(MethodView):
                     res = make_response(byte)
                     res.headers['Content-Type'] = 'image/png'
                 else:
-                    bad_request("thumbnail variable must be int or 'preview'")
+                    res = bad_request("thumbnail variable must be int or 'preview'")
             return res
 
         # get strem file for video
