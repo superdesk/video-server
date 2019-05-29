@@ -26,13 +26,16 @@ def check_user_agent():
     client_name = user_agent.split('/')[0]
     if client_name.lower() not in app.config.get('AGENT_ALLOW'):
         abort(bad_request("client is not allow to edit"))
-    return user_agent
 
 
 def check_request_schema_validity(request_schema, schema):
     validator = Validator(schema)
     if not validator.validate(request_schema):
         abort(bad_request(validator.errors))
+
+
+def get_request_address(request_headers):
+    return request_headers.get('HTTP_X_FORWARDED_FOR') or request_headers.get('REMOTE_ADDR')
 
 
 class UploadProject(MethodView):
@@ -114,9 +117,9 @@ class UploadProject(MethodView):
                 original_filename:
                   type: string
                   example: video.mp4
-                client_info:
+                request_address:
                   type: string
-                  example: Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:66.0) Gecko/20100101 Firefox/66.0
+                  example: 127.0.0.1
                 version:
                   type: integer
                   example: 1
@@ -142,8 +145,7 @@ class UploadProject(MethodView):
             # to avoid TypeError: cannot serialize '_io.BufferedRandom' error
             return bad_request({"file": ["required field"]})
 
-        # validate user-agent
-        user_agent = check_user_agent()
+        check_user_agent()
 
         # validate request
         check_request_schema_validity(request.files, self.SCHEMA_UPLOAD)
@@ -174,7 +176,7 @@ class UploadProject(MethodView):
                     'processing': False,
                     'parent': None,
                     'thumbnails': {},
-                    'client_info': user_agent,
+                    'request_address': get_request_address(request.headers.environ),
                     'original_filename': file.filename,
                     'preview_thumbnail': None,
                     'url': None
@@ -288,9 +290,9 @@ class UploadProject(MethodView):
                       original_filename:
                         type: string
                         example: video.mp4
-                      client_info:
+                      request_address:
                         type: string
-                        example: Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:66.0) Gecko/20100101 Firefox/66.0
+                        example: 127.0.0.1
                       version:
                         type: integer
                         example: 1
@@ -436,9 +438,9 @@ class RetrieveEditDestroyProject(MethodView):
                 original_filename:
                   type: string
                   example: video.mp4
-                client_info:
+                request_address:
                   type: string
-                  example: Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:66.0) Gecko/20100101 Firefox/66.0
+                  example: 127.0.0.1
                 version:
                   type: integer
                   example: 1
@@ -573,9 +575,9 @@ class RetrieveEditDestroyProject(MethodView):
                 original_filename:
                   type: string
                   example: video.mp4
-                client_info:
+                request_address:
                   type: string
-                  example: Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:66.0) Gecko/20100101 Firefox/66.0
+                  example: 127.0.0.1
                 version:
                   type: integer
                   example: 1
@@ -705,9 +707,9 @@ class RetrieveEditDestroyProject(MethodView):
                 original_filename:
                   type: string
                   example: video.mp4
-                client_info:
+                request_address:
                   type: string
-                  example: Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:66.0) Gecko/20100101 Firefox/66.0
+                  example: 127.0.0.1
                 version:
                   type: integer
                   example: 2
@@ -733,8 +735,7 @@ class RetrieveEditDestroyProject(MethodView):
                       type: string
                       example: 5cbd5acfe24f6045607e51aa
         """
-        # validate user-agent
-        user_agent = check_user_agent()
+        check_user_agent()
         # validate request
         check_request_schema_validity(request.get_json(), self.SCHEMA_EDIT)
 
@@ -751,7 +752,7 @@ class RetrieveEditDestroyProject(MethodView):
             'filename': new_file_name,
             'storage_id': doc.get('storage_id'),
             'metadata': None,
-            'client_info': user_agent,
+            'request_address': get_request_address(request.headers.environ),
             'version': version,
             'processing': True,
             'mime_type': doc.get('mime_type'),
@@ -1062,9 +1063,9 @@ class PreviewThumbnailVideo(MethodView):
                 original_filename:
                   type: string
                   example: video.mp4
-                client_info:
+                request_address:
                   type: string
-                  example: Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:66.0) Gecko/20100101 Firefox/66.0
+                  example: 127.0.0.1
                 version:
                   type: integer
                   example: 1
