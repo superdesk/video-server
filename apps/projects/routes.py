@@ -2,20 +2,20 @@ import base64
 import logging
 import os
 import re
-
 from datetime import datetime
 
 from bson import json_util
 from flask import abort, request, make_response
 from flask import current_app as app
 from flask.views import MethodView
+from werkzeug.exceptions import BadRequest, Forbidden, InternalServerError, NotFound
 
-from lib.errors import bad_request, forbidden, not_found
 from lib.utils import create_file_name, format_id, json_response, represents_int
 from lib.validator import Validator
 from lib.video_editor import get_video_editor
+
 from . import bp
-from .tasks import task_get_list_thumbnails, task_edit_video
+from .tasks import task_edit_video, task_get_list_thumbnails
 
 logger = logging.getLogger(__name__)
 
@@ -25,13 +25,13 @@ def check_user_agent():
 
     client_name = user_agent.split('/')[0]
     if client_name.lower() not in app.config.get('AGENT_ALLOW'):
-        abort(bad_request("client is not allow to edit"))
+        raise BadRequest("client is not allow to edit")
 
 
 def check_request_schema_validity(request_schema, schema):
     validator = Validator(schema)
     if not validator.validate(request_schema):
-        abort(bad_request(validator.errors))
+        raise BadRequest(validator.errors)
 
 
 def get_request_address(request_headers):
@@ -143,7 +143,7 @@ class UploadProject(MethodView):
         # validate request
         if 'file' not in request.files:
             # to avoid TypeError: cannot serialize '_io.BufferedRandom' error
-            return bad_request({"file": ["required field"]})
+            raise BadRequest({"file": ["required field"]})
 
         check_user_agent()
 
@@ -157,7 +157,7 @@ class UploadProject(MethodView):
         metadata = video_editor.get_meta(file_stream)
         codec_name = metadata.get('codec_name')
         if codec_name not in app.config.get('CODEC_SUPPORT'):
-            return bad_request("Codec: {} is not supported.".format(codec_name))
+            raise BadRequest("Codec: {} is not supported.".format(codec_name))
 
         # generate file name
         file_name = create_file_name(ext=file.filename.split('.')[1])
@@ -202,9 +202,9 @@ class UploadProject(MethodView):
             except Exception as ex:
                 # remove file from storage
                 app.fs.delete(file_name)
-                return forbidden("Can not insert a record to database: {}".format(ex))
+                raise BadRequest("Can not insert a record to database: {}".format(ex))
         else:
-            return forbidden("Can not store file")
+            raise Forbidden("Can not store file")
         return json_response(doc, status=201)
 
     def get(self):
@@ -463,7 +463,7 @@ class RetrieveEditDestroyProject(MethodView):
 
         doc = app.mongo.db.projects.find_one({'_id': format_id(project_id)})
         if not doc:
-            return not_found("Project with id: {} was not found.".format(project_id))
+            raise NotFound("Project with id: {} was not found.".format(project_id))
         return json_response(doc)
 
     def put(self, project_id):
@@ -604,11 +604,11 @@ class RetrieveEditDestroyProject(MethodView):
 
         doc = app.mongo.db.projects.find_one({'_id': format_id(project_id)})
         if not doc:
-            return not_found("Project with id: {} was not found.".format(project_id))
+            raise NotFound("Project with id: {} was not found.".format(project_id))
         if doc.get('processing') is True:
-            return forbidden('this video is still processing, please wait.')
+            raise Forbidden('this video is still processing, please wait.')
         if not doc.get('version') >= 2:
-            return bad_request("Only PUT action for edited video version 2")
+            raise BadRequest("Only PUT action for edited video version 2")
 
         # Update processing is True when begin edit video
         app.mongo.db.projects.update_one(
@@ -741,11 +741,11 @@ class RetrieveEditDestroyProject(MethodView):
 
         doc = app.mongo.db.projects.find_one({'_id': format_id(project_id)})
         if not doc:
-            return not_found("Project with id: {} was not found.".format(project_id))
+            raise NotFound("Project with id: {} was not found.".format(project_id))
 
         filename, ext = os.path.splitext(doc['filename'])
         if doc.get('version') >= 2:
-            return bad_request("Only POST action for original video version 1")
+            raise BadRequest("Only POST action for original video version 1")
         version = doc.get('version', 1) + 1
         new_file_name = f'{filename}_v{version}{ext}'
         new_doc = {
@@ -763,7 +763,7 @@ class RetrieveEditDestroyProject(MethodView):
             'preview_thumbnail': doc.get('preview_thumbnail')
         }
         app.mongo.db.projects.insert_one(new_doc)
-        new_doc['predict_url']= app.fs.url_for_media(new_doc.get('_id'))
+        new_doc['predict_url'] = app.fs.url_for_media(new_doc.get('_id'))
         task_edit_video.delay(json_util.dumps(new_doc), request.get_json())
         activity = {
             "action": "EDIT POST",
@@ -790,7 +790,7 @@ class RetrieveEditDestroyProject(MethodView):
         """
         doc = app.mongo.db.projects.find_one({'_id': format_id(project_id)})
         if not doc:
-            return not_found("Project with id: {} was not found.".format(project_id))
+            raise NotFound("Project with id: {} was not found.".format(project_id))
 
         # remove file from storage
         if app.fs.delete(doc['storage_id']):
@@ -807,7 +807,7 @@ class RetrieveEditDestroyProject(MethodView):
             app.mongo.db.projects.delete_one({'_id': format_id(project_id)})
             return json_response(status=204)
         else:
-            return json_response(status=500)
+            raise InternalServerError()
 
 
 class ThumbnailsTimelineProject(MethodView):
@@ -858,7 +858,7 @@ class ThumbnailsTimelineProject(MethodView):
 
         doc = app.mongo.db.projects.find_one({'_id': format_id(project_id)})
         if not doc:
-            return not_found("Project with id: {} was not found.".format(project_id))
+            raise NotFound("Project with id: {} was not found.".format(project_id))
 
         # Only get thumbnails when list thumbnail 've not created yet (empty) and video is not processed any task
         data = doc.get('thumbnails')
@@ -892,7 +892,7 @@ class GetRawVideoThumbnail(MethodView):
         doc = app.mongo.db.projects.find_one_or_404({'_id': format_id(project_id)})
         # video is processing
         if not doc['metadata']:
-            return not_found('Video is still processing')
+            raise NotFound('Video is still processing')
 
         # get thumbnails of video
         if request.args.get('thumbnail'):
@@ -900,7 +900,7 @@ class GetRawVideoThumbnail(MethodView):
             if thumbnail == 'preview':
                 preview_thumbnail = doc.get('preview_thumbnail')
                 if not preview_thumbnail:
-                    return not_found('')
+                    raise NotFound('')
                 byte = app.fs.get(preview_thumbnail.get('storage_id'))
                 res = make_response(byte)
                 res.headers['Content-Type'] = 'image/png'
@@ -910,12 +910,12 @@ class GetRawVideoThumbnail(MethodView):
                 if thumbnail or thumbnail == 0:
                     total = list(doc['thumbnails'].keys())[0]
                     if not thumbnail >= 0 or thumbnail >= len(doc['thumbnails'][total]):
-                        return not_found('')
+                        raise NotFound()
                     byte = app.fs.get(doc['thumbnails'][total][thumbnail]['storage_id'])
                     res = make_response(byte)
                     res.headers['Content-Type'] = 'image/png'
                 else:
-                    res = bad_request("thumbnail variable must be int or 'preview'")
+                    raise BadRequest("thumbnail variable must be int or 'preview'")
             return res
 
         # get strem file for video
@@ -1114,13 +1114,13 @@ class PreviewThumbnailVideo(MethodView):
 
         doc = app.mongo.db.projects.find_one({'_id': format_id(project_id)})
         if not doc:
-            return not_found("Project with id: {} was not found.".format(project_id))
+            raise NotFound("Project with id: {} was not found.".format(project_id))
         if doc.get('processing') is True:
-            return forbidden('this video is still processing, please wait.')
+            raise Forbidden('this video is still processing, please wait.')
 
         preview_thumbnail = self._set_thumbnail(doc['storage_id'], updates, json_util.dumps(doc))
         if not preview_thumbnail:
-            return bad_request('Invalid request')
+            raise BadRequest('Invalid request')
 
         else:
             app.mongo.db.projects.update_one(
@@ -1141,7 +1141,7 @@ class PreviewThumbnailVideo(MethodView):
         if action == 'upload':
             base64_string = schema.get('data')
             if not base64_string:
-                abort(bad_request({'data': ['required field']}))
+                raise BadRequest({'data': ['required field']})
             try:
                 if ',' not in base64_string:
                     base64_thumbnail = base64_string
@@ -1150,12 +1150,12 @@ class PreviewThumbnailVideo(MethodView):
 
                 thumbnail_stream = base64.b64decode(base64_thumbnail)
             except base64.binascii.Error as err:
-                abort(bad_request(str(err)))
+                raise BadRequest(str(err))
             thumbnail_metadata = video_editor.get_meta(thumbnail_stream, 'png')
         elif action == 'capture':
             time = schema.get('time')
             if time is None:
-                abort(bad_request({'time': ['required field']}))
+                raise BadRequest({'time': ['required field']})
             video_stream = app.fs.get(storage_id)
             thumbnail_stream, thumbnail_metadata = video_editor.capture_thumbnail(
                 video_stream, doc['filename'], doc['metadata'], time

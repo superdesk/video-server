@@ -81,13 +81,13 @@ def get_app(config=None):
 
     def make_json_error(ex):
         message = ex.description if hasattr(ex, 'description') else ex
-        response = jsonify(message=str(message))
+        response = jsonify(message=message)
 
         response.status_code = (ex.code
                                 if isinstance(ex, HTTPException)
                                 else 500)
         if response.status_code == 500:
-            response = jsonify(message='Something went wrong')
+            response = jsonify(message='Something went wrong'), 500
 
         return response
 
