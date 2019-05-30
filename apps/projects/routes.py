@@ -38,7 +38,7 @@ def get_request_address(request_headers):
     return request_headers.get('HTTP_X_FORWARDED_FOR') or request_headers.get('REMOTE_ADDR')
 
 
-class UploadProject(MethodView):
+class ListUploadProject(MethodView):
     SCHEMA_UPLOAD = {
         'file': {
             'type': 'filestorage',
@@ -313,7 +313,7 @@ class UploadProject(MethodView):
                             example: 5cbd5acfe24f6045607e51aa
         """
         offset = request.args.get('offset', 0, type=int)
-        size = int(app.config.get('ITEMS_PER_PAGE', 25))
+        size = app.config.get('ITEMS_PER_PAGE', 25)
         # get all projects
         docs = list(app.mongo.db.projects.find().skip(offset).limit(size))
 
@@ -1182,7 +1182,7 @@ class PreviewThumbnailVideo(MethodView):
 
 
 # register all urls
-bp.add_url_rule('/', view_func=UploadProject.as_view('upload_project'))
+bp.add_url_rule('/', view_func=ListUploadProject.as_view('upload_project'))
 bp.add_url_rule('/<path:project_id>', view_func=RetrieveEditDestroyProject.as_view('retrieve_edit_destroy_project'))
 bp.add_url_rule('/url_raw/<path:project_id>', view_func=GetRawVideoThumbnail.as_view('get_raw_video_thumbnail'))
 bp.add_url_rule('/<path:project_id>/preview_thumbnail',

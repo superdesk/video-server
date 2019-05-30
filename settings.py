@@ -48,8 +48,6 @@ CORE_APPS = [
     'apps.projects',
 ]
 
-PORT = env('PORT', '5050')
-
 #: Mongo host port
 MONGO_HOST = env('MONGO_HOST', 'localhost')
 MONGO_PORT = env('MONGO_PORT', 27017)
@@ -65,7 +63,7 @@ RABBIT_MQ_URL = env('RABBIT_MQ_URL', 'pyamqp://guest@localhost//')
 BROKER_URL = env('CELERY_BROKER_URL', RABBIT_MQ_URL)
 CELERY_BROKER_URL = BROKER_URL
 #: number retry when task fail
-NUMBER_RETRY = env('NUMBER_RETRY', 3)
+NUMBER_RETRY = int(env('NUMBER_RETRY', 3))
 BROKER_CONNECTION_MAX_RETRIES = NUMBER_RETRY
 
 #: allow agent
@@ -85,4 +83,4 @@ VIDEO_SERVER_URL = env('VIDEO_SERVER_URL', 'http://localhost:5050/projects')
 VIDEO_MEDIA_PREFIX = env('VIDEO_MEDIA_PREFIX', '%s/url_raw' % VIDEO_SERVER_URL.rstrip('/'))
 
 #: pagination, items per page
-ITEMS_PER_PAGE = env('ITEMS_PER_PAGE', 25)
+ITEMS_PER_PAGE = int(env('ITEMS_PER_PAGE', 25))
