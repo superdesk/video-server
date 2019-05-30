@@ -32,10 +32,19 @@ def check_request_schema_validity(request_schema, schema):
     validator = Validator(schema)
     if not validator.validate(request_schema):
         raise BadRequest(validator.errors)
+    return validator.document
 
 
 def get_request_address(request_headers):
     return request_headers.get('HTTP_X_FORWARDED_FOR') or request_headers.get('REMOTE_ADDR')
+
+
+def find_one_or_404(project_id):
+    # Flask-PyMongo find_one_or_404 method uses abort so can't pass custom 404 error message
+    doc = app.mongo.db.projects.find_one({'_id': format_id(project_id)})
+    if not doc:
+        raise NotFound(f"Project with id {project_id} was not found.")
+    return doc
 
 
 class ListUploadProject(MethodView):
@@ -146,9 +155,7 @@ class ListUploadProject(MethodView):
             raise BadRequest({"file": ["required field"]})
 
         check_user_agent()
-
-        # validate request
-        check_request_schema_validity(request.files, self.SCHEMA_UPLOAD)
+        schema = check_request_schema_validity(request.files, self.SCHEMA_UPLOAD)
 
         # validate codec
         video_editor = get_video_editor()
@@ -461,9 +468,7 @@ class RetrieveEditDestroyProject(MethodView):
                       example: 5cbd5acfe24f6045607e51aa
         """
 
-        doc = app.mongo.db.projects.find_one({'_id': format_id(project_id)})
-        if not doc:
-            raise NotFound("Project with id: {} was not found.".format(project_id))
+        doc = find_one_or_404(project_id)
         return json_response(doc)
 
     def put(self, project_id):
@@ -597,14 +602,10 @@ class RetrieveEditDestroyProject(MethodView):
                       type: string
                       example: 5cbd5acfe24f6045607e51aa
         """
-        # validate user-agent
         check_user_agent()
-        # validate request
-        check_request_schema_validity(request.get_json(), self.SCHEMA_EDIT)
+        schema = check_request_schema_validity(request.get_json(), self.SCHEMA_EDIT)
 
-        doc = app.mongo.db.projects.find_one({'_id': format_id(project_id)})
-        if not doc:
-            raise NotFound("Project with id: {} was not found.".format(project_id))
+        doc = find_one_or_404(project_id)
         if doc.get('processing') is True:
             raise Forbidden('this video is still processing, please wait.')
         if not doc.get('version') >= 2:
@@ -618,11 +619,11 @@ class RetrieveEditDestroyProject(MethodView):
             }}
         )
         doc['processing'] = True
-        task_edit_video.delay(json_util.dumps(doc), request.get_json(), action='put')
+        task_edit_video.delay(json_util.dumps(doc), schema, action='put')
         activity = {
             "action": "EDIT PUT",
             "project_id": doc.get('_id'),
-            "payload": request.get_json(),
+            "payload": schema,
             "create_date": datetime.utcnow()
         }
         app.mongo.db.activity.insert_one(activity)
@@ -736,12 +737,9 @@ class RetrieveEditDestroyProject(MethodView):
                       example: 5cbd5acfe24f6045607e51aa
         """
         check_user_agent()
-        # validate request
-        check_request_schema_validity(request.get_json(), self.SCHEMA_EDIT)
+        schema = check_request_schema_validity(request.get_json(), self.SCHEMA_EDIT)
 
-        doc = app.mongo.db.projects.find_one({'_id': format_id(project_id)})
-        if not doc:
-            raise NotFound("Project with id: {} was not found.".format(project_id))
+        doc = find_one_or_404(project_id)
 
         filename, ext = os.path.splitext(doc['filename'])
         if doc.get('version') >= 2:
@@ -764,11 +762,11 @@ class RetrieveEditDestroyProject(MethodView):
         }
         app.mongo.db.projects.insert_one(new_doc)
         new_doc['predict_url'] = app.fs.url_for_media(new_doc.get('_id'))
-        task_edit_video.delay(json_util.dumps(new_doc), request.get_json())
+        task_edit_video.delay(json_util.dumps(new_doc), schema)
         activity = {
             "action": "EDIT POST",
             "file_id": doc.get('_id'),
-            "payload": request.get_json(),
+            "payload": schema,
             "create_date": datetime.utcnow()
         }
         app.mongo.db.activity.insert_one(activity)
@@ -788,9 +786,7 @@ class RetrieveEditDestroyProject(MethodView):
           204:
             description: NO CONTENT
         """
-        doc = app.mongo.db.projects.find_one({'_id': format_id(project_id)})
-        if not doc:
-            raise NotFound("Project with id: {} was not found.".format(project_id))
+        doc = find_one_or_404(project_id)
 
         # remove file from storage
         if app.fs.delete(doc['storage_id']):
@@ -856,9 +852,7 @@ class ThumbnailsTimelineProject(MethodView):
         if amount <= 0:
             amount = 40
 
-        doc = app.mongo.db.projects.find_one({'_id': format_id(project_id)})
-        if not doc:
-            raise NotFound("Project with id: {} was not found.".format(project_id))
+        doc = find_one_or_404(project_id)
 
         # Only get thumbnails when list thumbnail 've not created yet (empty) and video is not processed any task
         data = doc.get('thumbnails')
@@ -1106,19 +1100,14 @@ class PreviewThumbnailVideo(MethodView):
                       type: string
                       example: 300000
         """
-        # validate user-agent
         check_user_agent()
-        # validate request
-        updates = request.get_json()
-        check_request_schema_validity(updates, self.SCHEMA_PREVIEW_THUMBNAIL)
+        schema = check_request_schema_validity(request.get_json(), self.SCHEMA_PREVIEW_THUMBNAIL)
 
-        doc = app.mongo.db.projects.find_one({'_id': format_id(project_id)})
-        if not doc:
-            raise NotFound("Project with id: {} was not found.".format(project_id))
+        doc = find_one_or_404(project_id)
         if doc.get('processing') is True:
             raise Forbidden('this video is still processing, please wait.')
 
-        preview_thumbnail = self._set_thumbnail(doc['storage_id'], updates, json_util.dumps(doc))
+        preview_thumbnail = self._set_thumbnail(doc['storage_id'], schema, json_util.dumps(doc))
         if not preview_thumbnail:
             raise BadRequest('Invalid request')
 
