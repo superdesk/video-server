@@ -1,5 +1,7 @@
 import itertools
+import json
 import uuid
+from datetime import datetime
 
 import bson
 from flask import Response
@@ -30,7 +32,14 @@ def json_response(doc=None, status=200):
     """
     Serialize mongodb documents and return Response with applicaton/json mimetype
     """
-    return Response(bson.json_util.dumps(doc), status=status, mimetype='application/json')
+    class JSONEncoder(json.JSONEncoder):
+        def default(self, o):
+            if isinstance(o, bson.ObjectId):
+                return str(o)
+            if isinstance(o, datetime):
+                return o.strftime("%Y-%m-%dT%H:%M:%S+00:00")
+            return json.JSONEncoder.default(self, o)
+    return Response(JSONEncoder().encode(doc), status=status, mimetype='application/json')
 
 
 def represents_int(s):

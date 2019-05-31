@@ -129,11 +129,8 @@ class ListUploadProject(MethodView):
                   type: string
                   example: video/mp4
                 create_time:
-                  type: object
-                  properties:
-                    $date:
-                      type: integer
-                      example: 1556853105063
+                  type: string
+                  example: 2019-05-01T09:00:00+00:00
                 original_filename:
                   type: string
                   example: video.mp4
@@ -153,11 +150,8 @@ class ListUploadProject(MethodView):
                   type: object
                   example: {}
                 _id:
-                  type: object
-                  properties:
-                    $oid:
-                      type: string
-                      example: 5cbd5acfe24f6045607e51aa
+                  type: string
+                  example: 5cbd5acfe24f6045607e51aa
         """
 
         # validate request
@@ -291,11 +285,8 @@ class ListUploadProject(MethodView):
                         type: string
                         example: video/mp4
                       create_time:
-                        type: object
-                        properties:
-                          $date:
-                            type: integer
-                            example: 1556853105063
+                        type: string
+                        example: 2019-05-01T09:00:00+00:00
                       original_filename:
                         type: string
                         example: video.mp4
@@ -315,11 +306,8 @@ class ListUploadProject(MethodView):
                         type: object
                         example: {}
                       _id:
-                        type: object
-                        properties:
-                          $oid:
-                            type: string
-                            example: 5cbd5acfe24f6045607e51aa
+                        type: string
+                        example: 5cbd5acfe24f6045607e51aa
         """
         offset = request.args.get('offset', 0, type=int)
         size = app.config.get('ITEMS_PER_PAGE', 25)
@@ -439,11 +427,8 @@ class RetrieveEditDestroyProject(MethodView):
                   type: string
                   example: video/mp4
                 create_time:
-                  type: object
-                  properties:
-                    $date:
-                      type: integer
-                      example: 1556853105063
+                  type: string
+                  example: 2019-05-01T09:00:00+00:00
                 original_filename:
                   type: string
                   example: video.mp4
@@ -463,11 +448,8 @@ class RetrieveEditDestroyProject(MethodView):
                   type: object
                   example: {}
                 _id:
-                  type: object
-                  properties:
-                    $oid:
-                      type: string
-                      example: 5cbd5acfe24f6045607e51aa
+                  type: string
+                  example: 5cbd5acfe24f6045607e51aa
         """
 
         doc = find_one_or_404(project_id)
@@ -574,11 +556,8 @@ class RetrieveEditDestroyProject(MethodView):
                   type: string
                   example: video/mp4
                 create_time:
-                  type: object
-                  properties:
-                    $date:
-                      type: integer
-                      example: 1556853105063
+                  type: string
+                  example: 2019-05-01T09:00:00+00:00
                 original_filename:
                   type: string
                   example: video.mp4
@@ -598,11 +577,8 @@ class RetrieveEditDestroyProject(MethodView):
                   type: object
                   example: {}
                 _id:
-                  type: object
-                  properties:
-                    $oid:
-                      type: string
-                      example: 5cbd5acfe24f6045607e51aa
+                  type: string
+                  example: 5cbd5acfe24f6045607e51aa
         """
         check_user_agent()
         schema = check_request_schema_validity(request.get_json(), self.SCHEMA_EDIT)
@@ -696,11 +672,8 @@ class RetrieveEditDestroyProject(MethodView):
                   type: string
                   example: video/mp4
                 create_time:
-                  type: object
-                  properties:
-                    $date:
-                      type: integer
-                      example: 1556853105063
+                  type: string
+                  example: 2019-05-01T09:00:00+00:00
                 original_filename:
                   type: string
                   example: video.mp4
@@ -726,11 +699,8 @@ class RetrieveEditDestroyProject(MethodView):
                   type: object
                   example: {}
                 _id:
-                  type: object
-                  properties:
-                    $oid:
-                      type: string
-                      example: 5cbd5acfe24f6045607e51aa
+                  type: string
+                  example: 5cbd5acfe24f6045607e51aa
         """
         check_user_agent()
         schema = check_request_schema_validity(request.get_json(), self.SCHEMA_EDIT)
@@ -993,11 +963,8 @@ class RetrieveOrCreateThumbnails(MethodView):
                   type: string
                   example: video/mp4
                 create_time:
-                  type: object
-                  properties:
-                    $date:
-                      type: integer
-                      example: 1556853105063
+                  type: string
+                  example: 2019-05-01T09:00:00+00:00
                 original_filename:
                   type: string
                   example: video.mp4
@@ -1017,11 +984,8 @@ class RetrieveOrCreateThumbnails(MethodView):
                   type: object
                   example: {}
                 _id:
-                  type: object
-                  properties:
-                    $oid:
-                      type: string
-                      example: 5cbd5acfe24f6045607e51aa
+                  type: string
+                  example: 5cbd5acfe24f6045607e51aa
                 preview_thumbnail:
                   type: object
                   properties:
