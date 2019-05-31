@@ -48,6 +48,16 @@ def find_one_or_404(project_id):
     return doc
 
 
+def save_activity_log(action, project_id, storage_id, payload=None):
+    app.mongo.db.activity.insert_one({
+        "action": action,
+        "project_id": project_id,
+        "storage_id": storage_id,
+        "payload": payload,
+        "create_date": datetime.utcnow()
+    })
+
+
 class ListUploadProject(MethodView):
     SCHEMA_UPLOAD = {
         'file': {
@@ -190,30 +200,21 @@ class ListUploadProject(MethodView):
                     'url': None
                 }
                 app.mongo.db.projects.insert_one(doc)
-                # create url for preview video
-                doc['url'] = app.fs.url_for_media(doc.get('_id'))
-                app.mongo.db.projects.update_one(
+                # update url for preview video
+                doc = app.mongo.db.projects.find_one_and_update(
                     {'_id': doc['_id']},
                     {'$set': {
-                        'url': doc['url'],
-
+                        'url': app.fs.url_for_media(doc.get('_id')),
                     }}
                 )
-
-                activity = {
-                    "action": "UPLOAD",
-                    "file_id": doc.get('_id'),
-                    "payload": {"file": doc.get('filename')},
-                    "create_date": datetime.utcnow()
-                }
-                app.mongo.db.activity.insert_one(activity)
+                save_activity_log("UPLOAD", doc['_id'], doc['storage_id'], {"file": doc.get('filename')})
+                return json_response(doc, status=201)
             except Exception as ex:
                 # remove file from storage
                 app.fs.delete(file_name)
                 raise BadRequest("Can not insert a record to database: {}".format(ex))
         else:
             raise Forbidden("Can not store file")
-        return json_response(doc, status=201)
 
     def get(self):
         """
@@ -613,21 +614,15 @@ class RetrieveEditDestroyProject(MethodView):
             raise BadRequest("Only PUT action for edited video version 2")
 
         # Update processing is True when begin edit video
-        app.mongo.db.projects.update_one(
+        doc = app.mongo.db.projects.find_one_and_update(
             {'_id': doc['_id']},
             {'$set': {
                 'processing': True,
-            }}
+            }},
+            return_document=ReturnDocument.AFTER
         )
-        doc['processing'] = True
+        save_activity_log("PUT PROJECT", doc['_id'], doc['storage_id'], schema)
         task_edit_video.delay(json_util.dumps(doc), schema, action='put')
-        activity = {
-            "action": "EDIT PUT",
-            "project_id": doc.get('_id'),
-            "payload": schema,
-            "create_date": datetime.utcnow()
-        }
-        app.mongo.db.activity.insert_one(activity)
         return json_response(doc)
 
     def post(self, project_id):
@@ -764,13 +759,7 @@ class RetrieveEditDestroyProject(MethodView):
         app.mongo.db.projects.insert_one(new_doc)
         new_doc['predict_url'] = app.fs.url_for_media(new_doc.get('_id'))
         task_edit_video.delay(json_util.dumps(new_doc), schema)
-        activity = {
-            "action": "EDIT POST",
-            "file_id": doc.get('_id'),
-            "payload": schema,
-            "create_date": datetime.utcnow()
-        }
-        app.mongo.db.activity.insert_one(activity)
+        save_activity_log("POST PROJECT", doc['_id'], doc['storage_id'], schema)
         return json_response(new_doc)
 
     def delete(self, project_id):
@@ -792,15 +781,14 @@ class RetrieveEditDestroyProject(MethodView):
         # remove file from storage
         if app.fs.delete(doc['storage_id']):
             # Delete thumbnails
-            thumbnails = []
-            for key in doc['thumbnails'].keys():
-                thumbnails = doc['thumbnails'][str(key)]
-            for thumbnail in thumbnails:
-                app.fs.delete(thumbnail['storage_id'])
+            for k in doc['thumbnails']:
+                for thumbnail in doc['thumbnails'][str(k)]:
+                    app.fs.delete(thumbnail['storage_id'])
             preview_thumbnail = doc['preview_thumbnail']
             if preview_thumbnail:
                 app.fs.delete(preview_thumbnail['storage_id'])
 
+            save_activity_log("DELETE PROJECT", doc['_id'], doc['storage_id'], None)
             app.mongo.db.projects.delete_one({'_id': format_id(project_id)})
             return json_response(status=204)
         else:
