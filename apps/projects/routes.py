@@ -8,6 +8,7 @@ from bson import json_util
 from flask import abort, request, make_response
 from flask import current_app as app
 from flask.views import MethodView
+from pymongo import ReturnDocument
 from werkzeug.exceptions import BadRequest, Forbidden, InternalServerError, NotFound
 
 from lib.utils import create_file_name, format_id, json_response, represents_int
@@ -806,19 +807,52 @@ class RetrieveEditDestroyProject(MethodView):
             raise InternalServerError()
 
 
-class ThumbnailsTimelineProject(MethodView):
+class RetrieveOrCreateThumbnails(MethodView):
     SCHEMA_THUMBNAILS = {
+        'type': {
+            'type': 'string',
+            'required': True,
+            'anyof': [
+                {
+                    'allowed': ['timeline'],
+                    'dependencies': ['amount'],
+                    'excludes': 'time',
+                },
+                {  # make amount optional
+                    'allowed': ['timeline'],
+                    'excludes': 'time',
+                },
+                {
+                    'allowed': ['preview'],
+                    'dependencies': ['time'],
+                    'excludes': 'amount',
+                }
+            ],
+        },
         'amount': {
             'type': 'integer',
+            'coerce': int,
+            'min': 1,
+        },
+        'time': {
+            'type': 'float',
+            'coerce': float,
+        },
+    }
+
+    SCHEMA_UPLOAD = {
+        'data': {
+            'type': 'string',
             'required': True,
             'empty': False,
-        },
+        }
     }
 
     def get(self, project_id):
         """
-        Get video thumbnails.
-        Generate new thumbnails if null or `amount` argument different from current total thumbnails
+        Get or capture video thumbnails.
+        Generate new thumbnails if it is empty or `amount` argument different from current total thumbnails.
+        Or capture thumbnail at `time`.
         ---
         consumes:
         - application/json
@@ -832,6 +866,10 @@ class ThumbnailsTimelineProject(MethodView):
           in: query
           type: integer
           description: number thumbnails to create
+        - name: time
+          in: query
+          type: float
+          description: time to capture preview thumbnail
         responses:
           200:
             description: OK
@@ -845,126 +883,53 @@ class ThumbnailsTimelineProject(MethodView):
                   type: object
                   example: {}
         """
-        # validate user-agent
-        check_user_agent()
-
-        amount = request.args.get('amount', 40, int)
-        if amount <= 0:
-            amount = 40
-
         doc = find_one_or_404(project_id)
+        check_user_agent()
+        schema = check_request_schema_validity(request.args.to_dict(), self.SCHEMA_THUMBNAILS)
 
-        # Only get thumbnails when list thumbnail 've not created yet (empty) and video is not processed any task
+        if schema['type'] == 'timeline':
+            return self._get_timeline_thumbnail(
+                doc,
+                schema.get('amount', app.config.get('DEFAULT_TOTAL_TIMELINE_THUMBNAILS'))
+            )
+        else:
+            return self._capture_thumbnail(doc, schema['time'])
+
+    def _get_timeline_thumbnail(self, doc, amount):
+        # Only get thumbnails when list thumbnail have not created yet (empty) and video is not processed any task
         data = doc.get('thumbnails')
         if (not data or not data.get(str(amount))) \
                 and doc.get('processing') is False:
+
+            # Delete all old thumbnails
+            for k in doc['thumbnails']:
+                for thumbnail in doc['thumbnails'][str(k)]:
+                    app.fs.delete(thumbnail['storage_id'])
+
             # Update processing is True when begin edit video
-            app.mongo.db.projects.update_one(
+            doc = app.mongo.db.projects.find_one_and_update(
                 {'_id': doc['_id']},
                 {'$set': {
                     'processing': True,
                     'thumbnails': {}
-                }}
+                }},
+                return_document=ReturnDocument.AFTER
             )
-            doc['processing'] = True
-            doc['thumbnails'] = {}
-
-            # Delete all old thumbnails
-            thumbnails = []
-            for key in doc['thumbnails'].keys():
-                thumbnails = doc['thumbnails'][str(key)]
-            for thumbnail in thumbnails:
-                app.fs.delete(thumbnail['storage_id'])
             # Run get list thumbnails of timeline for video in celery
             task_get_list_thumbnails.delay(json_util.dumps(doc), amount)
-        return json_response({"processing": doc.get('processing'), "thumbnails": doc['thumbnails']})
+        return json_response({
+            "processing": doc.get('processing'),
+            "thumbnails": doc['thumbnails'],
+        })
 
+    def _capture_thumbnail(self, doc, time):
+        video_editor = get_video_editor()
+        video_stream = app.fs.get(doc['storage_id'])
 
-class GetRawVideoThumbnail(MethodView):
-    def get(self, project_id):
-        project_id, _ = os.path.splitext(project_id)
-        doc = app.mongo.db.projects.find_one_or_404({'_id': format_id(project_id)})
-        # video is processing
-        if not doc['metadata']:
-            raise NotFound('Video is still processing')
-
-        # get thumbnails of video
-        if request.args.get('thumbnail'):
-            thumbnail = request.args.get('thumbnail')
-            if thumbnail == 'preview':
-                preview_thumbnail = doc.get('preview_thumbnail')
-                if not preview_thumbnail:
-                    raise NotFound('')
-                byte = app.fs.get(preview_thumbnail.get('storage_id'))
-                res = make_response(byte)
-                res.headers['Content-Type'] = 'image/png'
-
-            else:
-                thumbnail = represents_int(thumbnail)
-                if thumbnail or thumbnail == 0:
-                    total = list(doc['thumbnails'].keys())[0]
-                    if not thumbnail >= 0 or thumbnail >= len(doc['thumbnails'][total]):
-                        raise NotFound()
-                    byte = app.fs.get(doc['thumbnails'][total][thumbnail]['storage_id'])
-                    res = make_response(byte)
-                    res.headers['Content-Type'] = 'image/png'
-                else:
-                    raise BadRequest("thumbnail variable must be int or 'preview'")
-            return res
-
-        # get strem file for video
-        video_range = request.headers.environ.get('HTTP_RANGE')
-        length = int(doc['metadata'].get('size'))
-        if video_range:
-
-            start = int(re.split('[= | -]', video_range)[1])
-            end = length - 1
-            chunksize = end - start + 1
-            headers = {
-                'Content-Range': f'bytes {start}-{end}/{length}',
-                'Accept-Ranges': 'bytes',
-                'Content-Length': chunksize,
-                'Content-Type': doc.get("mime_type"),
-            }
-            # get a stack of bytes push to client
-            stream = app.fs.get_range(doc['storage_id'], start, chunksize)
-            res = make_response(stream)
-            res.headers = headers
-            return res, 206
-        else:
-
-            headers = {
-                'Content-Length': length,
-                'Content-Type': 'video/mp4',
-            }
-            stream = app.fs.get(doc.get('storage_id'))
-            res = make_response(stream)
-            res.headers = headers
-            return res, 200
-
-
-class PreviewThumbnailVideo(MethodView):
-    SCHEMA_PREVIEW_THUMBNAIL = {
-        'type': {
-            'type': 'string',
-            'required': True,
-            'empty': False,
-            'allowed': ['capture', 'upload'],
-        },
-        'time': {
-            'type': 'float',
-            'required': False,
-            'empty': True,
-            'nullable': True,
-            'min': 0,
-        },
-        'data': {
-            'type': 'string',
-            'required': False,
-            'empty': True,
-            'nullable': True,
-        },
-    }
+        thumbnail_stream, thumbnail_metadata = video_editor.capture_thumbnail(
+            video_stream, doc['filename'], doc['metadata'], time
+        )
+        return self._save_thumbnail(doc, thumbnail_stream, thumbnail_metadata)
 
     def post(self, project_id):
         """
@@ -985,15 +950,6 @@ class PreviewThumbnailVideo(MethodView):
           schema:
             type: object
             properties:
-              type:
-                type: string
-                enum: [capture, upload]
-                description: action want to perform
-                example: capture
-              time:
-                type: float
-                description: time frame which want to capture
-                example: 10
               data:
                 type: string
                 description: base64 image data want to upload
@@ -1100,81 +1056,116 @@ class PreviewThumbnailVideo(MethodView):
                       type: string
                       example: 300000
         """
-        check_user_agent()
-        schema = check_request_schema_validity(request.get_json(), self.SCHEMA_PREVIEW_THUMBNAIL)
-
         doc = find_one_or_404(project_id)
+
+        check_user_agent()
+        schema = check_request_schema_validity(request.get_json(), self.SCHEMA_UPLOAD)
+
         if doc.get('processing') is True:
             raise Forbidden('this video is still processing, please wait.')
 
-        preview_thumbnail = self._set_thumbnail(doc['storage_id'], schema, json_util.dumps(doc))
-        if not preview_thumbnail:
-            raise BadRequest('Invalid request')
+        base64_string = schema['data']
+        try:
+            if ',' not in base64_string:
+                base64_thumbnail = base64_string
+            else:
+                base64_format, base64_thumbnail = base64_string.split(',', 1)
+            thumbnail_stream = base64.b64decode(base64_thumbnail)
+        except base64.binascii.Error as err:
+            raise BadRequest(str(err))
 
-        else:
-            app.mongo.db.projects.update_one(
-                {'_id': doc['_id']},
-                {'$set': {
-                    'preview_thumbnail': preview_thumbnail
-                }}
-            )
-            doc['preview_thumbnail'] = preview_thumbnail
-        return json_response(doc)
-
-    def _set_thumbnail(self, storage_id, schema, doc):
-        action = schema.get('type')
-        thumbnail_stream, thumbnail_metadata = None, None
-        doc = json_util.loads(doc)
         video_editor = get_video_editor()
+        thumbnail_metadata = video_editor.get_meta(thumbnail_stream, 'png')
+        return self._save_thumbnail(doc, thumbnail_stream, thumbnail_metadata)
 
-        if action == 'upload':
-            base64_string = schema.get('data')
-            if not base64_string:
-                raise BadRequest({'data': ['required field']})
-            try:
-                if ',' not in base64_string:
-                    base64_thumbnail = base64_string
-                else:
-                    base64_format, base64_thumbnail = base64_string.split(',', 1)
-
-                thumbnail_stream = base64.b64decode(base64_thumbnail)
-            except base64.binascii.Error as err:
-                raise BadRequest(str(err))
-            thumbnail_metadata = video_editor.get_meta(thumbnail_stream, 'png')
-        elif action == 'capture':
-            time = schema.get('time')
-            if time is None:
-                raise BadRequest({'time': ['required field']})
-            video_stream = app.fs.get(storage_id)
-            thumbnail_stream, thumbnail_metadata = video_editor.capture_thumbnail(
-                video_stream, doc['filename'], doc['metadata'], time
-            )
-
-        if thumbnail_stream and thumbnail_metadata:
-            try:
-                filename, ext = os.path.splitext(doc['filename'])
-                thumbnail_filename = f"{filename}_thumbnail.png"
-                storage_id = app.fs.put(thumbnail_stream, thumbnail_filename, 'image/png')
-                return {
+    def _save_thumbnail(self, doc, stream, metadata):
+        filename, ext = os.path.splitext(doc['filename'])
+        thumbnail_filename = f"{filename}_thumbnail.png"
+        storage_id = app.fs.put(stream, thumbnail_filename, 'image/png')
+        doc = app.mongo.db.projects.find_one_and_update(
+            {'_id': doc['_id']},
+            {'$set': {
+                'preview_thumbnail': {
                     'filename': thumbnail_filename,
                     'url': f"{app.fs.url_for_media(doc.get('_id'))}?thumbnail=preview",
                     'storage_id': storage_id,
                     'mimetype': 'image/png',
-                    'width': thumbnail_metadata.get('width'),
-                    'height': thumbnail_metadata.get('height'),
-                    'size': thumbnail_metadata.get('size'),
+                    'width': metadata.get('width'),
+                    'height': metadata.get('height'),
+                    'size': metadata.get('size'),
                 }
-            except Exception as exc:
-                logger.exception(exc)
+            }},
+            return_document=ReturnDocument.AFTER
+        )
+        return json_response(doc)
+
+
+class GetRawVideoThumbnail(MethodView):
+    def get(self, project_id):
+        project_id, _ = os.path.splitext(project_id)
+        doc = app.mongo.db.projects.find_one_or_404({'_id': format_id(project_id)})
+        # video is processing
+        if not doc['metadata']:
+            raise NotFound('Video is still processing')
+
+        # get thumbnails of video
+        if request.args.get('thumbnail'):
+            thumbnail = request.args.get('thumbnail')
+            if thumbnail == 'preview':
+                preview_thumbnail = doc.get('preview_thumbnail')
+                if not preview_thumbnail:
+                    raise NotFound('')
+                byte = app.fs.get(preview_thumbnail.get('storage_id'))
+                res = make_response(byte)
+                res.headers['Content-Type'] = 'image/png'
+
+            else:
+                thumbnail = represents_int(thumbnail)
+                if thumbnail or thumbnail == 0:
+                    total = list(doc['thumbnails'].keys())[0]
+                    if not thumbnail >= 0 or thumbnail >= len(doc['thumbnails'][total]):
+                        raise NotFound()
+                    byte = app.fs.get(doc['thumbnails'][total][thumbnail]['storage_id'])
+                    res = make_response(byte)
+                    res.headers['Content-Type'] = 'image/png'
+                else:
+                    raise BadRequest("thumbnail variable must be int or 'preview'")
+            return res
+
+        # get strem file for video
+        video_range = request.headers.environ.get('HTTP_RANGE')
+        length = int(doc['metadata'].get('size'))
+        if video_range:
+
+            start = int(re.split('[= | -]', video_range)[1])
+            end = length - 1
+            chunksize = end - start + 1
+            headers = {
+                'Content-Range': f'bytes {start}-{end}/{length}',
+                'Accept-Ranges': 'bytes',
+                'Content-Length': chunksize,
+                'Content-Type': doc.get("mime_type"),
+            }
+            # get a stack of bytes push to client
+            stream = app.fs.get_range(doc['storage_id'], start, chunksize)
+            res = make_response(stream)
+            res.headers = headers
+            return res, 206
         else:
-            return {}
+
+            headers = {
+                'Content-Length': length,
+                'Content-Type': 'video/mp4',
+            }
+            stream = app.fs.get(doc.get('storage_id'))
+            res = make_response(stream)
+            res.headers = headers
+            return res, 200
 
 
 # register all urls
 bp.add_url_rule('/', view_func=ListUploadProject.as_view('upload_project'))
 bp.add_url_rule('/<path:project_id>', view_func=RetrieveEditDestroyProject.as_view('retrieve_edit_destroy_project'))
 bp.add_url_rule('/url_raw/<path:project_id>', view_func=GetRawVideoThumbnail.as_view('get_raw_video_thumbnail'))
-bp.add_url_rule('/<path:project_id>/preview_thumbnail',
-                view_func=PreviewThumbnailVideo.as_view('preview_thumbnail_video'))
 bp.add_url_rule('/<path:project_id>/thumbnails',
-                view_func=ThumbnailsTimelineProject.as_view('thumbnails_timeline_project'))
+                view_func=RetrieveOrCreateThumbnails.as_view('retrieve_or_create_thumbnails'))
