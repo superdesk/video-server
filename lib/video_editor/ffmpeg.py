@@ -172,7 +172,8 @@ class FFMPEGVideoEditor(VideoEditorInterface):
         :param time_capture:
         :return:
         """
-        cmd.run(["ffmpeg", "-v", "error", "-y", "-accurate_seek", "-i", path_video, "-ss", str(time_capture), "-vframes", "1", path_output])
+        cmd.run(["ffmpeg", "-v", "error", "-y", "-accurate_seek", "-i", path_video,
+                 "-ss", str(time_capture), "-vframes", "1", path_output])
         return open(path_output, "rb+").read()
 
     def _edit_video(self, path_video, path_output, para=[]):
@@ -220,6 +221,16 @@ class FFMPEGVideoEditor(VideoEditorInterface):
         metadata = {key: data.get(key) for key in video_meta}
         metadata['format_name'] = video_data['format']['format_name']
         metadata['size'] = video_data['format']['size']
+        # ffmpeg output some number type as string
+        format_type = {
+            'size': int,
+            'bit_rate': int,
+            'nb_frames': int,
+            'duration': float,
+        }
+        for value in format_type:
+            if metadata.get(value):
+                metadata[value] = format_type[value](metadata[value])
 
         return metadata
 

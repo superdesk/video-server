@@ -108,13 +108,13 @@ class ListUploadProject(MethodView):
                       type: int
                       example: 360
                     duration:
-                      type: string
+                      type: float
                       example: 300.014000
                     bit_rate:
-                      type: string
+                      type: int
                       example: 287654
                     nb_frames:
-                      type: string
+                      type: int
                       example: 7654
                     r_frame_rate:
                       type: string
@@ -123,7 +123,7 @@ class ListUploadProject(MethodView):
                       type: string
                       example: mov,mp4,m4a,3gp,3g2,mj2
                     size:
-                      type: string
+                      type: int
                       example: 14567890
                 mime_type:
                   type: string
@@ -270,13 +270,13 @@ class ListUploadProject(MethodView):
                             type: int
                             example: 360
                           duration:
-                            type: string
+                            type: float
                             example: 300.014000
                           bit_rate:
-                            type: string
+                            type: int
                             example: 287654
                           nb_frames:
-                            type: string
+                            type: int
                             example: 7654
                           r_frame_rate:
                             type: string
@@ -285,7 +285,7 @@ class ListUploadProject(MethodView):
                             type: string
                             example: mov,mp4,m4a,3gp,3g2,mj2
                           size:
-                            type: string
+                            type: int
                             example: 14567890
                       mime_type:
                         type: string
@@ -418,13 +418,13 @@ class RetrieveEditDestroyProject(MethodView):
                       type: integer
                       example: 360
                     duration:
-                      type: string
+                      type: float
                       example: 300.014000
                     bit_rate:
-                      type: string
+                      type: int
                       example: 287654
                     nb_frames:
-                      type: string
+                      type: int
                       example: 7654
                     r_frame_rate:
                       type: string
@@ -433,7 +433,7 @@ class RetrieveEditDestroyProject(MethodView):
                       type: string
                       example: mov,mp4,m4a,3gp,3g2,mj2
                     size:
-                      type: string
+                      type: int
                       example: 14567890
                 mime_type:
                   type: string
@@ -553,13 +553,13 @@ class RetrieveEditDestroyProject(MethodView):
                       type: integer
                       example: 360
                     duration:
-                      type: string
+                      type: float
                       example: 300.014000
                     bit_rate:
-                      type: string
+                      type: int
                       example: 287654
                     nb_frames:
-                      type: string
+                      type: int
                       example: 7654
                     r_frame_rate:
                       type: string
@@ -568,7 +568,7 @@ class RetrieveEditDestroyProject(MethodView):
                       type: string
                       example: mov,mp4,m4a,3gp,3g2,mj2
                     size:
-                      type: string
+                      type: int
                       example: 14567890
                 mime_type:
                   type: string
@@ -972,13 +972,13 @@ class RetrieveOrCreateThumbnails(MethodView):
                       type: string
                       example: 360
                     duration:
-                      type: string
+                      type: float
                       example: 300.014000
                     bit_rate:
-                      type: string
+                      type: int
                       example: 287654
                     nb_frames:
-                      type: string
+                      type: int
                       example: 7654
                     r_frame_rate:
                       type: string
@@ -987,7 +987,7 @@ class RetrieveOrCreateThumbnails(MethodView):
                       type: string
                       example: mov,mp4,m4a,3gp,3g2,mj2
                     size:
-                      type: string
+                      type: int
                       example: 14567890
                 mime_type:
                   type: string
@@ -1041,7 +1041,7 @@ class RetrieveOrCreateThumbnails(MethodView):
                       type: integer
                       example: 360
                     size:
-                      type: string
+                      type: int
                       example: 300000
         """
         doc = find_one_or_404(project_id)
@@ -1122,7 +1122,7 @@ class GetRawVideoThumbnail(MethodView):
 
         # get strem file for video
         video_range = request.headers.environ.get('HTTP_RANGE')
-        length = int(doc['metadata'].get('size'))
+        length = doc['metadata'].get('size')
         if video_range:
 
             start = int(re.split('[= | -]', video_range)[1])
