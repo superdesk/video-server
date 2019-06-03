@@ -171,19 +171,13 @@ class ListUploadProject(MethodView):
         codec_name = metadata.get('codec_name')
         if codec_name not in app.config.get('CODEC_SUPPORT'):
             raise BadRequest("Codec: {} is not supported.".format(codec_name))
-
         # generate file name
         file_name = create_file_name(ext=file.filename.split('.')[1])
-        # put file stream into storage
-        storage_id = app.fs.put(file_stream, filename=file_name, content_type=file.mimetype)
-        if not storage_id:
-            raise InternalServerError('Something went wrong when putting file into storage.')
-
         try:
             # add record to database
             doc = {
                 'filename': file_name,
-                'storage_id': storage_id,
+                'storage_id': None,
                 'metadata': metadata,
                 'create_time': datetime.utcnow(),
                 'mime_type': file.mimetype,
@@ -197,10 +191,17 @@ class ListUploadProject(MethodView):
                 'url': None
             }
             app.mongo.db.projects.insert_one(doc)
+
+            # put file stream into storage
+            storage_id = app.fs.put(file_stream, file_name, doc['_id'], content_type=file.mimetype)
+            if not storage_id:
+                raise InternalServerError('Something went wrong when putting file into storage.')
+
             # update url for preview video
             doc = app.mongo.db.projects.find_one_and_update(
                 {'_id': doc['_id']},
                 {'$set': {
+                    'storage_id': storage_id,
                     'url': get_url_for_media(doc.get('_id'), 'video'),
                 }},
                 return_document=ReturnDocument.AFTER
@@ -1038,7 +1039,10 @@ class RetrieveOrCreateThumbnails(MethodView):
     def _save_thumbnail(self, doc, stream, metadata):
         filename, ext = os.path.splitext(doc['filename'])
         thumbnail_filename = f"{filename}_thumbnail.png"
-        storage_id = app.fs.put(stream, thumbnail_filename, 'image/png')
+        storage_id = app.fs.put(
+            stream, thumbnail_filename, None,
+            asset_type='thumbnails', storage_id=doc['storage_id'], content_type='image/png'
+        )
         doc = app.mongo.db.projects.find_one_and_update(
             {'_id': doc['_id']},
             {'$set': {

@@ -40,7 +40,9 @@ def task_edit_video(sdoc, updates, action='post', retry=0):
             updates.get('quality')
         )
         if action == 'post':
-            new_storage_id = app.fs.put(edited_video_stream, doc.get('filename'), None)
+            new_storage_id = app.fs.put(
+                edited_video_stream, doc.get('filename'),
+                project_id=None, asset_type='thumbnails', storage_id=storage_id, content_type=None)
         elif action == 'put':
             new_storage_id = app.fs.replace(edited_video_stream, storage_id, None)
         else:
@@ -100,7 +102,9 @@ def task_get_list_thumbnails(sdoc, amount, retry=0):
                                                                             doc.get('metadata'),
                                                                             int(amount)):
             thumbnail_filename = '%s_timeline_%02d.png' % (filename, count)
-            storage_id = app.fs.put(thumbnail_stream, thumbnail_filename, 'image/png')
+            storage_id = app.fs.put(
+                thumbnail_stream, thumbnail_filename, None,
+                asset_type='thumbnails', storage_id=doc['storage_id'], content_type='image/png')
             update_thumbnails.append(
                 {
                     'filename': '%s_timeline_%02d.png' % (filename, count),
@@ -110,7 +114,6 @@ def task_get_list_thumbnails(sdoc, amount, retry=0):
                     'height': thumbnail_meta.get('height'),
                     'size': thumbnail_meta.get('size'),
                     'url': get_url_for_media(doc.get('_id'), 'thumbnail') + f'?index={count}'
-
                 }
             )
             count += 1
@@ -129,10 +132,9 @@ def task_get_list_thumbnails(sdoc, amount, retry=0):
 
         if update_thumbnails:
             for thumbnail in update_thumbnails:
-                path_thumbnail = os.path.join(app.config.get('FS_MEDIA_STORAGE_PATH'),
-                                              thumbnail.get('folder'), thumbnail.get('filename'))
-                if os.path.exists(path_thumbnail):
-                    os.remove(path_thumbnail)
+                storage_id = thumbnail.get('storage_id')
+                if storage_id and app.fs.get(storage_id):
+                    app.fs.delete(storage_id)
         if retry < app.config.get('NUMBER_RETRY', 3):
             task_get_list_thumbnails.delay(sdoc, amount, retry=retry + 1)
         else:

@@ -16,9 +16,9 @@ def test_ffmpeg_video_editor_cut_video(filestream):
 
     assert metadata['width'] == 640
     assert metadata['height'] == 480
-    assert metadata['duration'] == '8.027031'
-    assert metadata['size'] == '666985'
-    assert metadata['bit_rate'] == '332180'
+    assert metadata['duration'] == 8.027031
+    assert metadata['size'] == 666985
+    assert metadata['bit_rate'] == 332180
 
 
 def test_ffmpeg_video_editor_crop_video(filestream):
@@ -30,8 +30,8 @@ def test_ffmpeg_video_editor_crop_video(filestream):
     assert metadata['width'] == 500
     assert metadata['height'] == 400
     if sys.platform == 'linux':
-        assert metadata['bit_rate'] == '553486'
-        assert metadata['size'] == '2353910'
+        assert metadata['bit_rate'] == 553486
+        assert metadata['size'] == 2353910
 
 
 def test_ffmpeg_video_editor_rotate_video(filestream):
@@ -55,10 +55,12 @@ def test_ffmpeg_video_editor_generate_thumbnails(client, filestream):
             filename,
             metadata,
             app.config.get('AMOUNT_FRAMES', 40))):
-        storage_id = app.fs.put(thumbnail, f'test_generate_thumbnails/filename_{index}.png')
+        storage_id = app.fs.put(
+            thumbnail, f'filename_{index}.png', None,
+            asset_type='thumbnails', storage_id=f'{fs_path}/{filename}.mp4')
         storage_id_list.add(storage_id)
 
-    assert all(os.path.exists(f'{fs_path}/{storage_id}') for storage_id in storage_id_list)
+    assert all(os.path.exists(storage_id) for storage_id in storage_id_list)
 
 
 def test_ffmpeg_video_editor_capture_thumbnail(filestream):
@@ -68,4 +70,4 @@ def test_ffmpeg_video_editor_capture_thumbnail(filestream):
     )
 
     assert thumbnail_meta['codec_name'] == 'png'
-    assert thumbnail_meta['size'] == '317273'
+    assert thumbnail_meta['size'] == 317273

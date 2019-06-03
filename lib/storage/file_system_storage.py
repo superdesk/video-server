@@ -43,18 +43,24 @@ class FileSystemStorage(MediaStorageInterface):
             media_file = None
         return media_file
 
-    def put(self, content, filename, content_type=None):
+    def put(self, content, filename, project_id=None, asset_type='project', storage_id=None, content_type=None):
         """
         Put a file into storage
         :param content: stream of file, binary type
-        :param filename: full file path
+        :param filename: name of file to save to storage
+        :param project_id: project id
+        :param asset_type: folder to store asset under project_id if asset is not video
+        :param storage_id: storage_id of video
         :param content_type: content type of file
         :return: storage_id
         """
         try:
-            # generate storage_id
-            utcnow = datetime.utcnow()
-            storage_id = f'{utcnow.year}/{utcnow.month}/{utcnow.day}/{filename}'
+            if asset_type == 'project':
+                # generate storage_id for video
+                utcnow = datetime.utcnow()
+                storage_id = f'{utcnow.year}/{utcnow.month}/{utcnow.day}/{project_id}/{filename}'
+            else:
+                storage_id = f'{os.path.dirname(storage_id)}/{asset_type}/{filename}'
             file_path = os.path.join(app.config.get('FS_MEDIA_STORAGE_PATH'), storage_id)
             # check if dir exists, if not create it
             file_dir = os.path.dirname(file_path)

@@ -4,17 +4,21 @@ import abc
 class MediaStorageInterface(metaclass=abc.ABCMeta):
 
     @abc.abstractmethod
-    def get(self, file_path):
+    def get(self, storage_id):
         pass
 
     @abc.abstractmethod
-    def put(self, content, file_path):
+    def put(self, content, filename, project_id, asset_type, storage_id=None, content_type=None):
         pass
 
     @abc.abstractmethod
-    def get_range(self, file_path, start, length):
+    def replace(self, content, storage_id, content_type=None):
         pass
 
     @abc.abstractmethod
-    def delete(self, file_path):
+    def get_range(self, storage_id, start, length):
+        pass
+
+    @abc.abstractmethod
+    def delete(self, storage_id):
         pass
