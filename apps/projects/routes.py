@@ -5,11 +5,12 @@ import re
 from datetime import datetime
 
 from bson import json_util
-from flask import abort, request, make_response
+from flask import request, make_response
 from flask import current_app as app
 from flask.views import MethodView
 from pymongo import ReturnDocument
-from werkzeug.exceptions import BadRequest, Forbidden, InternalServerError, NotFound
+from pymongo.errors import ServerSelectionTimeoutError
+from werkzeug.exceptions import BadRequest, InternalServerError, NotFound
 
 from lib.utils import create_file_name, format_id, json_response, represents_int
 from lib.validator import Validator
@@ -164,7 +165,7 @@ class ListUploadProject(MethodView):
 
         # validate codec
         video_editor = get_video_editor()
-        file = request.files['file']
+        file = schema['file']
         file_stream = file.stream.read()
         metadata = video_editor.get_meta(file_stream)
         codec_name = metadata.get('codec_name')
@@ -175,40 +176,43 @@ class ListUploadProject(MethodView):
         file_name = create_file_name(ext=file.filename.split('.')[1])
         # put file stream into storage
         storage_id = app.fs.put(file_stream, filename=file_name, content_type=file.mimetype)
-        if storage_id:
-            try:
-                # add record to database
-                doc = {
-                    'filename': file_name,
-                    'storage_id': storage_id,
-                    'metadata': metadata,
-                    'create_time': datetime.utcnow(),
-                    'mime_type': file.mimetype,
-                    'version': 1,
-                    'processing': False,
-                    'parent': None,
-                    'thumbnails': {},
-                    'request_address': get_request_address(request.headers.environ),
-                    'original_filename': file.filename,
-                    'preview_thumbnail': None,
-                    'url': None
-                }
-                app.mongo.db.projects.insert_one(doc)
-                # update url for preview video
-                doc = app.mongo.db.projects.find_one_and_update(
-                    {'_id': doc['_id']},
-                    {'$set': {
-                        'url': app.fs.url_for_media(doc.get('_id')),
-                    }}
-                )
-                save_activity_log("UPLOAD", doc['_id'], doc['storage_id'], {"file": doc.get('filename')})
-                return json_response(doc, status=201)
-            except Exception as ex:
-                # remove file from storage
-                app.fs.delete(file_name)
-                raise BadRequest("Can not insert a record to database: {}".format(ex))
-        else:
-            raise Forbidden("Can not store file")
+        if not storage_id:
+            raise InternalServerError('Something went wrong when putting file into storage.')
+
+        try:
+            # add record to database
+            doc = {
+                'filename': file_name,
+                'storage_id': storage_id,
+                'metadata': metadata,
+                'create_time': datetime.utcnow(),
+                'mime_type': file.mimetype,
+                'version': 1,
+                'processing': False,
+                'parent': None,
+                'thumbnails': {},
+                'request_address': get_request_address(request.headers.environ),
+                'original_filename': file.filename,
+                'preview_thumbnail': None,
+                'url': None
+            }
+            app.mongo.db.projects.insert_one(doc)
+            # update url for preview video
+            doc = app.mongo.db.projects.find_one_and_update(
+                {'_id': doc['_id']},
+                {'$set': {
+                    'url': app.fs.url_for_media(doc.get('_id')),
+                }}
+            )
+            save_activity_log("UPLOAD", doc['_id'], doc['storage_id'], {"file": doc.get('filename')})
+            return json_response(doc, status=201)
+        except ServerSelectionTimeoutError:
+            app.fs.delete(file_name)
+            raise InternalServerError('Could not connect to database')
+        except Exception as ex:
+            app.fs.delete(file_name)
+            logger.exception(ex)
+            raise InternalServerError(str(ex))
 
     def get(self):
         """
@@ -585,7 +589,7 @@ class RetrieveEditDestroyProject(MethodView):
 
         doc = find_one_or_404(project_id)
         if doc.get('processing') is True:
-            raise Forbidden('this video is still processing, please wait.')
+            return json_response({'processing': doc['processing']}, status=202)
         if not doc.get('version') >= 2:
             raise BadRequest("Only PUT action for edited video version 2")
 
@@ -1014,7 +1018,7 @@ class RetrieveOrCreateThumbnails(MethodView):
         schema = check_request_schema_validity(request.get_json(), self.SCHEMA_UPLOAD)
 
         if doc.get('processing') is True:
-            raise Forbidden('this video is still processing, please wait.')
+            return json_response({'processing': doc['processing']}, status=202)
 
         base64_string = schema['data']
         try:
@@ -1058,7 +1062,7 @@ class GetRawVideoThumbnail(MethodView):
         doc = app.mongo.db.projects.find_one_or_404({'_id': format_id(project_id)})
         # video is processing
         if not doc['metadata']:
-            raise NotFound('Video is still processing')
+            return json_response({'processing': doc['processing']}, status=202)
 
         # get thumbnails of video
         if request.args.get('thumbnail'):

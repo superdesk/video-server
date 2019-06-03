@@ -9,17 +9,18 @@
 # AUTHORS and LICENSE files distributed with this source code, or
 # at https://www.sourcefabric.org/superdesk/license
 
-import os
-import settings
 import importlib
 import logging.config
+import os
+
 from flask import Flask, jsonify
 from flask_pymongo import PyMongo
 from werkzeug.exceptions import HTTPException, default_exceptions
 
+import settings
 from lib.celery_app import init_celery
-from lib.storage import get_media_storage
 from lib.logging import configure_logging
+from lib.storage import get_media_storage
 
 logger = logging.getLogger(__name__)
 
@@ -86,12 +87,10 @@ def get_app(config=None):
         response.status_code = (ex.code
                                 if isinstance(ex, HTTPException)
                                 else 500)
-        if response.status_code == 500:
-            response = jsonify(message='Something went wrong'), 500
 
         return response
 
-    for code in default_exceptions.keys():
+    for code in default_exceptions:
         app.register_error_handler(code, make_json_error)
 
     return app
