@@ -43,13 +43,6 @@ def json_response(doc=None, status=200):
     return Response(JSONEncoder().encode(doc), status=status, mimetype='application/json')
 
 
-def represents_int(s):
-    try:
-        return int(s)
-    except ValueError:
-        return None
-
-
 def get_url_for_media(project_id, media_type):
     """
     Get url project for reviewing media

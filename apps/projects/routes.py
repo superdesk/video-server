@@ -12,7 +12,7 @@ from pymongo import ReturnDocument
 from pymongo.errors import ServerSelectionTimeoutError
 from werkzeug.exceptions import BadRequest, InternalServerError, NotFound
 
-from lib.utils import create_file_name, format_id, json_response, represents_int, get_url_for_media
+from lib.utils import create_file_name, format_id, json_response, get_url_for_media
 from lib.validator import Validator
 from lib.video_editor import get_video_editor
 
@@ -1057,37 +1057,29 @@ class RetrieveOrCreateThumbnails(MethodView):
         return json_response(doc)
 
 
-class GetRawVideoThumbnail(MethodView):
+class GetRawVideo(MethodView):
     def get(self, project_id):
+        """
+        Get video
+        ---
+        parameters:
+        - in: path
+          name: project_id
+          type: string
+          required: True
+        produces:
+          - video/mp4
+        responses:
+          200:
+            description: OK
+            schema:
+              type: file
+        """
         project_id, _ = os.path.splitext(project_id)
         doc = app.mongo.db.projects.find_one_or_404({'_id': format_id(project_id)})
         # video is processing
         if not doc['metadata']:
             return json_response({'processing': doc['processing']}, status=202)
-
-        # get thumbnails of video
-        if request.args.get('thumbnail'):
-            thumbnail = request.args.get('thumbnail')
-            if thumbnail == 'preview':
-                preview_thumbnail = doc.get('preview_thumbnail')
-                if not preview_thumbnail:
-                    raise NotFound('')
-                byte = app.fs.get(preview_thumbnail.get('storage_id'))
-                res = make_response(byte)
-                res.headers['Content-Type'] = 'image/png'
-
-            else:
-                thumbnail = represents_int(thumbnail)
-                if thumbnail or thumbnail == 0:
-                    total = list(doc['thumbnails'].keys())[0]
-                    if not thumbnail >= 0 or thumbnail >= len(doc['thumbnails'][total]):
-                        raise NotFound()
-                    byte = app.fs.get(doc['thumbnails'][total][thumbnail]['storage_id'])
-                    res = make_response(byte)
-                    res.headers['Content-Type'] = 'image/png'
-                else:
-                    raise BadRequest("thumbnail variable must be int or 'preview'")
-            return res
 
         # get strem file for video
         video_range = request.headers.environ.get('HTTP_RANGE')
@@ -1108,21 +1100,76 @@ class GetRawVideoThumbnail(MethodView):
             res = make_response(stream)
             res.headers = headers
             return res, 206
-        else:
 
-            headers = {
-                'Content-Length': length,
-                'Content-Type': 'video/mp4',
-            }
-            stream = app.fs.get(doc.get('storage_id'))
-            res = make_response(stream)
-            res.headers = headers
-            return res, 200
+        headers = {
+            'Content-Length': length,
+            'Content-Type': 'video/mp4',
+        }
+        stream = app.fs.get(doc.get('storage_id'))
+        res = make_response(stream)
+        res.headers = headers
+        return res, 200
+
+
+class GetRawThumbnail(MethodView):
+    SCHEME_THUMBNAIL = {
+        'index': {
+            'type': 'integer',
+            'required': False,
+            'empty': True,
+            'coerce': int,
+            'min': 0
+        }
+    }
+
+    def get(self, project_id):
+        """
+        Get thumbnail
+        ---
+        parameters:
+        - in: path
+          name: project_id
+          type: string
+          required: True
+          description: Unique project id
+        - name: index
+          in: query
+          type:
+          - integer
+          - string
+          description: index of thumbnail to get, leave empty to get preview thumbnail
+        produces:
+          - image/png
+        responses:
+          200:
+            description: OK
+            schema:
+              type: file
+        """
+        doc = app.mongo.db.projects.find_one_or_404({'_id': format_id(project_id)})
+
+        if not request.args:
+            preview_thumbnail = doc.get('preview_thumbnail')
+            if not preview_thumbnail:
+                raise NotFound()
+            byte = app.fs.get(preview_thumbnail.get('storage_id'))
+        else:
+            schema = check_request_schema_validity(request.args.to_dict(), self.SCHEME_THUMBNAIL)
+            index = schema['index']
+            thumbnails = next(iter(doc['thumbnails'].values()))
+            if len(thumbnails) < index + 1:
+                raise NotFound()
+            byte = app.fs.get(thumbnails[index]['storage_id'])
+
+        res = make_response(byte)
+        res.headers['Content-Type'] = 'image/png'
+        return res
 
 
 # register all urls
 bp.add_url_rule('/', view_func=ListUploadProject.as_view('upload_project'))
-bp.add_url_rule('/<path:project_id>', view_func=RetrieveEditDestroyProject.as_view('retrieve_edit_destroy_project'))
-bp.add_url_rule('/url_raw/<path:project_id>', view_func=GetRawVideoThumbnail.as_view('get_raw_video_thumbnail'))
-bp.add_url_rule('/<path:project_id>/thumbnails',
+bp.add_url_rule('/<project_id>', view_func=RetrieveEditDestroyProject.as_view('retrieve_edit_destroy_project'))
+bp.add_url_rule('/<project_id>/thumbnails',
                 view_func=RetrieveOrCreateThumbnails.as_view('retrieve_or_create_thumbnails'))
+bp.add_url_rule('/<project_id>/url_raw/video', view_func=GetRawVideo.as_view('get_raw_video'))
+bp.add_url_rule('/<project_id>/url_raw/thumbnail', view_func=GetRawThumbnail.as_view('get_raw_thumbnail'))
