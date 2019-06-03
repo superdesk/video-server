@@ -69,14 +69,6 @@ class FileSystemStorage(MediaStorageInterface):
             logger.error('Cannot put file %s ex: %s' % (storage_id, ex))
             return None
 
-    def url_for_media(self, project_id):
-        """
-        Get url project for reviewing
-        :param project_id: id of project
-        :return:
-        """
-        return f'{app.config.get("VIDEO_MEDIA_PREFIX")}/{str(project_id)}'
-
     def replace(self, content, storage_id, content_type=None):
         """
         replace a file in storage

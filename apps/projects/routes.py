@@ -12,7 +12,7 @@ from pymongo import ReturnDocument
 from pymongo.errors import ServerSelectionTimeoutError
 from werkzeug.exceptions import BadRequest, InternalServerError, NotFound
 
-from lib.utils import create_file_name, format_id, json_response, represents_int
+from lib.utils import create_file_name, format_id, json_response, represents_int, get_url_for_media
 from lib.validator import Validator
 from lib.video_editor import get_video_editor
 
@@ -201,8 +201,9 @@ class ListUploadProject(MethodView):
             doc = app.mongo.db.projects.find_one_and_update(
                 {'_id': doc['_id']},
                 {'$set': {
-                    'url': app.fs.url_for_media(doc.get('_id')),
-                }}
+                    'url': get_url_for_media(doc.get('_id'), 'video'),
+                }},
+                return_document=ReturnDocument.AFTER
             )
             save_activity_log("UPLOAD", doc['_id'], doc['storage_id'], {"file": doc.get('filename')})
             return json_response(doc, status=201)
@@ -731,7 +732,7 @@ class RetrieveEditDestroyProject(MethodView):
             'preview_thumbnail': doc.get('preview_thumbnail')
         }
         app.mongo.db.projects.insert_one(new_doc)
-        new_doc['predict_url'] = app.fs.url_for_media(new_doc.get('_id'))
+        new_doc['predict_url'] = get_url_for_media(new_doc.get('_id'), 'video')
         task_edit_video.delay(json_util.dumps(new_doc), schema)
         save_activity_log("POST PROJECT", doc['_id'], doc['storage_id'], schema)
         return json_response(new_doc)
@@ -1043,7 +1044,7 @@ class RetrieveOrCreateThumbnails(MethodView):
             {'$set': {
                 'preview_thumbnail': {
                     'filename': thumbnail_filename,
-                    'url': f"{app.fs.url_for_media(doc.get('_id'))}?thumbnail=preview",
+                    'url': get_url_for_media(doc.get('_id'), 'thumbnail'),
                     'storage_id': storage_id,
                     'mimetype': 'image/png',
                     'width': metadata.get('width'),

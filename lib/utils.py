@@ -5,6 +5,7 @@ from datetime import datetime
 
 import bson
 from flask import Response
+from flask import current_app as app
 
 
 def create_file_name(ext):
@@ -47,3 +48,19 @@ def represents_int(s):
         return int(s)
     except ValueError:
         return None
+
+
+def get_url_for_media(project_id, media_type):
+    """
+    Get url project for reviewing media
+    :param project_id: id of project
+    :return:
+    """
+    if media_type == 'video':
+        suffix = app.config.get('VIDEO_URL_SUFFIX')
+    elif media_type == 'thumbnail':
+        suffix = app.config.get('THUMBNAIL_URL_SUFFIX')
+    else:
+        raise KeyError('Invalid media_type')
+
+    return '/'.join(x.strip('/') for x in (app.config.get('VIDEO_SERVER_URL'), str(project_id), suffix))

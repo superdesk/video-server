@@ -6,7 +6,7 @@ from flask import current_app as app
 from pymongo import ReturnDocument
 
 from lib.celery_app import celery
-from lib.utils import format_id
+from lib.utils import format_id, get_url_for_media
 from lib.video_editor import get_video_editor
 
 logger = logging.getLogger(__name__)
@@ -47,7 +47,7 @@ def task_edit_video(sdoc, updates, action='post', retry=0):
             raise KeyError(f'Invalid action `{action}`')
 
         # create url for preview video
-        url = app.fs.url_for_media(doc.get('_id'))
+        url = get_url_for_media(doc.get('_id'), 'video')
         # Update data status is True and data video when edit was finished
         app.mongo.db.projects.find_one_and_update(
             {'_id': doc['_id']},
@@ -109,7 +109,7 @@ def task_get_list_thumbnails(sdoc, amount, retry=0):
                     'width': thumbnail_meta.get('width'),
                     'height': thumbnail_meta.get('height'),
                     'size': thumbnail_meta.get('size'),
-                    'url': f"{app.fs.url_for_media(doc.get('_id'))}?thumbnail={count}"
+                    'url': get_url_for_media(doc.get('_id'), 'thumbnail') + f'?index={count}'
 
                 }
             )

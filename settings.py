@@ -73,14 +73,15 @@ CODEC_SUPPORT = json.loads(env('CODEC_SUPPORT', '["vp8", "vp9", "h264", "theora"
 
 #: media storage
 MEDIA_STORAGE = env('MEDIA_STORAGE', 'filesystem')
-default_path = os.path.join(BASE_PATH, 'media', 'projects')
-FS_MEDIA_STORAGE_PATH = env('FS_MEDIA_STORAGE_PATH', default_path)
+DEFAULT_PATH = os.path.join(BASE_PATH, 'media', 'projects')
+FS_MEDIA_STORAGE_PATH = env('FS_MEDIA_STORAGE_PATH', DEFAULT_PATH)
 
 #: media tool
 DEFAULT_MEDIA_TOOL = env('DEFAULT_MEDIA_TOOL', 'ffmpeg')
 
 VIDEO_SERVER_URL = env('VIDEO_SERVER_URL', 'http://localhost:5050/projects')
-VIDEO_MEDIA_PREFIX = env('VIDEO_MEDIA_PREFIX', '%s/url_raw' % VIDEO_SERVER_URL.rstrip('/'))
+VIDEO_URL_SUFFIX = env('VIDEO_URL_SUFFIX', 'url_raw/video')
+THUMBNAIL_URL_SUFFIX = env('THUMBNAIL_URL_SUFFIX', 'url_raw/thumbnail')
 
 #: pagination, items per page
 ITEMS_PER_PAGE = int(env('ITEMS_PER_PAGE', 25))
