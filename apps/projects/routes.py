@@ -757,9 +757,8 @@ class RetrieveEditDestroyProject(MethodView):
         # remove file from storage
         if app.fs.delete(doc['storage_id']):
             # Delete thumbnails
-            for k in doc['thumbnails']:
-                for thumbnail in doc['thumbnails'][str(k)]:
-                    app.fs.delete(thumbnail['storage_id'])
+            for thumbnail in next(iter(doc['thumbnails'].values())):
+                app.fs.delete(thumbnail['storage_id'])
             preview_thumbnail = doc['preview_thumbnail']
             if preview_thumbnail:
                 app.fs.delete(preview_thumbnail['storage_id'])
@@ -866,9 +865,8 @@ class RetrieveOrCreateThumbnails(MethodView):
                 and doc.get('processing') is False:
 
             # Delete all old thumbnails
-            for k in doc['thumbnails']:
-                for thumbnail in doc['thumbnails'][str(k)]:
-                    app.fs.delete(thumbnail['storage_id'])
+            for thumbnail in next(iter(doc['thumbnails'].values())):
+                app.fs.delete(thumbnail['storage_id'])
 
             # Update processing is True when begin edit video
             doc = app.mongo.db.projects.find_one_and_update(

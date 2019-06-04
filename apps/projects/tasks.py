@@ -64,10 +64,7 @@ def task_edit_video(sdoc, updates, action='post'):
             return_document=ReturnDocument.AFTER
         )
         # Delete all old thumbnails
-        thumbnails = []
-        for key in doc['thumbnails'].keys():
-            thumbnails = doc['thumbnails'][str(key)]
-        for thumbnail in thumbnails:
+        for thumbnail in next(iter(doc['thumbnails'].values())):
             app.fs.delete(thumbnail['storage_id'])
 
     except Exception as exc:
