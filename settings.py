@@ -11,7 +11,7 @@ def strtobool(value):
 
 
 def env(variable, fallback_value=None):
-    if os.environ.get('VIDEOSERVER_USE_DEFAULTS'):
+    if os.environ.get('VIDEO_SERVER_USE_DEFAULTS'):
         return fallback_value
 
     env_value = os.environ.get(variable)
@@ -34,7 +34,7 @@ def celery_queue(name):
 
     :param name: queue name
     """
-    return "{}{}".format(os.environ.get('VIDEOSERVER_CELERY_PREFIX', ''), name)
+    return "{}{}".format(os.environ.get('VIDEO_SERVER_CELERY_PREFIX', ''), name)
 
 
 # base path
@@ -86,3 +86,6 @@ THUMBNAIL_URL_SUFFIX = env('THUMBNAIL_URL_SUFFIX', 'url_raw/thumbnail')
 #: pagination, items per page
 ITEMS_PER_PAGE = int(env('ITEMS_PER_PAGE', 25))
 DEFAULT_TOTAL_TIMELINE_THUMBNAILS = int(env('DEFAULT_TOTAL_TIMELINE_THUMBNAILS', 40))
+
+#: set PORT for video server
+VIDEO_SERVER_PORT = env('ITEMS_PER_PAGE', 5050)

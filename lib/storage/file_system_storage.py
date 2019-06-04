@@ -45,11 +45,14 @@ class FileSystemStorage(MediaStorageInterface):
 
     def put(self, content, filename, project_id=None, asset_type='project', storage_id=None, content_type=None):
         """
-        Put a file into storage
+        Put a file into storage.
+        Auto create the path, if asset_type is project: <year>/<month>/<day>/<project-id>/<filename>
+                        and if asset_type is not project: <year>/<month>/<day>/<project-id>/<asset_type>/<filename>
+                        asset_type isnot project, that mean it is sub item contain in project.
         :param content: stream of file, binary type
         :param filename: name of file to save to storage
         :param project_id: project id
-        :param asset_type: folder to store asset under project_id if asset is not video
+        :param asset_type: the folder to store asset under project_id if asset_type is not project
         :param storage_id: storage_id of video
         :param content_type: content type of file
         :return: storage_id
@@ -57,9 +60,13 @@ class FileSystemStorage(MediaStorageInterface):
         try:
             if asset_type == 'project':
                 # generate storage_id for video
+                if not project_id:
+                    raise KeyError("asset_type is project, the project_id must be not empty")
                 utcnow = datetime.utcnow()
                 storage_id = f'{utcnow.year}/{utcnow.month}/{utcnow.day}/{project_id}/{filename}'
             else:
+                if not storage_id:
+                    raise KeyError("asset_type is not project, must have the storage_id of asset's project")
                 storage_id = f'{os.path.dirname(storage_id)}/{asset_type}/{filename}'
             file_path = os.path.join(app.config.get('FS_MEDIA_STORAGE_PATH'), storage_id)
             # check if dir exists, if not create it
@@ -100,6 +107,11 @@ class FileSystemStorage(MediaStorageInterface):
             return None
 
     def delete(self, storage_id):
+        """
+        Delete a file in storage
+        :param storage_id: storage_id of file
+        :return:
+        """
         try:
             file_path = os.path.join(app.config.get('FS_MEDIA_STORAGE_PATH'), storage_id)
             if os.path.exists(file_path):

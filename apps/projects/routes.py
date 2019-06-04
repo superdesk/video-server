@@ -363,10 +363,10 @@ class RetrieveEditDestroyProject(MethodView):
             'required': False,
             'empty': True,
             'schema': {
-                'width': {'type': 'integer', 'required': True},
-                'height': {'type': 'integer', 'required': True},
-                'x': {'type': 'integer', 'required': True},
-                'y': {'type': 'integer', 'required': True}
+                'width': {'type': 'float', 'required': True},
+                'height': {'type': 'float', 'required': True},
+                'x': {'type': 'float', 'required': True},
+                'y': {'type': 'float', 'required': True}
             }
         }
     }
@@ -757,7 +757,7 @@ class RetrieveEditDestroyProject(MethodView):
         # remove file from storage
         if app.fs.delete(doc['storage_id']):
             # Delete thumbnails
-            for thumbnail in next(iter(doc['thumbnails'].values())):
+            for thumbnail in next(iter(doc['thumbnails'].values()), []):
                 app.fs.delete(thumbnail['storage_id'])
             preview_thumbnail = doc['preview_thumbnail']
             if preview_thumbnail:
@@ -865,7 +865,8 @@ class RetrieveOrCreateThumbnails(MethodView):
                 and doc.get('processing') is False:
 
             # Delete all old thumbnails
-            for thumbnail in next(iter(doc['thumbnails'].values())):
+
+            for thumbnail in next(iter(doc['thumbnails'].values()), []):
                 app.fs.delete(thumbnail['storage_id'])
 
             # Update processing is True when begin edit video
@@ -1087,7 +1088,6 @@ class GetRawVideo(MethodView):
         video_range = request.headers.environ.get('HTTP_RANGE')
         length = doc['metadata'].get('size')
         if video_range:
-
             start = int(re.split('[= | -]', video_range)[1])
             end = length - 1
             chunksize = end - start + 1
@@ -1158,7 +1158,7 @@ class GetRawThumbnail(MethodView):
         else:
             schema = check_request_schema_validity(request.args.to_dict(), self.SCHEME_THUMBNAIL)
             index = schema['index']
-            thumbnails = next(iter(doc['thumbnails'].values()))
+            thumbnails = next(iter(doc['thumbnails'].values()), [])
             if len(thumbnails) < index + 1:
                 raise NotFound()
             byte = app.fs.get(thumbnails[index]['storage_id'])
