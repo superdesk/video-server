@@ -30,8 +30,8 @@ def check_user_agent():
         raise BadRequest("client is not allow to edit")
 
 
-def check_request_schema_validity(request_schema, schema):
-    validator = Validator(schema)
+def check_request_schema_validity(request_schema, schema, **kwargs):
+    validator = Validator(schema, **kwargs)
     if not validator.validate(request_schema):
         raise BadRequest(validator.errors)
     return validator.document
@@ -1120,8 +1120,8 @@ class GetRawThumbnail(MethodView):
             'required': False,
             'empty': True,
             'coerce': int,
-            'min': 0
-        }
+            'min': 0,
+        },	
     }
 
     def get(self, project_id):
@@ -1156,7 +1156,7 @@ class GetRawThumbnail(MethodView):
                 raise NotFound()
             byte = app.fs.get(preview_thumbnail.get('storage_id'))
         else:
-            schema = check_request_schema_validity(request.args.to_dict(), self.SCHEME_THUMBNAIL)
+            schema = check_request_schema_validity(request.args.to_dict(), self.SCHEME_THUMBNAIL, allow_unknown=True)
             index = schema['index']
             thumbnails = next(iter(doc['thumbnails'].values()), [])
             if len(thumbnails) < index + 1:

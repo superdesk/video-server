@@ -14,7 +14,7 @@ logger = logging.getLogger(__name__)
 
 
 @celery.task(bind=True, default_retry_delay=10)
-def task_edit_video(sdoc, updates, action='post'):
+def task_edit_video(self, sdoc, updates, action='post'):
     """
     Task use tool for edit video and record the data and update status after finished,
     :param file_path: full path edit video
@@ -70,7 +70,7 @@ def task_edit_video(sdoc, updates, action='post'):
     except Exception as exc:
         logger.exception(exc)
         try:
-            task_edit_video.delay.retry(max_retries=app.config.get('NUMBER_RETRY', 3))
+            self.retry(max_retries=app.config.get('NUMBER_RETRY', 3))
         except MaxRetriesExceededError:
             if doc['version'] >= 2:
                 app.mongo.db.projects.delete_one({'_id': doc['_id']})
