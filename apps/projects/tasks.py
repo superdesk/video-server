@@ -5,6 +5,7 @@ from bson import json_util
 from flask import current_app as app
 from pymongo import ReturnDocument
 
+from celery.exceptions import MaxRetriesExceededError
 from lib.celery_app import celery
 from lib.utils import format_id, get_url_for_media
 from lib.video_editor import get_video_editor
@@ -12,8 +13,8 @@ from lib.video_editor import get_video_editor
 logger = logging.getLogger(__name__)
 
 
-@celery.task
-def task_edit_video(sdoc, updates, action='post', retry=0):
+@celery.task(bind=True, default_retry_delay=10)
+def task_edit_video(sdoc, updates, action='post'):
     """
     Task use tool for edit video and record the data and update status after finished,
     :param file_path: full path edit video
@@ -71,9 +72,9 @@ def task_edit_video(sdoc, updates, action='post', retry=0):
 
     except Exception as exc:
         logger.exception(exc)
-        if retry < app.config.get('NUMBER_RETRY', 3):
-            task_edit_video.delay(json_util.dumps(doc), updates, action, retry=retry + 1)
-        else:
+        try:
+            task_edit_video.delay.retry(max_retries=app.config.get('NUMBER_RETRY', 3))
+        except MaxRetriesExceededError:
             if doc['version'] >= 2:
                 app.mongo.db.projects.delete_one({'_id': doc['_id']})
             else:
@@ -85,8 +86,8 @@ def task_edit_video(sdoc, updates, action='post', retry=0):
                 )
 
 
-@celery.task
-def task_get_list_thumbnails(sdoc, amount, retry=0):
+@celery.task(bind=True, default_retry_delay=10)
+def task_get_list_thumbnails(self, sdoc, amount):
     update_thumbnails = []
     try:
         doc = json_util.loads(sdoc)
@@ -129,18 +130,15 @@ def task_get_list_thumbnails(sdoc, amount, retry=0):
             upsert=False)
     except Exception as exc:
         logger.exception(exc)
-
         if update_thumbnails:
             for thumbnail in update_thumbnails:
-                storage_id = thumbnail.get('storage_id')
-                if storage_id and app.fs.get(storage_id):
-                    app.fs.delete(storage_id)
-        if retry < app.config.get('NUMBER_RETRY', 3):
-            task_get_list_thumbnails.delay(sdoc, amount, retry=retry + 1)
-        else:
+                app.fs.delete(thumbnail.get('storage_id'))
+        try:
+            raise self.retry(max_retries=app.config.get('NUMBER_RETRY', 3))
+        except MaxRetriesExceededError:
             app.mongo.db.projects.update_one(
                 {'_id': format_id(doc.get('_id'))},
                 {"$set": {
-                    'processing': True,
+                    'processing': False,
                 }},
                 upsert=False)
