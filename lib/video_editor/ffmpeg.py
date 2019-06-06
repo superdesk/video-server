@@ -221,6 +221,11 @@ class FFMPEGVideoEditor(VideoEditorInterface):
         metadata = {key: data.get(key) for key in video_meta}
         metadata['format_name'] = video_data['format']['format_name']
         metadata['size'] = video_data['format']['size']
+
+        # some video don't have duration in video stream
+        if not metadata['duration']:
+            metadata['duration'] = video_data['format'].get('duration')
+
         # ffmpeg output some number type as string
         format_type = {
             'size': int,
