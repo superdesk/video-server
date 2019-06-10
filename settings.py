@@ -1,3 +1,4 @@
+import json
 import os
 from distutils.util import strtobool as _strtobool
 
@@ -10,7 +11,7 @@ def strtobool(value):
 
 
 def env(variable, fallback_value=None):
-    if os.environ.get('VIDEOSERVER_USE_DEFAULTS'):
+    if os.environ.get('VIDEO_SERVER_USE_DEFAULTS'):
         return fallback_value
 
     env_value = os.environ.get(variable)
@@ -33,7 +34,7 @@ def celery_queue(name):
 
     :param name: queue name
     """
-    return "{}{}".format(os.environ.get('VIDEOSERVER_CELERY_PREFIX', ''), name)
+    return "{}{}".format(os.environ.get('VIDEO_SERVER_CELERY_PREFIX', ''), name)
 
 
 # base path
@@ -59,17 +60,32 @@ MONGO_URI = "mongodb://{host}:{port}/{dbname}".format(
 RABBIT_MQ_URL = env('RABBIT_MQ_URL', 'pyamqp://guest@localhost//')
 
 #: celery broker
-BROKER_MEDIA_URL = env('CELERY_MEDIA_BROKER_URL', RABBIT_MQ_URL)
-CELERY_MEDIA_BROKER_URL = BROKER_MEDIA_URL
+BROKER_URL = env('CELERY_BROKER_URL', RABBIT_MQ_URL)
+CELERY_BROKER_URL = BROKER_URL
+#: number retry when task fail
+NUMBER_RETRY = int(env('NUMBER_RETRY', 3))
+BROKER_CONNECTION_MAX_RETRIES = NUMBER_RETRY
 
 #: allow agent
-AGENT_ALLOW = env('AGENT_ALLOW', ['superdesk', 'postmanruntime'])
+AGENT_ALLOW = json.loads(env('AGENT_ALLOW', '["superdesk", "python-requests" ,"postmanruntime", "mozilla"]'))
 #: Codec support
-CODEC_SUPPORT = env('CODEC_SUPPORT', ['vp8', 'vp9', 'h264', 'aac', 'flac', 'ogg', 'vorbis'])
+CODEC_SUPPORT = json.loads(env('CODEC_SUPPORT', '["vp8", "vp9", "h264", "theora", "av1"]'))
 
 #: media storage
 MEDIA_STORAGE = env('MEDIA_STORAGE', 'filesystem')
-FS_MEDIA_STORAGE_PATH = os.path.join(BASE_PATH, 'media', 'projects')
+DEFAULT_PATH = os.path.join(BASE_PATH, 'media', 'projects')
+FS_MEDIA_STORAGE_PATH = env('FS_MEDIA_STORAGE_PATH', DEFAULT_PATH)
 
 #: media tool
 DEFAULT_MEDIA_TOOL = env('DEFAULT_MEDIA_TOOL', 'ffmpeg')
+
+VIDEO_SERVER_URL = env('VIDEO_SERVER_URL', 'http://localhost:5050/projects')
+VIDEO_URL_SUFFIX = env('VIDEO_URL_SUFFIX', 'url_raw/video')
+THUMBNAIL_URL_SUFFIX = env('THUMBNAIL_URL_SUFFIX', 'url_raw/thumbnail')
+
+#: pagination, items per page
+ITEMS_PER_PAGE = int(env('ITEMS_PER_PAGE', 25))
+DEFAULT_TOTAL_TIMELINE_THUMBNAILS = int(env('DEFAULT_TOTAL_TIMELINE_THUMBNAILS', 40))
+
+#: set PORT for video server
+VIDEO_SERVER_PORT = env('ITEMS_PER_PAGE', 5050)
