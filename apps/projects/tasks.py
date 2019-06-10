@@ -1,13 +1,13 @@
 import logging
 import os
 
-from bson import json_util
+from bson import json_util, ObjectId
 from flask import current_app as app
 from pymongo import ReturnDocument
 
 from celery.exceptions import MaxRetriesExceededError
 from lib.celery_app import celery
-from lib.utils import format_id, get_url_for_media
+from lib.utils import get_url_for_media
 from lib.video_editor import get_video_editor
 
 logger = logging.getLogger(__name__)
@@ -117,7 +117,7 @@ def task_get_list_thumbnails(self, sdoc, amount):
             count += 1
         # Update data status is True and data video when getting thumbnails was finished.
         app.mongo.db.projects.update_one(
-            {'_id': format_id(doc.get('_id'))},
+            {'_id': ObjectId(doc.get('_id'))},
             {"$set": {
                 'thumbnails': {
                     str(amount): update_thumbnails
@@ -134,7 +134,7 @@ def task_get_list_thumbnails(self, sdoc, amount):
             raise self.retry(max_retries=app.config.get('NUMBER_RETRY', 3))
         except MaxRetriesExceededError:
             app.mongo.db.projects.update_one(
-                {'_id': format_id(doc.get('_id'))},
+                {'_id': ObjectId(doc.get('_id'))},
                 {"$set": {
                     'processing': False,
                 }},

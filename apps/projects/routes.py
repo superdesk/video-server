@@ -4,7 +4,7 @@ import os
 import re
 from datetime import datetime
 
-from bson import json_util
+from bson import json_util, ObjectId
 from flask import request, make_response
 from flask import current_app as app
 from flask.views import MethodView
@@ -12,7 +12,7 @@ from pymongo import ReturnDocument
 from pymongo.errors import ServerSelectionTimeoutError
 from werkzeug.exceptions import BadRequest, InternalServerError, NotFound
 
-from lib.utils import create_file_name, format_id, json_response, get_url_for_media
+from lib.utils import create_file_name, json_response, get_url_for_media
 from lib.validator import Validator
 from lib.video_editor import get_video_editor
 
@@ -35,7 +35,7 @@ def get_request_address(request_headers):
 
 def find_one_or_404(project_id):
     # Flask-PyMongo find_one_or_404 method uses abort so can't pass custom 404 error message
-    doc = app.mongo.db.projects.find_one({'_id': format_id(project_id)})
+    doc = app.mongo.db.projects.find_one({'_id': ObjectId(project_id)})
     if not doc:
         raise NotFound(f"Project with id {project_id} was not found.")
     return doc
@@ -753,7 +753,7 @@ class RetrieveEditDestroyProject(MethodView):
                 app.fs.delete(preview_thumbnail['storage_id'])
 
             save_activity_log("DELETE PROJECT", doc['_id'], doc['storage_id'], None)
-            app.mongo.db.projects.delete_one({'_id': format_id(project_id)})
+            app.mongo.db.projects.delete_one({'_id': ObjectId(project_id)})
             return json_response(status=204)
         else:
             raise InternalServerError()
@@ -1066,7 +1066,7 @@ class GetRawVideo(MethodView):
               type: file
         """
         project_id, _ = os.path.splitext(project_id)
-        doc = app.mongo.db.projects.find_one_or_404({'_id': format_id(project_id)})
+        doc = app.mongo.db.projects.find_one_or_404({'_id': ObjectId(project_id)})
         # video is processing
         if not doc['metadata']:
             return json_response({'processing': doc['processing']}, status=202)
@@ -1135,7 +1135,7 @@ class GetRawThumbnail(MethodView):
             schema:
               type: file
         """
-        doc = app.mongo.db.projects.find_one_or_404({'_id': format_id(project_id)})
+        doc = app.mongo.db.projects.find_one_or_404({'_id': ObjectId(project_id)})
 
         if not request.args:
             preview_thumbnail = doc.get('preview_thumbnail')

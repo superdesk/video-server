@@ -9,14 +9,13 @@ from flask import current_app as app
 
 
 def create_file_name(ext):
+    """
+    Generates a filename using uuid4
+    :param ext: file extension
+    :return: generated filename
+    """
+
     return "%s.%s" % (uuid.uuid4().hex, ext)
-
-
-def format_id(_id):
-    try:
-        return bson.ObjectId(_id)
-    except bson.errors.InvalidId:
-        return _id
 
 
 def paginate(iterable, page_size):
