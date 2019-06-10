@@ -22,14 +22,6 @@ from .tasks import task_edit_video, task_get_list_thumbnails
 logger = logging.getLogger(__name__)
 
 
-def check_user_agent():
-    user_agent = request.headers.environ.get('HTTP_USER_AGENT')
-
-    client_name = user_agent.split('/')[0]
-    if client_name.lower() not in app.config.get('AGENT_ALLOW'):
-        raise BadRequest("client is not allow to edit")
-
-
 def check_request_schema_validity(request_schema, schema, **kwargs):
     validator = Validator(schema, **kwargs)
     if not validator.validate(request_schema):
@@ -160,7 +152,6 @@ class ListUploadProject(MethodView):
             # to avoid TypeError: cannot serialize '_io.BufferedRandom' error
             raise BadRequest({"file": ["required field"]})
 
-        check_user_agent()
         schema = check_request_schema_validity(request.files, self.SCHEMA_UPLOAD)
 
         # validate codec
@@ -586,7 +577,6 @@ class RetrieveEditDestroyProject(MethodView):
                   type: string
                   example: 5cbd5acfe24f6045607e51aa
         """
-        check_user_agent()
         schema = check_request_schema_validity(request.get_json(), self.SCHEMA_EDIT)
 
         doc = find_one_or_404(project_id)
@@ -708,7 +698,6 @@ class RetrieveEditDestroyProject(MethodView):
                   type: string
                   example: 5cbd5acfe24f6045607e51aa
         """
-        check_user_agent()
         schema = check_request_schema_validity(request.get_json(), self.SCHEMA_EDIT)
 
         doc = find_one_or_404(project_id)
@@ -847,7 +836,6 @@ class RetrieveOrCreateThumbnails(MethodView):
                   example: {}
         """
         doc = find_one_or_404(project_id)
-        check_user_agent()
         schema = check_request_schema_validity(request.args.to_dict(), self.SCHEMA_THUMBNAILS)
 
         if schema['type'] == 'timeline':
@@ -1015,7 +1003,6 @@ class RetrieveOrCreateThumbnails(MethodView):
         """
         doc = find_one_or_404(project_id)
 
-        check_user_agent()
         schema = check_request_schema_validity(request.get_json(), self.SCHEMA_UPLOAD)
 
         if doc.get('processing') is True:

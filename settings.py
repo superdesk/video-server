@@ -66,8 +66,6 @@ CELERY_BROKER_URL = BROKER_URL
 NUMBER_RETRY = int(env('NUMBER_RETRY', 3))
 BROKER_CONNECTION_MAX_RETRIES = NUMBER_RETRY
 
-#: allow agent
-AGENT_ALLOW = json.loads(env('AGENT_ALLOW', '["superdesk", "python-requests" ,"postmanruntime", "mozilla"]'))
 #: Codec support
 CODEC_SUPPORT = json.loads(env('CODEC_SUPPORT', '["vp8", "vp9", "h264", "theora", "av1"]'))
 
