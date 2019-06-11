@@ -7,48 +7,22 @@ from datetime import datetime
 from bson import json_util, ObjectId
 from flask import request, make_response
 from flask import current_app as app
-from flask.views import MethodView
 from pymongo import ReturnDocument
 from pymongo.errors import ServerSelectionTimeoutError
 from werkzeug.exceptions import BadRequest, InternalServerError, NotFound
 
-from lib.utils import create_file_name, json_response, get_url_for_media
-from lib.validator import Validator
+from lib.utils import (
+    create_file_name, json_response, get_url_for_media, check_request_schema_validity,
+    get_request_address, save_activity_log
+)
 from lib.video_editor import get_video_editor
+from lib.views import MethodView
 
-from . import bp
 from .tasks import task_edit_video, task_get_list_thumbnails
+from . import bp
 
 logger = logging.getLogger(__name__)
 
-
-def check_request_schema_validity(request_schema, schema, **kwargs):
-    validator = Validator(schema, **kwargs)
-    if not validator.validate(request_schema):
-        raise BadRequest(validator.errors)
-    return validator.document
-
-
-def get_request_address(request_headers):
-    return request_headers.get('HTTP_X_FORWARDED_FOR') or request_headers.get('REMOTE_ADDR')
-
-
-def find_one_or_404(project_id):
-    # Flask-PyMongo find_one_or_404 method uses abort so can't pass custom 404 error message
-    doc = app.mongo.db.projects.find_one({'_id': ObjectId(project_id)})
-    if not doc:
-        raise NotFound(f"Project with id {project_id} was not found.")
-    return doc
-
-
-def save_activity_log(action, project_id, storage_id, payload=None):
-    app.mongo.db.activity.insert_one({
-        "action": action,
-        "project_id": project_id,
-        "storage_id": storage_id,
-        "payload": payload,
-        "create_date": datetime.utcnow()
-    })
 
 
 class ListUploadProject(MethodView):
@@ -449,8 +423,7 @@ class RetrieveEditDestroyProject(MethodView):
                   example: 5cbd5acfe24f6045607e51aa
         """
 
-        doc = find_one_or_404(project_id)
-        return json_response(doc)
+        return json_response(self._project)
 
     def put(self, project_id):
         """
@@ -579,15 +552,14 @@ class RetrieveEditDestroyProject(MethodView):
         """
         schema = check_request_schema_validity(request.get_json(), self.SCHEMA_EDIT)
 
-        doc = find_one_or_404(project_id)
-        if doc.get('processing') is True:
-            return json_response({'processing': doc['processing']}, status=202)
-        if not doc.get('version') >= 2:
+        if self._project.get('processing') is True:
+            return json_response({'processing': self._project['processing']}, status=202)
+        if not self._project.get('version') >= 2:
             raise BadRequest("Only PUT action for edited video version 2")
 
         # Update processing is True when begin edit video
         doc = app.mongo.db.projects.find_one_and_update(
-            {'_id': doc['_id']},
+            {'_id': self._project['_id']},
             {'$set': {
                 'processing': True,
             }},
@@ -700,31 +672,30 @@ class RetrieveEditDestroyProject(MethodView):
         """
         schema = check_request_schema_validity(request.get_json(), self.SCHEMA_EDIT)
 
-        doc = find_one_or_404(project_id)
 
-        filename, ext = os.path.splitext(doc['filename'])
-        if doc.get('version') >= 2:
+        filename, ext = os.path.splitext(self._project['filename'])
+        if self._project.get('version') >= 2:
             raise BadRequest("Only POST action for original video version 1")
-        version = doc.get('version', 1) + 1
+        version = self._project.get('version', 1) + 1
         new_file_name = f'{filename}_v{version}{ext}'
         new_doc = {
             'filename': new_file_name,
-            'storage_id': doc.get('storage_id'),
+            'storage_id': self._project.get('storage_id'),
             'metadata': None,
             'request_address': get_request_address(request.headers.environ),
             'version': version,
             'processing': True,
-            'mime_type': doc.get('mime_type'),
+            'mime_type': self._project.get('mime_type'),
             'parent': {
-                '_id': doc.get('_id'),
+                '_id': self._project.get('_id'),
             },
             'thumbnails': {},
-            'preview_thumbnail': doc.get('preview_thumbnail')
+            'preview_thumbnail': self._project.get('preview_thumbnail')
         }
         app.mongo.db.projects.insert_one(new_doc)
         new_doc['predict_url'] = get_url_for_media(new_doc.get('_id'), 'video')
         task_edit_video.delay(json_util.dumps(new_doc), schema)
-        save_activity_log("POST PROJECT", doc['_id'], doc['storage_id'], schema)
+        save_activity_log("POST PROJECT", self._project['_id'], self._project['storage_id'], schema)
         return json_response(new_doc)
 
     def delete(self, project_id):
@@ -741,18 +712,17 @@ class RetrieveEditDestroyProject(MethodView):
           204:
             description: NO CONTENT
         """
-        doc = find_one_or_404(project_id)
 
         # remove file from storage
-        if app.fs.delete(doc['storage_id']):
+        if app.fs.delete(self._project['storage_id']):
             # Delete thumbnails
-            for thumbnail in next(iter(doc['thumbnails'].values()), []):
+            for thumbnail in next(iter(self._project['thumbnails'].values()), []):
                 app.fs.delete(thumbnail['storage_id'])
-            preview_thumbnail = doc['preview_thumbnail']
+            preview_thumbnail = self._project['preview_thumbnail']
             if preview_thumbnail:
                 app.fs.delete(preview_thumbnail['storage_id'])
 
-            save_activity_log("DELETE PROJECT", doc['_id'], doc['storage_id'], None)
+            save_activity_log("DELETE PROJECT", self._project['_id'], self._project['storage_id'], None)
             app.mongo.db.projects.delete_one({'_id': ObjectId(project_id)})
             return json_response(status=204)
         else:
@@ -835,52 +805,15 @@ class RetrieveOrCreateThumbnails(MethodView):
                   type: object
                   example: {}
         """
-        doc = find_one_or_404(project_id)
         schema = check_request_schema_validity(request.args.to_dict(), self.SCHEMA_THUMBNAILS)
 
         if schema['type'] == 'timeline':
             return self._get_timeline_thumbnail(
-                doc,
+                self._project,
                 schema.get('amount', app.config.get('DEFAULT_TOTAL_TIMELINE_THUMBNAILS'))
             )
         else:
-            return self._capture_thumbnail(doc, schema['time'])
-
-    def _get_timeline_thumbnail(self, doc, amount):
-        # Only get thumbnails when list thumbnail have not created yet (empty) and video is not processed any task
-        data = doc.get('thumbnails')
-        if (not data or not data.get(str(amount))) \
-                and doc.get('processing') is False:
-
-            # Delete all old thumbnails
-
-            for thumbnail in next(iter(doc['thumbnails'].values()), []):
-                app.fs.delete(thumbnail['storage_id'])
-
-            # Update processing is True when begin edit video
-            doc = app.mongo.db.projects.find_one_and_update(
-                {'_id': doc['_id']},
-                {'$set': {
-                    'processing': True,
-                    'thumbnails': {}
-                }},
-                return_document=ReturnDocument.AFTER
-            )
-            # Run get list thumbnails of timeline for video in celery
-            task_get_list_thumbnails.delay(json_util.dumps(doc), amount)
-        return json_response({
-            "processing": doc.get('processing'),
-            "thumbnails": doc['thumbnails'],
-        })
-
-    def _capture_thumbnail(self, doc, time):
-        video_editor = get_video_editor()
-        video_stream = app.fs.get(doc['storage_id'])
-
-        thumbnail_stream, thumbnail_metadata = video_editor.capture_thumbnail(
-            video_stream, doc['filename'], doc['metadata'], time
-        )
-        return self._save_thumbnail(doc, thumbnail_stream, thumbnail_metadata)
+            return self._capture_thumbnail(self._project, schema['time'])
 
     def post(self, project_id):
         """
@@ -1001,12 +934,11 @@ class RetrieveOrCreateThumbnails(MethodView):
                       type: int
                       example: 300000
         """
-        doc = find_one_or_404(project_id)
 
         schema = check_request_schema_validity(request.get_json(), self.SCHEMA_UPLOAD)
 
-        if doc.get('processing') is True:
-            return json_response({'processing': doc['processing']}, status=202)
+        if self._project.get('processing') is True:
+            return json_response({'processing': self._project['processing']}, status=202)
 
         base64_string = schema['data']
         try:
@@ -1020,6 +952,42 @@ class RetrieveOrCreateThumbnails(MethodView):
 
         video_editor = get_video_editor()
         thumbnail_metadata = video_editor.get_meta(thumbnail_stream, 'png')
+        return self._save_thumbnail(self._project, thumbnail_stream, thumbnail_metadata)
+
+    def _get_timeline_thumbnail(self, doc, amount):
+        # Only get thumbnails when list thumbnail have not created yet (empty) and video is not processed any task
+        data = doc.get('thumbnails')
+        if (not data or not data.get(str(amount))) \
+                and doc.get('processing') is False:
+
+            # Delete all old thumbnails
+
+            for thumbnail in next(iter(doc['thumbnails'].values()), []):
+                app.fs.delete(thumbnail['storage_id'])
+
+            # Update processing is True when begin edit video
+            doc = app.mongo.db.projects.find_one_and_update(
+                {'_id': doc['_id']},
+                {'$set': {
+                    'processing': True,
+                    'thumbnails': {}
+                }},
+                return_document=ReturnDocument.AFTER
+            )
+            # Run get list thumbnails of timeline for video in celery
+            task_get_list_thumbnails.delay(json_util.dumps(doc), amount)
+        return json_response({
+            "processing": doc.get('processing'),
+            "thumbnails": doc['thumbnails'],
+        })
+
+    def _capture_thumbnail(self, doc, time):
+        video_editor = get_video_editor()
+        video_stream = app.fs.get(doc['storage_id'])
+
+        thumbnail_stream, thumbnail_metadata = video_editor.capture_thumbnail(
+            video_stream, doc['filename'], doc['metadata'], time
+        )
         return self._save_thumbnail(doc, thumbnail_stream, thumbnail_metadata)
 
     def _save_thumbnail(self, doc, stream, metadata):
@@ -1066,14 +1034,13 @@ class GetRawVideo(MethodView):
               type: file
         """
         project_id, _ = os.path.splitext(project_id)
-        doc = app.mongo.db.projects.find_one_or_404({'_id': ObjectId(project_id)})
         # video is processing
-        if not doc['metadata']:
-            return json_response({'processing': doc['processing']}, status=202)
+        if not self._project['metadata']:
+            return json_response({'processing': self._project['processing']}, status=202)
 
         # get strem file for video
         video_range = request.headers.environ.get('HTTP_RANGE')
-        length = doc['metadata'].get('size')
+        length = self._project['metadata'].get('size')
         if video_range:
             start = int(re.split('[= | -]', video_range)[1])
             end = length - 1
@@ -1082,10 +1049,10 @@ class GetRawVideo(MethodView):
                 'Content-Range': f'bytes {start}-{end}/{length}',
                 'Accept-Ranges': 'bytes',
                 'Content-Length': chunksize,
-                'Content-Type': doc.get("mime_type"),
+                'Content-Type': self._project.get("mime_type"),
             }
             # get a stack of bytes push to client
-            stream = app.fs.get_range(doc['storage_id'], start, chunksize)
+            stream = app.fs.get_range(self._project['storage_id'], start, chunksize)
             res = make_response(stream)
             res.headers = headers
             return res, 206
@@ -1094,7 +1061,7 @@ class GetRawVideo(MethodView):
             'Content-Length': length,
             'Content-Type': 'video/mp4',
         }
-        stream = app.fs.get(doc.get('storage_id'))
+        stream = app.fs.get(self._project.get('storage_id'))
         res = make_response(stream)
         res.headers = headers
         return res, 200
@@ -1135,17 +1102,16 @@ class GetRawThumbnail(MethodView):
             schema:
               type: file
         """
-        doc = app.mongo.db.projects.find_one_or_404({'_id': ObjectId(project_id)})
 
         if not request.args:
-            preview_thumbnail = doc.get('preview_thumbnail')
+            preview_thumbnail = self._project.get('preview_thumbnail')
             if not preview_thumbnail:
                 raise NotFound()
             byte = app.fs.get(preview_thumbnail.get('storage_id'))
         else:
             schema = check_request_schema_validity(request.args.to_dict(), self.SCHEME_THUMBNAIL, allow_unknown=True)
             index = schema['index']
-            thumbnails = next(iter(doc['thumbnails'].values()), [])
+            thumbnails = next(iter(self._project['thumbnails'].values()), [])
             if len(thumbnails) < index + 1:
                 raise NotFound()
             byte = app.fs.get(thumbnails[index]['storage_id'])
