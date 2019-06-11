@@ -13,7 +13,7 @@ from werkzeug.exceptions import BadRequest, InternalServerError, NotFound
 
 from lib.utils import (
     create_file_name, json_response, get_url_for_media, check_request_schema_validity,
-    get_request_address, save_activity_log
+    get_request_address, save_activity_log, paginate
 )
 from lib.video_editor import get_video_editor
 from lib.views import MethodView
@@ -22,7 +22,6 @@ from .tasks import task_edit_video, task_get_list_thumbnails
 from . import bp
 
 logger = logging.getLogger(__name__)
-
 
 
 class ListUploadProject(MethodView):
@@ -186,26 +185,29 @@ class ListUploadProject(MethodView):
         Get list of projects in DB
         ---
         parameters:
-        - name: offset
+        - name: page
           in: query
           type: integer
           description: Page number
         responses:
           200:
-            description: OK
+            description: list of projects
             schema:
               type: object
               properties:
-                offset:
-                  type: integer
-                  example: 1
-                size:
-                  type: integer
-                  example: 14
-                max_size:
-                  type: integer
-                  example: 50
-                items:
+                _meta:
+                  type: object
+                  properties:
+                    page:
+                      type: integer
+                      example: 1
+                    max_results:
+                      type: integer
+                      example: 25
+                    total:
+                      type: integer
+                      example: 230
+                _items:
                   type: array
                   items:
                     type: object
@@ -280,18 +282,23 @@ class ListUploadProject(MethodView):
                         type: string
                         example: 5cbd5acfe24f6045607e51aa
         """
-        offset = request.args.get('offset', 0, type=int)
-        size = app.config.get('ITEMS_PER_PAGE', 25)
-        # get all projects
-        docs = list(app.mongo.db.projects.find().skip(offset).limit(size))
 
-        res = {
-            'items': docs,
-            'offset': offset,
-            'max_results': size,
-            'total': app.mongo.db.projects.count()
-        }
-        return json_response(res)
+        page = request.args.get('page', 1, type=int)
+        projects = list(paginate(
+            cursor=app.mongo.db.projects.find(),
+            page=page
+        ))
+
+        return json_response(
+            {
+                '_items': projects,
+                '_meta': {
+                    'page': page,
+                    'max_results': app.config.get('ITEMS_PER_PAGE'),
+                    'total': app.mongo.db.projects.count()
+                }
+            }
+        )
 
 
 class RetrieveEditDestroyProject(MethodView):
@@ -671,7 +678,6 @@ class RetrieveEditDestroyProject(MethodView):
                   example: 5cbd5acfe24f6045607e51aa
         """
         schema = check_request_schema_validity(request.get_json(), self.SCHEMA_EDIT)
-
 
         filename, ext = os.path.splitext(self._project['filename'])
         if self._project.get('version') >= 2:
@@ -1075,7 +1081,7 @@ class GetRawThumbnail(MethodView):
             'empty': True,
             'coerce': int,
             'min': 0,
-        },	
+        },
     }
 
     def get(self, project_id):
