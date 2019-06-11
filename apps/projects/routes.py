@@ -12,7 +12,7 @@ from pymongo.errors import ServerSelectionTimeoutError
 from werkzeug.exceptions import BadRequest, InternalServerError, NotFound
 
 from lib.utils import (
-    create_file_name, json_response, get_url_for_media, check_request_schema_validity,
+    create_file_name, json_response, get_url_for_media, validate_document,
     get_request_address, save_activity_log, paginate
 )
 from lib.video_editor import get_video_editor
@@ -125,11 +125,11 @@ class ListUploadProject(MethodView):
             # to avoid TypeError: cannot serialize '_io.BufferedRandom' error
             raise BadRequest({"file": ["required field"]})
 
-        schema = check_request_schema_validity(request.files, self.SCHEMA_UPLOAD)
+        document = validate_document(request.files, self.SCHEMA_UPLOAD)
 
         # validate codec
         video_editor = get_video_editor()
-        file = schema['file']
+        file = document['file']
         file_stream = file.stream.read()
         metadata = video_editor.get_meta(file_stream)
         codec_name = metadata.get('codec_name')
@@ -557,7 +557,7 @@ class RetrieveEditDestroyProject(MethodView):
                   type: string
                   example: 5cbd5acfe24f6045607e51aa
         """
-        schema = check_request_schema_validity(request.get_json(), self.SCHEMA_EDIT)
+        document = validate_document(request.get_json(), self.SCHEMA_EDIT)
 
         if self._project.get('processing') is True:
             return json_response({'processing': self._project['processing']}, status=202)
@@ -572,8 +572,8 @@ class RetrieveEditDestroyProject(MethodView):
             }},
             return_document=ReturnDocument.AFTER
         )
-        save_activity_log("PUT PROJECT", doc['_id'], doc['storage_id'], schema)
-        task_edit_video.delay(json_util.dumps(doc), schema, action='put')
+        save_activity_log("PUT PROJECT", doc['_id'], doc['storage_id'], document)
+        task_edit_video.delay(json_util.dumps(doc), document, action='put')
         return json_response(doc)
 
     def post(self, project_id):
@@ -677,7 +677,7 @@ class RetrieveEditDestroyProject(MethodView):
                   type: string
                   example: 5cbd5acfe24f6045607e51aa
         """
-        schema = check_request_schema_validity(request.get_json(), self.SCHEMA_EDIT)
+        document = validate_document(request.get_json(), self.SCHEMA_EDIT)
 
         filename, ext = os.path.splitext(self._project['filename'])
         if self._project.get('version') >= 2:
@@ -700,8 +700,8 @@ class RetrieveEditDestroyProject(MethodView):
         }
         app.mongo.db.projects.insert_one(new_doc)
         new_doc['predict_url'] = get_url_for_media(new_doc.get('_id'), 'video')
-        task_edit_video.delay(json_util.dumps(new_doc), schema)
-        save_activity_log("POST PROJECT", self._project['_id'], self._project['storage_id'], schema)
+        task_edit_video.delay(json_util.dumps(new_doc), document)
+        save_activity_log("POST PROJECT", self._project['_id'], self._project['storage_id'], document)
         return json_response(new_doc)
 
     def delete(self, project_id):
@@ -811,15 +811,15 @@ class RetrieveOrCreateThumbnails(MethodView):
                   type: object
                   example: {}
         """
-        schema = check_request_schema_validity(request.args.to_dict(), self.SCHEMA_THUMBNAILS)
+        document = validate_document(request.args.to_dict(), self.SCHEMA_THUMBNAILS)
 
-        if schema['type'] == 'timeline':
+        if document['type'] == 'timeline':
             return self._get_timeline_thumbnail(
                 self._project,
-                schema.get('amount', app.config.get('DEFAULT_TOTAL_TIMELINE_THUMBNAILS'))
+                document.get('amount', app.config.get('DEFAULT_TOTAL_TIMELINE_THUMBNAILS'))
             )
         else:
-            return self._capture_thumbnail(self._project, schema['time'])
+            return self._capture_thumbnail(self._project, document['time'])
 
     def post(self, project_id):
         """
@@ -941,12 +941,12 @@ class RetrieveOrCreateThumbnails(MethodView):
                       example: 300000
         """
 
-        schema = check_request_schema_validity(request.get_json(), self.SCHEMA_UPLOAD)
+        document = validate_document(request.get_json(), self.SCHEMA_UPLOAD)
 
         if self._project.get('processing') is True:
             return json_response({'processing': self._project['processing']}, status=202)
 
-        base64_string = schema['data']
+        base64_string = document['data']
         try:
             if ',' not in base64_string:
                 base64_thumbnail = base64_string
@@ -1115,8 +1115,8 @@ class GetRawThumbnail(MethodView):
                 raise NotFound()
             byte = app.fs.get(preview_thumbnail.get('storage_id'))
         else:
-            schema = check_request_schema_validity(request.args.to_dict(), self.SCHEME_THUMBNAIL, allow_unknown=True)
-            index = schema['index']
+            document = validate_document(request.args.to_dict(), self.SCHEME_THUMBNAIL, allow_unknown=True)
+            index = document['index']
             thumbnails = next(iter(self._project['thumbnails'].values()), [])
             if len(thumbnails) < index + 1:
                 raise NotFound()
