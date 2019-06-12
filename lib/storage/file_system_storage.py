@@ -45,10 +45,15 @@ class FileSystemStorage(MediaStorageInterface):
 
     def put(self, content, filename, project_id=None, asset_type='project', storage_id=None, content_type=None):
         """
-        Put a file into storage.
-        Auto create the path, if asset_type is project: <year>/<month>/<day>/<project-id>/<filename>
-                        and if asset_type is not project: <year>/<month>/<day>/<project-id>/<asset_type>/<filename>
-                        asset_type isnot project, that mean it is sub item contain in project.
+        Save file into a fs storage.
+
+        Use <year>/<month>/<day>/<project-id>/<filename> path if `asset_type` is 'project'.
+        Use <year>/<month>/<day>/<project-id>/<asset_type>/<filename> if `asset_type` is not 'project'
+
+        Example:
+         - video file: 2019/6/11/5cff82a6fe985e1e3bddb326/3ada91761c6048bdb3dd42a2463d5df8.mp4
+         - thumbnail:  2019/6/11/5cff82a6fe985e1e3bddb326/thumbnails/3ada91761c6048bdb3dd42a2463d5df8_timeline_00.png
+
         :param content: stream of file, binary type
         :param filename: name of file to save to storage
         :param project_id: project id
@@ -57,30 +62,34 @@ class FileSystemStorage(MediaStorageInterface):
         :param content_type: content type of file
         :return: storage_id
         """
+
+        if asset_type == 'project':
+            if not project_id:
+                raise ValueError("Argument 'project_id' is required when 'asset_type' is 'project'")
+            # generate storage_id for project
+            utcnow = datetime.utcnow()
+            storage_id = f'{utcnow.year}/{utcnow.month}/{utcnow.day}/{project_id}/{filename}'
+        else:
+            if not storage_id:
+                raise ValueError("Argument 'storage_id' is required when 'asset_type' is not 'project'")
+            # generate storage_id
+            storage_id = f'{os.path.dirname(storage_id)}/{asset_type}/{filename}'
+
+        file_path = os.path.join(app.config.get('FS_MEDIA_STORAGE_PATH'), storage_id)
+        # check if dir exists, if not create it
+        file_dir = os.path.dirname(file_path)
+        if not os.path.exists(file_dir):
+            os.makedirs(file_dir)
+        # write stream to file
         try:
-            if asset_type == 'project':
-                # generate storage_id for video
-                if not project_id:
-                    raise KeyError("asset_type is project, the project_id must be not empty")
-                utcnow = datetime.utcnow()
-                storage_id = f'{utcnow.year}/{utcnow.month}/{utcnow.day}/{project_id}/{filename}'
-            else:
-                if not storage_id:
-                    raise KeyError("asset_type is not project, must have the storage_id of asset's project")
-                storage_id = f'{os.path.dirname(storage_id)}/{asset_type}/{filename}'
-            file_path = os.path.join(app.config.get('FS_MEDIA_STORAGE_PATH'), storage_id)
-            # check if dir exists, if not create it
-            file_dir = os.path.dirname(file_path)
-            if not os.path.exists(file_dir):
-                os.makedirs(file_dir)
-            # write stream to file
             with open(file_path, "wb") as f:
                 f.write(content)
-            logger.info('Put media file %s to storage' % storage_id)
-            return storage_id
-        except Exception as ex:
-            logger.error('Cannot put file %s ex: %s' % (storage_id, ex))
-            return None
+        except Exception as e:
+            logger.error(f'FileSystemStorage:put: {e}')
+            raise e
+
+        logger.info(f"Saved file '{storage_id}' to fs storage")
+        return storage_id
 
     def replace(self, content, storage_id, content_type=None):
         """
