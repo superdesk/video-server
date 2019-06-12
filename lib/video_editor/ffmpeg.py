@@ -1,15 +1,20 @@
 import json
 import os
-import subprocess as cmd
+import subprocess
 import tempfile
-from io import BytesIO
+import logging
 
 from lib.utils import create_file_name
 
 from .interface import VideoEditorInterface
 
+logger = logging.getLogger(__name__)
+
 
 class FFMPEGVideoEditor(VideoEditorInterface):
+    """
+    FFMPEG based video editor
+    """
 
     def get_meta(self, filestream, extension='tmp'):
         """
@@ -18,15 +23,12 @@ class FFMPEGVideoEditor(VideoEditorInterface):
         :return:
         """
         file_name = create_file_name(extension)
-        metadata = {}
+        file_temp_path = self._create_temp_file(filestream, file_name)
         try:
-            #: create a temp file
-            file_temp_path = self._create_temp_file(filestream, file_name)
-            #: get metadata
             metadata = self._get_meta(file_temp_path)
         finally:
-            if file_temp_path:
-                os.remove(file_temp_path)
+            os.remove(file_temp_path)
+
         return metadata
 
     def edit_video(self, stream_file, filename, metadata, video_cut=None, video_crop=None, video_rotate=None,
@@ -151,7 +153,7 @@ class FFMPEGVideoEditor(VideoEditorInterface):
 
             # capture list frame via script capture_list_frames.sh
             path_script = os.path.dirname(__file__) + '/script/capture_list_frames.sh'
-            cmd.run([path_script, path_video, path_video + "_", str(frame_per_second), str(number_frames)])
+            subprocess.run([path_script, path_video, path_video + "_", str(frame_per_second), str(number_frames)])
             for i in range(0, number_frames):
                 path_output = path_video + '_%0d.bmp' % i
                 try:
@@ -172,7 +174,7 @@ class FFMPEGVideoEditor(VideoEditorInterface):
         :param time_capture:
         :return:
         """
-        cmd.run(["ffmpeg", "-v", "error", "-y", "-accurate_seek", "-i", path_video,
+        subprocess.run(["ffmpeg", "-v", "error", "-y", "-accurate_seek", "-i", path_video,
                  "-ss", str(time_capture), "-vframes", "1", path_output])
         return open(path_output, "rb+").read()
 
@@ -186,43 +188,44 @@ class FFMPEGVideoEditor(VideoEditorInterface):
         """
         try:
             # cut video
-            cmd.run(["ffmpeg", "-v", "error", "-i", path_video, *para, path_output])
+            subprocess.run(["ffmpeg", "-v", "error", "-i", path_video, *para, path_output])
 
             # replace tmp origin
 
-            cmd.run(["cp", "-r", path_output, path_video])
+            subprocess.run(["cp", "-r", path_output, path_video])
             return path_video
         finally:
             os.remove(path_output)
 
-    def _get_meta(self, path_video):
+    def _get_meta(self, file_path):
         """
-            Use ffmpeg to capture video at a time.
-        :param path_video:
-        :param path_output:
-        :param time_capture:
+        Get metada using `ffprobe` command
+        :param file_path: path to a file to retrieve a metadata
         :return:
         """
-        res = cmd.Popen(
-            ['ffprobe', '-v', 'error', '-print_format', 'json', '-show_streams', '-show_format', path_video],
-            stdout=cmd.PIPE)
-        result = res.communicate()[0].decode("utf-8")
-        video_data = json.loads(result)
+
+        cmd = ('ffprobe', '-v', 'error', '-print_format', 'json', '-show_streams', '-show_format', file_path)
+        with subprocess.Popen(cmd, stdout=subprocess.PIPE) as proc:
+            (output, _) = proc.communicate()
+            if proc.returncode != 0:
+                raise RuntimeError(f"Subprocess with command: '{cmd}' has failed.")
+
+        video_data = json.loads(output.decode("utf-8"))
 
         data = None
         for stream in video_data['streams']:
-            if stream['codec_type'] == 'video' or not data:
+            if stream['codec_type'] == 'video':
                 data = stream
+                break
 
-        format_meta = ('format_name', 'size')
-        video_meta = ('codec_name', 'codec_long_name', 'width', 'height', 'r_frame_rate', 'bit_rate',
-                      'nb_frames', 'duration')
+        video_meta_keys = ('codec_name', 'codec_long_name', 'width', 'height', 'r_frame_rate', 'bit_rate',
+                           'nb_frames', 'duration')
 
-        metadata = {key: data.get(key) for key in video_meta}
+        metadata = {key: data.get(key) for key in video_meta_keys}
         metadata['format_name'] = video_data['format']['format_name']
         metadata['size'] = video_data['format']['size']
 
-        # some video don't have duration in video stream
+        # some videos don't have duration in video stream
         if not metadata['duration']:
             metadata['duration'] = video_data['format'].get('duration')
 
@@ -241,11 +244,17 @@ class FFMPEGVideoEditor(VideoEditorInterface):
 
     def _create_temp_file(self, file_stream, file_name):
         """
-            Get stream file from resource and save it to /tmp directory for using (cutting and capture)
-        :param media_id:
-        :return:
+        Saves `file_stream` into /tmp directory
+        :param file_stream: bytes file stream to save
+        :param file_name: file name used to save `file_stream`
+        :return: file path
         """
-        tmp_path = tempfile.gettempdir() + "/tmp_%s" % file_name
-        with open(tmp_path, "wb") as f:
-            f.write(file_stream)
+
+        tmp_path = f"{tempfile.gettempdir()}/tmp_{file_name}"
+        try:
+            with open(tmp_path, "wb") as f:
+                f.write(file_stream)
+        except Exception as e:
+            logger.error(f'Can not save file stream to tmp directory: {e}')
+
         return tmp_path
