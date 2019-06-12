@@ -124,7 +124,9 @@ class FileSystemStorage(MediaStorageInterface):
 
         file_path = os.path.join(app.config.get('FS_MEDIA_STORAGE_PATH'), storage_id)
         dir_path = os.path.dirname(file_path)
+
         if os.path.isdir(dir_path):
             shutil.rmtree(dir_path)
+            logger.info(f"Removed '{dir_path}' from fs storage")
 
-        logger.info(f"Removed '{dir_path}' from fs storage")
+        logger.warning(f"Directory '{dir_path}' was not found in fs storage.")
