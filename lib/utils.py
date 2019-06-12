@@ -63,7 +63,7 @@ def get_url_for_media(project_id, media_type):
     return '/'.join(x.strip('/') for x in (app.config.get('VIDEO_SERVER_URL'), str(project_id), suffix))
 
 
-def save_activity_log(action, project_id, storage_id, payload=None):
+def save_activity_log(action, project_id, payload=None):
     """
     Inserts an activity record into `activity` collection
     """
@@ -71,15 +71,23 @@ def save_activity_log(action, project_id, storage_id, payload=None):
     app.mongo.db.activity.insert_one({
         "action": action,
         "project_id": project_id,
-        "storage_id": storage_id,
         "payload": payload,
         "create_date": datetime.utcnow()
     })
 
 
-def check_request_schema_validity(request_schema, schema, **kwargs):
+def validate_document(document, schema, **kwargs):
+    """
+    Validate `document` against provided `schema`
+    :param document: document for validation
+    :param schema: validation schema
+    :param kwargs: additional arguments for `Validator`
+    :return: normalized and validated document
+    :raise: `BadRequest` if `document` is not valid
+    """
+
     validator = Validator(schema, **kwargs)
-    if not validator.validate(request_schema):
+    if not validator.validate(document):
         raise BadRequest(validator.errors)
     return validator.document
 

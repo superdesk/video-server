@@ -17,6 +17,7 @@ from lib.utils import (
 )
 from lib.video_editor import get_video_editor
 from lib.views import MethodView
+from lib.enums import ActivityActions
 
 from .tasks import task_edit_video, task_get_list_thumbnails
 from . import bp
@@ -124,61 +125,61 @@ class ListUploadProject(MethodView):
         if 'file' not in request.files:
             # to avoid TypeError: cannot serialize '_io.BufferedRandom' error
             raise BadRequest({"file": ["required field"]})
-
         document = validate_document(request.files, self.SCHEMA_UPLOAD)
 
         # validate codec
-        video_editor = get_video_editor()
-        file = document['file']
-        file_stream = file.stream.read()
-        metadata = video_editor.get_meta(file_stream)
-        codec_name = metadata.get('codec_name')
-        if codec_name not in app.config.get('CODEC_SUPPORT'):
-            raise BadRequest("Codec: {} is not supported.".format(codec_name))
-        # generate file name
-        file_name = create_file_name(ext=file.filename.split('.')[1])
+        file_stream = document['file'].stream.read()
+        metadata = get_video_editor().get_meta(file_stream)
+        if metadata.get('codec_name') not in app.config.get('CODEC_SUPPORT'):
+            raise BadRequest(f"Codec: '{metadata.get('codec_name')}' is not supported.")
+
+        # add record to database
+        project = {
+            'filename': create_file_name(ext=document['file'].filename.rsplit('.')[-1]),
+            'storage_id': None,
+            'metadata': metadata,
+            'create_time': datetime.utcnow(),
+            'mime_type': document['file'].mimetype,
+            'version': 1,
+            'processing': False,
+            'parent': None,
+            'thumbnails': {},
+            'request_address': get_request_address(request.headers.environ),
+            'original_filename': document['file'].filename,
+            'preview_thumbnail': None
+        }
+        app.mongo.db.projects.insert_one(project)
+
+        # put file stream into storage
         try:
-            # add record to database
-            doc = {
-                'filename': file_name,
-                'storage_id': None,
-                'metadata': metadata,
-                'create_time': datetime.utcnow(),
-                'mime_type': file.mimetype,
-                'version': 1,
-                'processing': False,
-                'parent': None,
-                'thumbnails': {},
-                'request_address': get_request_address(request.headers.environ),
-                'original_filename': file.filename,
-                'preview_thumbnail': None,
-                'url': None
-            }
-            app.mongo.db.projects.insert_one(doc)
+            storage_id = app.fs.put(
+                content=file_stream,
+                filename=project['filename'],
+                project_id=project['_id'],
+                content_type=document['file'].mimetype
+            )
+        except Exception as e:
+            # remove record from db
+            app.mongo.db.projects.delete_one({'_id': project['_id']})
+            raise InternalServerError(str(e))
 
-            # put file stream into storage
-            storage_id = app.fs.put(file_stream, file_name, doc['_id'], content_type=file.mimetype)
-            if not storage_id:
-                raise InternalServerError('Something went wrong when putting file into storage.')
-
-            # update url for preview video
-            doc = app.mongo.db.projects.find_one_and_update(
-                {'_id': doc['_id']},
-                {'$set': {
-                    'storage_id': storage_id,
-                    'url': get_url_for_media(doc.get('_id'), 'video'),
-                }},
+        # set 'storage_id' for project
+        try:
+            project = app.mongo.db.projects.find_one_and_update(
+                {'_id': project['_id']},
+                {'$set': {'storage_id': storage_id}},
                 return_document=ReturnDocument.AFTER
             )
-            save_activity_log("UPLOAD", doc['_id'], doc['storage_id'], {"file": doc.get('filename')})
-            return json_response(doc, status=201)
-        except ServerSelectionTimeoutError:
-            app.fs.delete(file_name)
-            raise InternalServerError('Could not connect to database')
-        except Exception as ex:
-            app.fs.delete(file_name)
-            logger.exception(ex)
-            raise InternalServerError(str(ex))
+        except ServerSelectionTimeoutError as e:
+            # delete file
+            app.fs.delete(storage_id)
+            # remove record from db
+            app.mongo.db.projects.delete_one({'_id': project['_id']})
+            raise InternalServerError(str(e))
+
+        save_activity_log(ActivityActions.UPLOAD, project['_id'])
+
+        return json_response(project, status=201)
 
     def get(self):
         """
@@ -572,7 +573,7 @@ class RetrieveEditDestroyProject(MethodView):
             }},
             return_document=ReturnDocument.AFTER
         )
-        save_activity_log("PUT PROJECT", doc['_id'], doc['storage_id'], document)
+        save_activity_log("PUT PROJECT", doc['_id'], document)
         task_edit_video.delay(json_util.dumps(doc), document, action='put')
         return json_response(doc)
 
@@ -701,7 +702,7 @@ class RetrieveEditDestroyProject(MethodView):
         app.mongo.db.projects.insert_one(new_doc)
         new_doc['predict_url'] = get_url_for_media(new_doc.get('_id'), 'video')
         task_edit_video.delay(json_util.dumps(new_doc), document)
-        save_activity_log("POST PROJECT", self._project['_id'], self._project['storage_id'], document)
+        save_activity_log("POST PROJECT", self._project['_id'], document)
         return json_response(new_doc)
 
     def delete(self, project_id):
@@ -728,7 +729,7 @@ class RetrieveEditDestroyProject(MethodView):
             if preview_thumbnail:
                 app.fs.delete(preview_thumbnail['storage_id'])
 
-            save_activity_log("DELETE PROJECT", self._project['_id'], self._project['storage_id'], None)
+            save_activity_log("DELETE PROJECT", self._project['_id'], None)
             app.mongo.db.projects.delete_one({'_id': ObjectId(project_id)})
             return json_response(status=204)
         else:
