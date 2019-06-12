@@ -1,5 +1,6 @@
-import logging
 import os
+import shutil
+import logging
 from datetime import datetime
 
 from flask import current_app as app
@@ -119,14 +120,11 @@ class FileSystemStorage(MediaStorageInterface):
         """
         Delete a file in storage
         :param storage_id: storage_id of file
-        :return:
         """
-        try:
-            file_path = os.path.join(app.config.get('FS_MEDIA_STORAGE_PATH'), storage_id)
-            if os.path.exists(file_path):
-                os.remove(file_path)
-            logger.info('Deleted media file %s from storage' % storage_id)
-            return True
-        except Exception as ex:
-            logger.error('Cannot delete file %s ex: %s' % (storage_id, ex))
-            return False
+
+        file_path = os.path.join(app.config.get('FS_MEDIA_STORAGE_PATH'), storage_id)
+        dir_path = os.path.dirname(file_path)
+        if os.path.isdir(dir_path):
+            shutil.rmtree(dir_path)
+
+        logger.info(f"Removed '{dir_path}' from fs storage")
