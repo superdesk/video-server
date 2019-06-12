@@ -17,7 +17,6 @@ from lib.utils import (
 )
 from lib.video_editor import get_video_editor
 from lib.views import MethodView
-from lib.enums import ActivityActions
 
 from .tasks import task_edit_video, task_get_list_thumbnails
 from . import bp
@@ -177,7 +176,7 @@ class ListUploadProject(MethodView):
             app.mongo.db.projects.delete_one({'_id': project['_id']})
             raise InternalServerError(str(e))
 
-        save_activity_log(ActivityActions.UPLOAD, project['_id'])
+        save_activity_log('upload', project['_id'])
 
         return json_response(project, status=201)
 
@@ -721,19 +720,19 @@ class RetrieveEditDestroyProject(MethodView):
         """
 
         # remove file from storage
-        if app.fs.delete(self._project['storage_id']):
-            # Delete thumbnails
-            for thumbnail in next(iter(self._project['thumbnails'].values()), []):
-                app.fs.delete(thumbnail['storage_id'])
-            preview_thumbnail = self._project['preview_thumbnail']
-            if preview_thumbnail:
-                app.fs.delete(preview_thumbnail['storage_id'])
+        app.fs.delete(self._project['storage_id'])
 
-            save_activity_log("DELETE PROJECT", self._project['_id'], None)
-            app.mongo.db.projects.delete_one({'_id': ObjectId(project_id)})
-            return json_response(status=204)
-        else:
-            raise InternalServerError()
+        # # Delete thumbnails
+        # for thumbnail in next(iter(self._project['thumbnails'].values()), []):
+        #     app.fs.delete(thumbnail['storage_id'])
+        # preview_thumbnail = self._project['preview_thumbnail']
+        # if preview_thumbnail:
+        #     app.fs.delete(preview_thumbnail['storage_id'])
+
+        save_activity_log("DELETE PROJECT", self._project['_id'])
+        app.mongo.db.projects.delete_one({'_id': self._project['_id']})
+
+        return json_response(status=204)
 
 
 class RetrieveOrCreateThumbnails(MethodView):
