@@ -139,13 +139,18 @@ class ListUploadProject(MethodView):
             'metadata': metadata,
             'create_time': datetime.utcnow(),
             'mime_type': document['file'].mimetype,
-            'version': 1,
-            'processing': False,
-            'parent': None,
-            'thumbnails': {},
             'request_address': get_request_address(request.headers.environ),
             'original_filename': document['file'].filename,
-            'preview_thumbnail': None
+            'version': 1,
+            'parent': None,
+            'processing': {
+                'video': False,
+                'thumbnails': False
+            },
+            'thumbnails': {
+                'timeline': [],
+                'preview': None
+            },
         }
         app.mongo.db.projects.insert_one(project)
 
@@ -1039,12 +1044,12 @@ class GetRawVideo(MethodView):
             schema:
               type: file
         """
-        project_id, _ = os.path.splitext(project_id)
-        # video is processing
-        if not self._project['metadata']:
-            return json_response({'processing': self._project['processing']}, status=202)
 
-        # get strem file for video
+        # video is processing
+        if self._project['processing']['video']:
+            return json_response({'processing': True}, status=202)
+
+        # get stream file for video
         video_range = request.headers.environ.get('HTTP_RANGE')
         length = self._project['metadata'].get('size')
         if video_range:
