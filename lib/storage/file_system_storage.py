@@ -15,15 +15,17 @@ class FileSystemStorage(MediaStorageInterface):
     def get(self, storage_id):
         """
         Get stream file
-        :param storage_id: full file path
+        :param storage_id: storage id
         :return:
         """
+        file_path = os.path.join(app.config.get('FS_MEDIA_STORAGE_PATH'), storage_id)
         try:
-            file_path = os.path.join(app.config.get('FS_MEDIA_STORAGE_PATH'), storage_id)
-            media_file = (open(file_path, 'rb')).read()
-        except Exception as ex:
-            logger.error('Cannot get data file %s ex: %s' % (storage_id, ex))
-            media_file = None
+            with open(file_path, 'rb') as rb:
+                media_file = rb.read()
+        except Exception as e:
+            logger.error(f'FileSystemStorage:get: {e}')
+            raise e
+
         return media_file
 
     def get_range(self, storage_id, start, length):
