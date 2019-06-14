@@ -6,9 +6,10 @@ from flask import current_app as app
 from pymongo import ReturnDocument
 
 from celery.exceptions import MaxRetriesExceededError
-from lib.celery_app import celery
-from lib.utils import get_url_for_media
+from lib.utils import get_url_for_media, create_temp_file
 from lib.video_editor import get_video_editor
+
+from celery_app import celery
 
 logger = logging.getLogger(__name__)
 
@@ -84,58 +85,104 @@ def task_edit_video(self, sdoc, updates, action='post'):
 
 
 @celery.task(bind=True, default_retry_delay=10)
-def task_get_list_thumbnails(self, sdoc, amount):
-    update_thumbnails = []
-    try:
-        doc = json_util.loads(sdoc)
+def generate_timeline_thumbnails(self, project_json, amount):
+    project = json_util.loads(project_json)
+    timeline_thumbnails = []
+    video_editor = get_video_editor()
 
-        # get full path file of video
-        filename, ext = os.path.splitext(doc['filename'])
-        stream_file = app.fs.get(doc['storage_id'])
-        video_editor = get_video_editor()
-        count = 0
-        for thumbnail_stream, \
-            thumbnail_meta in video_editor.capture_list_timeline_thumbnails(stream_file,
-                                                                            filename,
-                                                                            doc.get('metadata'),
-                                                                            int(amount)):
-            thumbnail_filename = '%s_timeline_%02d.png' % (filename, count)
-            storage_id = app.fs.put(
-                thumbnail_stream, thumbnail_filename, None,
-                asset_type='thumbnails', storage_id=doc['storage_id'], content_type='image/png')
-            update_thumbnails.append(
-                {
-                    'filename': '%s_timeline_%02d.png' % (filename, count),
-                    'storage_id': storage_id,
-                    'mimetype': 'image/png',
-                    'width': thumbnail_meta.get('width'),
-                    'height': thumbnail_meta.get('height'),
-                    'size': thumbnail_meta.get('size'),
-                    'url': get_url_for_media(doc.get('_id'), 'thumbnail') + f'?index={count}'
-                }
-            )
-            count += 1
-        # Update data status is True and data video when getting thumbnails was finished.
-        app.mongo.db.projects.update_one(
-            {'_id': ObjectId(doc.get('_id'))},
-            {"$set": {
-                'thumbnails': {
-                    str(amount): update_thumbnails
-                },
-                'processing': False,
-            }},
-            upsert=False)
-    except Exception as exc:
-        logger.exception(exc)
-        if update_thumbnails:
-            for thumbnail in update_thumbnails:
-                app.fs.delete(thumbnail.get('storage_id'))
-        try:
-            raise self.retry(max_retries=app.config.get('NUMBER_RETRY', 3))
-        except MaxRetriesExceededError:
-            app.mongo.db.projects.update_one(
-                {'_id': ObjectId(doc.get('_id'))},
-                {"$set": {
-                    'processing': False,
-                }},
-                upsert=False)
+    video_editor.capture_timeline_thumbnails(
+        stream_file=app.fs.get(project['storage_id']),
+        filename=project['filename'],
+        duration=float(project['metadata']['duration']),
+        thumbnails_amount=amount
+    )
+
+
+
+    # count = 0
+    # for thumbnail_stream, thumbnail_meta in video_editor.capture_list_timeline_thumbnails(stream_file,
+    #                                                                     filename,
+    #                                                                     project.get('metadata'),
+    #                                                                     int(amount)):
+    #     thumbnail_filename = '%s_timeline_%02d.png' % (filename, count)
+    #     storage_id = app.fs.put(
+    #         thumbnail_stream, thumbnail_filename, None,
+    #         asset_type='thumbnails', storage_id=project['storage_id'], content_type='image/png')
+    #     timeline_thumbnails.append(
+    #         {
+    #             'filename': '%s_timeline_%02d.png' % (filename, count),
+    #             'storage_id': storage_id,
+    #             'mimetype': 'image/png',
+    #             'width': thumbnail_meta.get('width'),
+    #             'height': thumbnail_meta.get('height'),
+    #             'size': thumbnail_meta.get('size'),
+    #             'url': get_url_for_media(project.get('_id'), 'thumbnail') + f'?index={count}'
+    #         }
+    #     )
+    #     count += 1
+    # # Update data status is True and data video when getting thumbnails was finished.
+    # app.mongo.db.projects.update_one(
+    #     {'_id': ObjectId(project.get('_id'))},
+    #     {"$set": {
+    #         'thumbnails': {
+    #             str(amount): timeline_thumbnails
+    #         },
+    #         'processing': False,
+    #     }},
+    #     upsert=False)
+
+
+
+    # try:
+    #     project = json_util.loads(project_json)
+    #
+    #     # get full path file of video
+    #     filename, ext = os.path.splitext(project['filename'])
+    #     stream_file = app.fs.get(project['storage_id'])
+    #     video_editor = get_video_editor()
+    #     count = 0
+    #     for thumbnail_stream, \
+    #         thumbnail_meta in video_editor.capture_list_timeline_thumbnails(stream_file,
+    #                                                                         filename,
+    #                                                                         project.get('metadata'),
+    #                                                                         int(amount)):
+    #         thumbnail_filename = '%s_timeline_%02d.png' % (filename, count)
+    #         storage_id = app.fs.put(
+    #             thumbnail_stream, thumbnail_filename, None,
+    #             asset_type='thumbnails', storage_id=project['storage_id'], content_type='image/png')
+    #         update_thumbnails.append(
+    #             {
+    #                 'filename': '%s_timeline_%02d.png' % (filename, count),
+    #                 'storage_id': storage_id,
+    #                 'mimetype': 'image/png',
+    #                 'width': thumbnail_meta.get('width'),
+    #                 'height': thumbnail_meta.get('height'),
+    #                 'size': thumbnail_meta.get('size'),
+    #                 'url': get_url_for_media(project.get('_id'), 'thumbnail') + f'?index={count}'
+    #             }
+    #         )
+    #         count += 1
+    #     # Update data status is True and data video when getting thumbnails was finished.
+    #     app.mongo.db.projects.update_one(
+    #         {'_id': ObjectId(project.get('_id'))},
+    #         {"$set": {
+    #             'thumbnails': {
+    #                 str(amount): update_thumbnails
+    #             },
+    #             'processing': False,
+    #         }},
+    #         upsert=False)
+    # except Exception as exc:
+    #     logger.exception(exc)
+    #     # if update_thumbnails:
+    #     #     for thumbnail in update_thumbnails:
+    #     #         app.fs.delete(thumbnail.get('storage_id'))
+    #     # try:
+    #     #     raise self.retry(max_retries=app.config.get('NUMBER_RETRY', 3))
+    #     # except MaxRetriesExceededError:
+    #     #     app.mongo.db.projects.update_one(
+    #     #         {'_id': ObjectId(project.get('_id'))},
+    #     #         {"$set": {
+    #     #             'processing': False,
+    #     #         }},
+    #     #         upsert=False)

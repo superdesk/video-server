@@ -1,6 +1,6 @@
 # -*- coding: utf-8; -*-
 #
-# This file is part of Superdesk.
+# This file is part of Superdesk Video Server.
 #
 # Copyright 2013, 2014, 2015 Sourcefabric z.u. and contributors.
 #
@@ -15,9 +15,6 @@ handlers:
     class: logging.StreamHandler
     stream  : ext://sys.stdout
 loggers:
-  video-server.ws:
-    handlers: [console]
-    level: DEBUG
   worker:
     handlers: [console]
     level: WARN

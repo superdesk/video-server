@@ -1,6 +1,6 @@
 # -*- coding: utf-8; -*-
 #
-# This file is part of Superdesk.
+# This file is part of Superdesk Video Server.
 #
 # Copyright 2015 Sourcefabric z.u. and contributors.
 #

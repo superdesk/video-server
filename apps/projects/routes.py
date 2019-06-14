@@ -18,7 +18,7 @@ from lib.utils import (
 from lib.video_editor import get_video_editor
 from lib.views import MethodView
 
-from .tasks import task_edit_video, task_get_list_thumbnails
+from .tasks import task_edit_video, generate_timeline_thumbnails
 from . import bp
 
 logger = logging.getLogger(__name__)
@@ -145,7 +145,8 @@ class ListUploadProject(MethodView):
             'parent': None,
             'processing': {
                 'video': False,
-                'thumbnails': False
+                'thumbnail_preview': False,
+                'thumbnails_timeline': False
             },
             'thumbnails': {
                 'timeline': [],
@@ -751,7 +752,8 @@ class RetrieveOrCreateThumbnails(MethodView):
                     'dependencies': ['amount'],
                     'excludes': 'time',
                 },
-                {  # make amount optional
+                {
+                    # make `amount` optional
                     'allowed': ['timeline'],
                     'excludes': 'time',
                 },
@@ -819,12 +821,11 @@ class RetrieveOrCreateThumbnails(MethodView):
         document = validate_document(request.args.to_dict(), self.SCHEMA_THUMBNAILS)
 
         if document['type'] == 'timeline':
-            return self._get_timeline_thumbnail(
-                self._project,
-                document.get('amount', app.config.get('DEFAULT_TOTAL_TIMELINE_THUMBNAILS'))
+            return self._get_timeline_thumbnails(
+                amount=document.get('amount', app.config.get('DEFAULT_TOTAL_TIMELINE_THUMBNAILS'))
             )
-        else:
-            return self._capture_thumbnail(self._project, document['time'])
+
+        return self._get_preview_thumbnail(self._project, document['time'])
 
     def post(self, project_id):
         """
@@ -965,34 +966,50 @@ class RetrieveOrCreateThumbnails(MethodView):
         thumbnail_metadata = video_editor.get_meta(thumbnail_stream, 'png')
         return self._save_thumbnail(self._project, thumbnail_stream, thumbnail_metadata)
 
-    def _get_timeline_thumbnail(self, doc, amount):
-        # Only get thumbnails when list thumbnail have not created yet (empty) and video is not processed any task
-        data = doc.get('thumbnails')
-        if (not data or not data.get(str(amount))) \
-                and doc.get('processing') is False:
+    def _get_timeline_thumbnails(self, amount):
+        """
+        Get list or create thumbnails for timeline
+        :param amount: amount of thumbnails
+        :return: json response
+        """
+        thumbnails_list = self._project['thumbnails']['timeline']
+        processing = self._project['processing']['thumbnails_timeline']
 
-            # Delete all old thumbnails
+        generate_timeline_thumbnails.delay(
+            json_util.dumps(self._project),
+            amount
+        )
+        return json_response({"processing": True}, status=202)
 
-            for thumbnail in next(iter(doc['thumbnails'].values()), []):
-                app.fs.delete(thumbnail['storage_id'])
+        # # resource is busy
+        # if processing:
+        #     return json_response({"processing": True}, status=202)
+        # # no need to generate thumbnails
+        # elif amount == len(thumbnails_list):
+        #     return json_response({"thumbnails": thumbnails_list})
+        # else:
+        #     # set processing flag
+        #     self._project = app.mongo.db.projects.find_one_and_update(
+        #         {'_id': self._project['_id']},
+        #         {'$set': {'processing.thumbnails_timeline': True}},
+        #         return_document=ReturnDocument.AFTER
+        #     )
+        #     logger.error('THIS IS ERROR IN ROUTES')
+        #     logger.warning('THIS IS WARNING IN ROUTES')
+        #     logger.info('THIS IS INFO IN ROUTES')
+        #     # run task
+        #     generate_timeline_thumbnails.delay(
+        #         json_util.dumps(self._project),
+        #         amount
+        #     )
+        #
+        #     # # Delete all old thumbnails
+        #     # for thumbnail in next(iter(doc['thumbnails'].values()), []):
+        #     #     app.fs.delete(thumbnail['storage_id'])
+        #
+        #     return json_response({"processing": True}, status=202)
 
-            # Update processing is True when begin edit video
-            doc = app.mongo.db.projects.find_one_and_update(
-                {'_id': doc['_id']},
-                {'$set': {
-                    'processing': True,
-                    'thumbnails': {}
-                }},
-                return_document=ReturnDocument.AFTER
-            )
-            # Run get list thumbnails of timeline for video in celery
-            task_get_list_thumbnails.delay(json_util.dumps(doc), amount)
-        return json_response({
-            "processing": doc.get('processing'),
-            "thumbnails": doc['thumbnails'],
-        })
-
-    def _capture_thumbnail(self, doc, time):
+    def _get_preview_thumbnail(self, doc, time):
         video_editor = get_video_editor()
         video_stream = app.fs.get(doc['storage_id'])
 

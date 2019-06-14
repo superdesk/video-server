@@ -1,6 +1,8 @@
 import json
 import uuid
 from datetime import datetime
+import tempfile
+import logging
 
 import bson
 from flask import Response
@@ -8,6 +10,8 @@ from flask import current_app as app
 from werkzeug.exceptions import BadRequest
 
 from lib.validator import Validator
+
+logger = logging.getLogger(__name__)
 
 
 def create_file_name(ext):
@@ -94,3 +98,21 @@ def validate_document(document, schema, **kwargs):
 
 def get_request_address(request_headers):
     return request_headers.get('HTTP_X_FORWARDED_FOR') or request_headers.get('REMOTE_ADDR')
+
+
+def create_temp_file(file_stream, file_name):
+    """
+    Saves `file_stream` into /tmp directory
+    :param file_stream: bytes file stream to save
+    :param file_name: file name used to save `file_stream`
+    :return: file path
+    """
+
+    tmp_path = f"{tempfile.gettempdir()}/tmp_video_server_{file_name}"
+    try:
+        with open(tmp_path, "wb") as f:
+            f.write(file_stream)
+    except Exception as e:
+        logger.error(f'Can not save file stream to tmp directory: {e}')
+
+    return tmp_path

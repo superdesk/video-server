@@ -1,10 +1,9 @@
 import json
 import os
 import subprocess
-import tempfile
 import logging
 
-from lib.utils import create_file_name
+from lib.utils import create_file_name, create_temp_file
 
 from .interface import VideoEditorInterface
 
@@ -23,7 +22,7 @@ class FFMPEGVideoEditor(VideoEditorInterface):
         :return:
         """
         file_name = create_file_name(extension)
-        file_temp_path = self._create_temp_file(filestream, file_name)
+        file_temp_path = create_temp_file(filestream, file_name)
         try:
             metadata = self._get_meta(file_temp_path)
         finally:
@@ -46,7 +45,7 @@ class FFMPEGVideoEditor(VideoEditorInterface):
         """
         path_video = ''
         try:
-            path_video = self._create_temp_file(stream_file, filename)
+            path_video = create_temp_file(stream_file, filename)
 
             if not metadata:
                 metadata = self._get_meta(path_video)
@@ -116,7 +115,7 @@ class FFMPEGVideoEditor(VideoEditorInterface):
         """
         path_video = ''
         try:
-            path_video = self._create_temp_file(stream_file, filename)
+            path_video = create_temp_file(stream_file, filename)
             duration = float(metadata['duration'])
             path_output = path_video + "_thumbnail.png"
             # avoid the end frame, is null
@@ -131,30 +130,32 @@ class FFMPEGVideoEditor(VideoEditorInterface):
                 os.remove(path_output)
         return content, thumbnail_metadata
 
-    def capture_list_timeline_thumbnails(self, stream_file, filename, metadata, number_frames):
+    def capture_timeline_thumbnails(self, stream_file, filename, duration, thumbnails_amount):
         """
         Capture a list frames in all play time of video.
         :param stream_file: binary file stream
         :param filename: name of edit video, not path
-        :param metadata:  a dictionary, contain metadata edited video
-        :param number_frames: total number frames capture
+        :param duration: video duration metadata
+        :param thumbnails_amount: total number of thumbnails to capture
         :return:
         """
-        path_video = ''
+
+        path_video = create_temp_file(stream_file, filename)
+
+
         try:
-            path_video = self._create_temp_file(stream_file, filename)
-            duration = float(metadata['duration'])
+
             # period time between two frames
 
-            if number_frames == 1:
+            if thumbnails_amount == 1:
                 frame_per_second = (duration - 1)
             else:
-                frame_per_second = (duration - 1) / (number_frames - 1)
+                frame_per_second = (duration - 1) / (thumbnails_amount - 1)
 
             # capture list frame via script capture_list_frames.sh
             path_script = os.path.dirname(__file__) + '/script/capture_list_frames.sh'
-            subprocess.run([path_script, path_video, path_video + "_", str(frame_per_second), str(number_frames)])
-            for i in range(0, number_frames):
+            subprocess.run([path_script, path_video, path_video + "_", str(frame_per_second), str(thumbnails_amount)])
+            for i in range(0, thumbnails_amount):
                 path_output = path_video + '_%0d.bmp' % i
                 try:
                     thumbnail_metadata = self._get_meta(path_output)
@@ -168,7 +169,7 @@ class FFMPEGVideoEditor(VideoEditorInterface):
 
     def _capture_thumbnail(self, path_video, path_output, time_capture=0):
         """
-            Use ffmpeg to capture video at a time.
+        Use ffmpeg to capture video at a time.
         :param path_video:
         :param path_output:
         :param time_capture:
@@ -241,20 +242,3 @@ class FFMPEGVideoEditor(VideoEditorInterface):
                 metadata[value] = format_type[value](metadata[value])
 
         return metadata
-
-    def _create_temp_file(self, file_stream, file_name):
-        """
-        Saves `file_stream` into /tmp directory
-        :param file_stream: bytes file stream to save
-        :param file_name: file name used to save `file_stream`
-        :return: file path
-        """
-
-        tmp_path = f"{tempfile.gettempdir()}/tmp_{file_name}"
-        try:
-            with open(tmp_path, "wb") as f:
-                f.write(file_stream)
-        except Exception as e:
-            logger.error(f'Can not save file stream to tmp directory: {e}')
-
-        return tmp_path
