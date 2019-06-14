@@ -12,15 +12,18 @@ logger = logging.getLogger(__name__)
 
 class FileSystemStorage(MediaStorageInterface):
 
+    @staticmethod
+    def _get_file_path(storage_id):
+        return os.path.join(app.config.get('FS_MEDIA_STORAGE_PATH'), storage_id)
+
     def get(self, storage_id):
         """
         Get stream file
         :param storage_id: storage id
         :return:
         """
-        file_path = os.path.join(app.config.get('FS_MEDIA_STORAGE_PATH'), storage_id)
         try:
-            with open(file_path, 'rb') as rb:
+            with open(self._get_file_path(storage_id), 'rb') as rb:
                 media_file = rb.read()
         except Exception as e:
             logger.error(f'FileSystemStorage:get: {e}')
@@ -37,13 +40,13 @@ class FileSystemStorage(MediaStorageInterface):
         :return:
         """
         try:
-            file_path = os.path.join(app.config.get('FS_MEDIA_STORAGE_PATH'), storage_id)
-            file = (open(file_path, 'rb'))
-            file.seek(start)
-            media_file = file.read(length)
-        except Exception as ex:
-            logger.error('Cannot get data file %s ex: %s' % (storage_id, ex))
-            media_file = None
+            with open(self._get_file_path(storage_id), 'rb') as rb:
+                rb.seek(start)
+                media_file = rb.read(length)
+        except Exception as e:
+            logger.error(f'FileSystemStorage:get_range: {e}')
+            raise e
+
         return media_file
 
     def put(self, content, filename, project_id=None, asset_type='project', storage_id=None, content_type=None):
@@ -78,7 +81,7 @@ class FileSystemStorage(MediaStorageInterface):
             # generate storage_id
             storage_id = f'{os.path.dirname(storage_id)}/{asset_type}/{filename}'
 
-        file_path = os.path.join(app.config.get('FS_MEDIA_STORAGE_PATH'), storage_id)
+        file_path = self._get_file_path(storage_id)
         # check if dir exists, if not create it
         file_dir = os.path.dirname(file_path)
         if not os.path.exists(file_dir):
@@ -103,8 +106,7 @@ class FileSystemStorage(MediaStorageInterface):
         :return:
         """
         try:
-            # generate storage_id
-            file_path = os.path.join(app.config.get('FS_MEDIA_STORAGE_PATH'), storage_id)
+            file_path = self._get_file_path(storage_id)
             # check if dir exists, if not create it
             file_dir = os.path.dirname(file_path)
             if not os.path.exists(file_dir):
@@ -124,8 +126,7 @@ class FileSystemStorage(MediaStorageInterface):
         :param storage_id: storage_id of file
         """
 
-        file_path = os.path.join(app.config.get('FS_MEDIA_STORAGE_PATH'), storage_id)
-        dir_path = os.path.dirname(file_path)
+        dir_path = os.path.dirname(self._get_file_path(storage_id))
 
         if os.path.isdir(dir_path):
             shutil.rmtree(dir_path)

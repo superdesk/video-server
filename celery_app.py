@@ -1,13 +1,20 @@
 from celery import Celery
-from lib.logging import logger
 from werkzeug.exceptions import InternalServerError
+
+from lib.logging import logger
 
 celery = Celery(__name__)
 TaskBase = celery.Task
 
 
 def init_celery(app):
+
     class ContextTask(TaskBase):
+        """
+        Enhance `celery.Task` by wrapping the task execution in a flask application context.
+        """
+
+        # https://docs.celeryproject.org/en/latest/reference/celery.app.task.html#celery.app.task.Task.abstract
         abstract = True
 
         def __call__(self, *args, **kwargs):
@@ -20,6 +27,7 @@ def init_celery(app):
         def on_failure(self, exc, task_id, args, kwargs, einfo):
             with app.app_context():
                 handle_exception(exc)
+
     celery.Task = ContextTask
     celery.config_from_object(app.config, namespace='CELERY')
     app.init_db()
