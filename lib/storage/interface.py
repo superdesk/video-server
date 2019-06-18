@@ -22,3 +22,7 @@ class MediaStorageInterface(metaclass=abc.ABCMeta):
     @abc.abstractmethod
     def delete(self, storage_id):
         pass
+
+    @abc.abstractmethod
+    def delete_dir(self, storage_id):
+        pass

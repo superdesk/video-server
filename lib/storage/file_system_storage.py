@@ -53,8 +53,9 @@ class FileSystemStorage(MediaStorageInterface):
         """
         Save file into a fs storage.
 
-        Use <year>/<month>/<day>/<project-id>/<filename> path if `asset_type` is 'project'.
-        Use <year>/<month>/<day>/<project-id>/<asset_type>/<filename> if `asset_type` is not 'project'
+        Use <year>/<month>/<day>/<project-id>/<filename> path if `asset_type` is 'project', `project_id` is required.
+        Use <year>/<month>/<day>/<project-id>/<asset_type>/<filename> if `asset_type` is not 'project', `storage_id`
+        is required.
 
         Example:
          - video file: 2019/6/11/5cff82a6fe985e1e3bddb326/3ada91761c6048bdb3dd42a2463d5df8.mp4
@@ -64,7 +65,7 @@ class FileSystemStorage(MediaStorageInterface):
         :param filename: name of file to save to storage
         :param project_id: project id
         :param asset_type: the folder to store asset under project_id if asset_type is not project
-        :param storage_id: storage_id of video
+        :param storage_id: storage_id of file
         :param content_type: content type of file
         :return: storage_id
         """
@@ -126,10 +127,24 @@ class FileSystemStorage(MediaStorageInterface):
         :param storage_id: storage_id of file
         """
 
+        file_path = self._get_file_path(storage_id)
+
+        if os.path.exists(file_path):
+            os.remove(file_path)
+            logger.info(f"Removed '{file_path}' from fs storage")
+        else:
+            logger.warning(f"File '{file_path}' was not found in fs storage.")
+
+    def delete_dir(self, storage_id):
+        """
+        Delete an entire folder where `storage_id` is located
+        :param storage_id: storage_id of file
+        """
+
         dir_path = os.path.dirname(self._get_file_path(storage_id))
 
         if os.path.isdir(dir_path):
             shutil.rmtree(dir_path)
             logger.info(f"Removed '{dir_path}' from fs storage")
-
-        logger.warning(f"Directory '{dir_path}' was not found in fs storage.")
+        else:
+            logger.warning(f"Directory '{dir_path}' was not found in fs storage.")

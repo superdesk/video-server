@@ -132,7 +132,7 @@ class FFMPEGVideoEditor(VideoEditorInterface):
 
     def capture_timeline_thumbnails(self, stream_file, filename, duration, thumbnails_amount):
         """
-        Capture a list frames in all play time of video.
+        Capture thumbnails for timeline.
         :param stream_file: binary file stream
         :param filename: name of edit video, not path
         :param duration: video duration metadata
@@ -141,12 +141,8 @@ class FFMPEGVideoEditor(VideoEditorInterface):
         """
 
         path_video = create_temp_file(stream_file, filename)
-
-
         try:
-
-            # period time between two frames
-
+            # time period between two frames
             if thumbnails_amount == 1:
                 frame_per_second = (duration - 1)
             else:
@@ -154,15 +150,16 @@ class FFMPEGVideoEditor(VideoEditorInterface):
 
             # capture list frame via script capture_list_frames.sh
             path_script = os.path.dirname(__file__) + '/script/capture_list_frames.sh'
-            subprocess.run([path_script, path_video, path_video + "_", str(frame_per_second), str(thumbnails_amount)])
+            output_file = f"{path_video}_"
+            subprocess.run([path_script, path_video, output_file, str(frame_per_second), str(thumbnails_amount)])
             for i in range(0, thumbnails_amount):
-                path_output = path_video + '_%0d.bmp' % i
+                thumbnail_path =  f'{output_file}{i}.bmp'
                 try:
-                    thumbnail_metadata = self._get_meta(path_output)
+                    thumbnail_metadata = self._get_meta(thumbnail_path)
                     thumbnail_metadata['mimetype'] = 'image/bmp',
-                    yield open(path_output, "rb+").read(), thumbnail_metadata
+                    yield open(thumbnail_path, "rb+").read(), thumbnail_metadata
                 finally:
-                    os.remove(path_output)
+                    os.remove(thumbnail_path)
         finally:
             if path_video:
                 os.remove(path_video)
