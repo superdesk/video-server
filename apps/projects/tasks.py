@@ -93,7 +93,7 @@ def generate_timeline_thumbnails(self, project_json, amount):
         thumbnails_generator = video_editor.capture_timeline_thumbnails(
             stream_file=app.fs.get(project['storage_id']),
             filename=project['filename'],
-            duration=float(project['metadata']['duration']),
+            duration=project['metadata']['duration'],
             thumbnails_amount=amount)
 
         for count, (stream, meta) in enumerate(thumbnails_generator, 1):
@@ -124,7 +124,7 @@ def generate_timeline_thumbnails(self, project_json, amount):
         # delete just saved files
         for thumbnail in timeline_thumbnails:
             app.fs.delete(thumbnail.get('storage_id'))
-        logger.info(f"Due to exception {len(timeline_thumbnails)} just created thumbnails were removed from "
+        logger.info(f"Due to exception, {len(timeline_thumbnails)} just created thumbnails were removed from "
                     f"{app.fs.__class__.__name__} in project {project.get('_id')}")
         logger.exception(e)
 
@@ -155,4 +155,75 @@ def generate_timeline_thumbnails(self, project_json, amount):
             }},
             upsert=False
         )
-        logger.info(f"Replaced thumbnails in db in project {project.get('_id')}.")
+        logger.info(f"Set timeline thumbnails in db for project {project.get('_id')}.")
+
+
+@celery.task(bind=True, default_retry_delay=10)
+def generate_preview_thumbnail(self, project_json, position):
+    project = json_util.loads(project_json)
+    video_editor = get_video_editor()
+    preview_thumbnail = None
+
+    try:
+        stream, meta = video_editor.capture_thumbnail(
+            stream_file=app.fs.get(project['storage_id']),
+            filename=project['filename'],
+            duration=project['metadata']['duration'],
+            position=position
+        )
+        filename = f"{project['filename'].rsplit('.', 1)[0]}_preview-{position}.png"
+        # save to storage
+        storage_id = app.fs.put(
+            content=stream,
+            filename=filename,
+            project_id=None,
+            asset_type='thumbnails',
+            storage_id=project['storage_id'],
+            content_type='image/png'
+        )
+        logger.info(f"Created and saved preview thumbnail at position {position} to {app.fs.__class__.__name__} "
+                    f"in project {project.get('_id')}.")
+        preview_thumbnail = {
+            'filename': filename,
+            'storage_id': storage_id,
+            'mimetype': meta.get('mimetype')[0],
+            'width': meta.get('width'),
+            'height': meta.get('height'),
+            'size': meta.get('size'),
+            'position': position
+        }
+    except Exception as e:
+        # delete just saved file
+        if preview_thumbnail:
+            app.fs.delete(preview_thumbnail.get('storage_id'))
+            logger.info(f"Due to exception, just created preview thumbnail at position {position} was removed from "
+                        f"{app.fs.__class__.__name__} in project {project.get('_id')}")
+        logger.exception(e)
+
+        try:
+            raise self.retry(max_retries=app.config.get('MAX_RETRIES', 3))
+        except MaxRetriesExceededError:
+            app.mongo.db.projects.update_one(
+                {'_id': ObjectId(project.get('_id'))},
+                {"$set": {
+                    'processing.thumbnail_preview': False,
+                }},
+                upsert=False
+            )
+
+    else:
+        # remove an old preview thumbnail from a storage only after a new thumbnail was created succesfully
+        if project['thumbnails']['preview']:
+            app.fs.delete(project['thumbnails']['preview'].get('storage_id'))
+            logger.info(f"Removed old preview thumbnail at position {project['thumbnails']['preview']['position']} "
+                        f"from {app.fs.__class__.__name__} in project {project.get('_id')}")
+        # set preview thumbnail in db
+        app.mongo.db.projects.update_one(
+            {'_id': ObjectId(project.get('_id'))},
+            {"$set": {
+                'thumbnails.preview': preview_thumbnail,
+                'processing.thumbnail_preview': False,
+            }},
+            upsert=False
+        )
+        logger.info(f"Set preview thumbnail in db for project {project.get('_id')}.")

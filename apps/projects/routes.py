@@ -4,7 +4,7 @@ import os
 import re
 from datetime import datetime
 
-from bson import json_util, ObjectId
+from bson import json_util
 from flask import request, make_response
 from flask import current_app as app
 from pymongo import ReturnDocument
@@ -18,7 +18,7 @@ from lib.utils import (
 from lib.video_editor import get_video_editor
 from lib.views import MethodView
 
-from .tasks import task_edit_video, generate_timeline_thumbnails
+from .tasks import task_edit_video, generate_timeline_thumbnails, generate_preview_thumbnail
 from . import bp
 
 logger = logging.getLogger(__name__)
@@ -742,16 +742,16 @@ class RetrieveOrCreateThumbnails(MethodView):
                 {
                     'allowed': ['timeline'],
                     'dependencies': ['amount'],
-                    'excludes': 'time',
+                    'excludes': 'position',
                 },
                 {
                     # make `amount` optional
                     'allowed': ['timeline'],
-                    'excludes': 'time',
+                    'excludes': 'position',
                 },
                 {
                     'allowed': ['preview'],
-                    'dependencies': ['time'],
+                    'dependencies': ['position'],
                     'excludes': 'amount',
                 }
             ],
@@ -761,7 +761,7 @@ class RetrieveOrCreateThumbnails(MethodView):
             'coerce': int,
             'min': 1,
         },
-        'time': {
+        'position': {
             'type': 'float',
             'coerce': float,
         },
@@ -779,7 +779,7 @@ class RetrieveOrCreateThumbnails(MethodView):
         """
         Get or capture video thumbnails.
         Generate new thumbnails if it is empty or `amount` argument different from current total thumbnails.
-        Or capture thumbnail at `time`.
+        Or capture preview thumbnail at `position`.
         ---
         consumes:
         - application/json
@@ -793,10 +793,10 @@ class RetrieveOrCreateThumbnails(MethodView):
           in: query
           type: integer
           description: number thumbnails to create
-        - name: time
+        - name: position
           in: query
           type: float
-          description: time to capture preview thumbnail
+          description: position to capture preview thumbnail
         responses:
           200:
             description: OK
@@ -817,7 +817,7 @@ class RetrieveOrCreateThumbnails(MethodView):
                 amount=document.get('amount', app.config.get('DEFAULT_TOTAL_TIMELINE_THUMBNAILS'))
             )
 
-        return self._get_preview_thumbnail(self._project, document['time'])
+        return self._get_preview_thumbnail(document['position'])
 
     def post(self, project_id):
         """
@@ -964,15 +964,12 @@ class RetrieveOrCreateThumbnails(MethodView):
         :param amount: amount of thumbnails
         :return: json response
         """
-        thumbnails_list = self._project['thumbnails']['timeline']
-        processing = self._project['processing']['thumbnails_timeline']
-
         # resource is busy
-        if processing:
+        if self._project['processing']['thumbnails_timeline']:
             return json_response({"processing": True}, status=202)
         # no need to generate thumbnails
-        elif amount == len(thumbnails_list):
-            return json_response({"thumbnails": thumbnails_list})
+        elif amount == len(self._project['thumbnails']['timeline']):
+            return json_response({"thumbnails": self._project['thumbnails']['timeline']})
         else:
             # set processing flag
             self._project = app.mongo.db.projects.find_one_and_update(
@@ -987,14 +984,35 @@ class RetrieveOrCreateThumbnails(MethodView):
             )
             return json_response({"processing": True}, status=202)
 
-    def _get_preview_thumbnail(self, doc, time):
-        video_editor = get_video_editor()
-        video_stream = app.fs.get(doc['storage_id'])
-
-        thumbnail_stream, thumbnail_metadata = video_editor.capture_thumbnail(
-            video_stream, doc['filename'], doc['metadata'], time
-        )
-        return self._save_thumbnail(doc, thumbnail_stream, thumbnail_metadata)
+    def _get_preview_thumbnail(self, position):
+        """
+        Get or create thumbnail for preview
+        :param position: video position to capture a frame
+        :return: json response
+        """
+        # resource is busy
+        if self._project['processing']['thumbnail_preview']:
+            return json_response({"processing": True}, status=202)
+        elif (self._project['thumbnails']['preview'] and
+              self._project['thumbnails']['preview'].get('position') == position):
+            return json_response({"thumbnails": self._project['thumbnails']['preview']})
+        elif self._project['metadata']['duration'] < position:
+            return BadRequest(
+                f"Requested position:{position} is more than video's duration:{self._project['metadata']['duration']}."
+            )
+        else:
+            # set processing flag
+            self._project = app.mongo.db.projects.find_one_and_update(
+                {'_id': self._project['_id']},
+                {'$set': {'processing.thumbnail_preview': True}},
+                return_document=ReturnDocument.AFTER
+            )
+            # run task
+            generate_preview_thumbnail.delay(
+                json_util.dumps(self._project),
+                position
+            )
+            return json_response({"processing": True}, status=202)
 
     def _save_thumbnail(self, doc, stream, metadata):
         filename, ext = os.path.splitext(doc['filename'])

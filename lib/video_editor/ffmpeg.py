@@ -104,40 +104,48 @@ class FFMPEGVideoEditor(VideoEditorInterface):
                 os.remove(path_video)
         return content, metadata_edit_file
 
-    def capture_thumbnail(self, stream_file, filename, metadata, capture_time):
+    def capture_thumbnail(self, stream_file, filename, duration, position):
         """
-        Use ffmpeg tool to capture video at a time.
+        Use ffmpeg tool to capture video frame at a position.
         :param stream_file: binary file stream
-        :param filename: name of edit video, not path
-        :param metadata: a dictionary, contain metadata edited video
-        :param capture_time: type int, time for capture
-        :return: stream file and dictionary info of metadata of edit video
+        :param filename: video's file name
+        :param duration: video's duration
+        :param position: video position to capture a frame
+        :return: file stream, metadata
         """
-        path_video = ''
+
+        path_video = create_temp_file(stream_file, filename)
         try:
-            path_video = create_temp_file(stream_file, filename)
-            duration = float(metadata['duration'])
-            path_output = path_video + "_thumbnail.png"
-            # avoid the end frame, is null
-            if int(duration) <= int(capture_time):
-                capture_time = duration - 0.1
-            content = self._capture_thumbnail(path_video, path_output, capture_time)
-            thumbnail_metadata = self._get_meta(path_output)
+            # avoid the last frame, it is null
+            if int(duration) <= int(position):
+                position = duration - 0.1
+            # create output file path
+            output_file = f"{path_video}_preview_thumbnail.png"
+            # run ffmpeg command
+            subprocess.run(["ffmpeg", "-v", "error", "-y", "-accurate_seek", "-i", path_video,
+                            "-ss", str(position), "-vframes", "1", output_file])
+            try:
+                # get metadata
+                thumbnail_metadata = self._get_meta(output_file)
+                thumbnail_metadata['mimetype'] = 'image/bmp',
+                # read binary
+                with open(output_file, "rb") as f:
+                    content = f.read()
+                return content, thumbnail_metadata
+            finally:
+                # delete temp thumbnail file
+                os.remove(output_file)
         finally:
-            if path_video:
-                os.remove(path_video)
-            if path_output:
-                os.remove(path_output)
-        return content, thumbnail_metadata
+            os.remove(path_video)
 
     def capture_timeline_thumbnails(self, stream_file, filename, duration, thumbnails_amount):
         """
         Capture thumbnails for timeline.
         :param stream_file: binary file stream
-        :param filename: name of edit video, not path
-        :param duration: video duration metadata
+        :param filename: video's file name
+        :param duration: video's duration
         :param thumbnails_amount: total number of thumbnails to capture
-        :return:
+        :return: file stream, metadata generator
         """
 
         path_video = create_temp_file(stream_file, filename)
@@ -150,31 +158,25 @@ class FFMPEGVideoEditor(VideoEditorInterface):
 
             # capture list frame via script capture_list_frames.sh
             path_script = os.path.dirname(__file__) + '/script/capture_list_frames.sh'
+            # create output file path
             output_file = f"{path_video}_"
+            # subprocess bash -> ffmpeg in the loop
             subprocess.run([path_script, path_video, output_file, str(frame_per_second), str(thumbnails_amount)])
             for i in range(0, thumbnails_amount):
                 thumbnail_path =  f'{output_file}{i}.bmp'
                 try:
+                    # get metadata
                     thumbnail_metadata = self._get_meta(thumbnail_path)
                     thumbnail_metadata['mimetype'] = 'image/bmp',
-                    yield open(thumbnail_path, "rb+").read(), thumbnail_metadata
+                    # read binary
+                    with open(thumbnail_path, "rb") as f:
+                        content = f.read()
+                    yield content, thumbnail_metadata
                 finally:
+                    # delete temp thumbnail file
                     os.remove(thumbnail_path)
         finally:
-            if path_video:
-                os.remove(path_video)
-
-    def _capture_thumbnail(self, path_video, path_output, time_capture=0):
-        """
-        Use ffmpeg to capture video at a time.
-        :param path_video:
-        :param path_output:
-        :param time_capture:
-        :return:
-        """
-        subprocess.run(["ffmpeg", "-v", "error", "-y", "-accurate_seek", "-i", path_video,
-                 "-ss", str(time_capture), "-vframes", "1", path_output])
-        return open(path_output, "rb+").read()
+            os.remove(path_video)
 
     def _edit_video(self, path_video, path_output, para=[]):
         """
