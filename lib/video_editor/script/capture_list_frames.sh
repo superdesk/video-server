@@ -3,7 +3,7 @@
 ##Decription:
 $1: input file
 $2: output file
-$3: delta time every picture,
+$3: time delta between frames
 $4: total frames
 ########
 '
@@ -11,9 +11,9 @@ for i in `seq 0 $4`
 do
         if [ 1 -eq "$(echo "${i}*${3} < 1" | bc)" ]
         then
-                num = bc -l <<<"$3*$i"
-                ffmpeg -v error -y -accurate_seek -ss `echo 0$num | bc` -i $1 -filter:v scale="-1:50" -frames:v 1 $2$i.bmp
+                position=0
         else
-                ffmpeg -v error -y -accurate_seek -ss `echo $i*$3 | bc` -i $1 -filter:v scale="-1:50" -frames:v 1 $2$i.bmp
+                position=$(echo "$3*$i" | bc)
         fi
+        ffmpeg -v error -y -accurate_seek -ss $position -i $1 -filter:v scale="-1:50" -frames:v 1 $2$i.bmp
 done
