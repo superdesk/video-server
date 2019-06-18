@@ -176,8 +176,8 @@ class ListUploadProject(MethodView):
                 return_document=ReturnDocument.AFTER
             )
         except ServerSelectionTimeoutError as e:
-            # delete file
-            app.fs.delete(storage_id)
+            # delete project dir
+            app.fs.delete_dir(storage_id)
             # remove record from db
             app.mongo.db.projects.delete_one({'_id': project['_id']})
             raise InternalServerError(str(e))
@@ -725,16 +725,8 @@ class RetrieveEditDestroyProject(MethodView):
             description: NO CONTENT
         """
 
-        # remove file from storage
-        app.fs.delete(self._project['storage_id'])
-
-        # # Delete thumbnails
-        # for thumbnail in next(iter(self._project['thumbnails'].values()), []):
-        #     app.fs.delete(thumbnail['storage_id'])
-        # preview_thumbnail = self._project['preview_thumbnail']
-        # if preview_thumbnail:
-        #     app.fs.delete(preview_thumbnail['storage_id'])
-
+        # remove project dir from storage
+        app.fs.delete_dir(self._project['storage_id'])
         save_activity_log("DELETE PROJECT", self._project['_id'])
         app.mongo.db.projects.delete_one({'_id': self._project['_id']})
 
@@ -975,39 +967,25 @@ class RetrieveOrCreateThumbnails(MethodView):
         thumbnails_list = self._project['thumbnails']['timeline']
         processing = self._project['processing']['thumbnails_timeline']
 
-        generate_timeline_thumbnails.delay(
-            json_util.dumps(self._project),
-            amount
-        )
-        return json_response({"processing": True}, status=202)
-
-        # # resource is busy
-        # if processing:
-        #     return json_response({"processing": True}, status=202)
-        # # no need to generate thumbnails
-        # elif amount == len(thumbnails_list):
-        #     return json_response({"thumbnails": thumbnails_list})
-        # else:
-        #     # set processing flag
-        #     self._project = app.mongo.db.projects.find_one_and_update(
-        #         {'_id': self._project['_id']},
-        #         {'$set': {'processing.thumbnails_timeline': True}},
-        #         return_document=ReturnDocument.AFTER
-        #     )
-        #     logger.error('THIS IS ERROR IN ROUTES')
-        #     logger.warning('THIS IS WARNING IN ROUTES')
-        #     logger.info('THIS IS INFO IN ROUTES')
-        #     # run task
-        #     generate_timeline_thumbnails.delay(
-        #         json_util.dumps(self._project),
-        #         amount
-        #     )
-        #
-        #     # # Delete all old thumbnails
-        #     # for thumbnail in next(iter(doc['thumbnails'].values()), []):
-        #     #     app.fs.delete(thumbnail['storage_id'])
-        #
-        #     return json_response({"processing": True}, status=202)
+        # resource is busy
+        if processing:
+            return json_response({"processing": True}, status=202)
+        # no need to generate thumbnails
+        elif amount == len(thumbnails_list):
+            return json_response({"thumbnails": thumbnails_list})
+        else:
+            # set processing flag
+            self._project = app.mongo.db.projects.find_one_and_update(
+                {'_id': self._project['_id']},
+                {'$set': {'processing.thumbnails_timeline': True}},
+                return_document=ReturnDocument.AFTER
+            )
+            # run task
+            generate_timeline_thumbnails.delay(
+                json_util.dumps(self._project),
+                amount
+            )
+            return json_response({"processing": True}, status=202)
 
     def _get_preview_thumbnail(self, doc, time):
         video_editor = get_video_editor()

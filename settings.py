@@ -63,8 +63,8 @@ RABBIT_MQ_URL = env('RABBIT_MQ_URL', 'pyamqp://guest@localhost//')
 BROKER_URL = env('CELERY_BROKER_URL', RABBIT_MQ_URL)
 CELERY_BROKER_URL = BROKER_URL
 #: number retry when task fail
-NUMBER_RETRY = int(env('NUMBER_RETRY', 3))
-BROKER_CONNECTION_MAX_RETRIES = NUMBER_RETRY
+MAX_RETRIES = int(env('MAX_RETRIES', 3))
+BROKER_CONNECTION_MAX_RETRIES = MAX_RETRIES
 
 #: Codec support
 CODEC_SUPPORT = json.loads(env('CODEC_SUPPORT', '["vp8", "vp9", "h264", "theora", "av1"]'))
