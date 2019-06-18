@@ -1092,32 +1092,46 @@ class GetRawVideo(MethodView):
 
 
 class GetRawThumbnail(MethodView):
-    SCHEME_THUMBNAIL = {
+    SCHEMA_THUMBNAILS = {
+        'type': {
+            'type': 'string',
+            'required': True,
+            'anyof': [
+                {
+                    'allowed': ['timeline'],
+                    'dependencies': ['index']
+                },
+                {
+                    'allowed': ['preview'],
+                    'excludes': 'index'
+                }
+            ],
+        },
         'index': {
             'type': 'integer',
-            'required': False,
-            'empty': True,
             'coerce': int,
-            'min': 0,
-        },
+            'min': 0
+        }
     }
 
     def get(self, project_id):
         """
-        Get thumbnail
+        Get thumbnail file
         ---
         parameters:
-        - in: path
-          name: project_id
+        - name: project_id
+          in: path
           type: string
           required: True
           description: Unique project id
+        - name: type
+          in: query
+          type: string
+          description: 'timeline' or 'preview'
         - name: index
           in: query
-          type:
-          - integer
-          - string
-          description: index of thumbnail to get, leave empty to get preview thumbnail
+          type: integer
+          description: index of timeline thumbnail to read, used only when type=preview
         produces:
           - image/png
         responses:
@@ -1127,18 +1141,20 @@ class GetRawThumbnail(MethodView):
               type: file
         """
 
-        if not request.args:
-            preview_thumbnail = self._project.get('preview_thumbnail')
-            if not preview_thumbnail:
+        document = validate_document(request.args.to_dict(), self.SCHEMA_THUMBNAILS)
+
+        # preview
+        if document['type'] == 'preview':
+            if not self._project['thumbnails']['preview']:
                 raise NotFound()
-            byte = app.fs.get(preview_thumbnail.get('storage_id'))
+            byte = app.fs.get(self._project['thumbnails']['preview']['storage_id'])
+        # timeline
         else:
-            document = validate_document(request.args.to_dict(), self.SCHEME_THUMBNAIL, allow_unknown=True)
-            index = document['index']
-            thumbnails = next(iter(self._project['thumbnails'].values()), [])
-            if len(thumbnails) < index + 1:
+            try:
+                thumbnail = self._project['thumbnails']['timeline'][document['index']]
+            except IndexError:
                 raise NotFound()
-            byte = app.fs.get(thumbnails[index]['storage_id'])
+            byte = app.fs.get(thumbnail['storage_id'])
 
         res = make_response(byte)
         res.headers['Content-Type'] = 'image/png'
