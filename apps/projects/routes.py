@@ -129,7 +129,7 @@ class ListUploadProject(MethodView):
         # validate codec
         file_stream = document['file'].stream.read()
         metadata = get_video_editor().get_meta(file_stream)
-        if metadata.get('codec_name') not in app.config.get('CODEC_SUPPORT'):
+        if metadata.get('codec_name') not in app.config.get('CODEC_SUPPORT_VIDEO'):
             raise BadRequest(f"Codec: '{metadata.get('codec_name')}' is not supported.")
 
         # add record to database
@@ -770,10 +770,9 @@ class RetrieveOrCreateThumbnails(MethodView):
     }
 
     SCHEMA_UPLOAD = {
-        'data': {
-            'type': 'string',
-            'required': True,
-            'empty': False,
+        'file': {
+            'type': 'filestorage',
+            'required': True
         }
     }
 
@@ -824,7 +823,7 @@ class RetrieveOrCreateThumbnails(MethodView):
 
     def post(self, project_id):
         """
-        Update video preview thumbnails
+        Update video preview thumbnail
         ---
         consumes:
         - application/json
@@ -942,24 +941,54 @@ class RetrieveOrCreateThumbnails(MethodView):
                       example: 300000
         """
 
-        document = validate_document(request.get_json(), self.SCHEMA_UPLOAD)
+        # validate request
+        if 'file' not in request.files:
+            # to avoid TypeError: cannot serialize '_io.BufferedRandom' error
+            raise BadRequest({"file": ["required field"]})
+        document = validate_document(request.files, self.SCHEMA_UPLOAD)
 
-        if self._project.get('processing') is True:
-            return json_response({'processing': self._project['processing']}, status=202)
+        # validate codec
+        file_stream = document['file'].stream.read()
+        metadata = get_video_editor().get_meta(file_stream)
+        if metadata.get('codec_name') not in app.config.get('CODEC_SUPPORT_IMAGE'):
+            raise BadRequest(f"Codec: '{metadata.get('codec_name')}' is not supported.")
 
-        base64_string = document['data']
-        try:
-            if ',' not in base64_string:
-                base64_thumbnail = base64_string
-            else:
-                base64_format, base64_thumbnail = base64_string.split(',', 1)
-            thumbnail_stream = base64.b64decode(base64_thumbnail)
-        except base64.binascii.Error as err:
-            raise BadRequest(str(err))
+        if self._project['processing']['thumbnail_preview']:
+            return json_response({'processing': True}, status=202)
 
-        video_editor = get_video_editor()
-        thumbnail_metadata = video_editor.get_meta(thumbnail_stream, 'png')
-        return self._save_thumbnail(self._project, thumbnail_stream, thumbnail_metadata)
+        filename, _ = os.path.splitext(self._project['filename'])
+        original_ext = request.files['file'].filename.rsplit('.', 1)[-1].lower()
+        thumbnail_filename = f"{filename}_preview-custom.{original_ext}"
+        # save to fs
+        storage_id = app.fs.put(
+            content=file_stream,
+            filename=thumbnail_filename,
+            project_id=None,
+            asset_type='thumbnails',
+            storage_id=self._project['storage_id'],
+            content_type='image/png'
+        )
+        # delete old file
+        app.fs.delete(self._project['thumbnails']['preview'].get('storage_id'))
+        # save new thumbnail info
+        self._project = app.mongo.db.projects.find_one_and_update(
+            {'_id': self._project['_id']},
+            {'$set': {
+                'thumbnails.preview': {
+                    'filename': thumbnail_filename,
+                    'storage_id': storage_id,
+                    'mimetype': 'image/png',
+                    'width': metadata.get('width'),
+                    'height': metadata.get('height'),
+                    'size': metadata.get('size'),
+                    'position': 'custom'
+                }
+            }},
+            return_document=ReturnDocument.AFTER
+        )
+        add_urls(self._project)
+
+        return json_response(self._project['thumbnails']['preview'])
 
     def _get_timeline_thumbnails(self, amount):
         """
@@ -972,7 +1001,7 @@ class RetrieveOrCreateThumbnails(MethodView):
             return json_response({"processing": True}, status=202)
         # no need to generate thumbnails
         elif amount == len(self._project['thumbnails']['timeline']):
-            return json_response({"thumbnails": self._project['thumbnails']['timeline']})
+            return json_response(self._project['thumbnails']['timeline'])
         else:
             # set processing flag
             self._project = app.mongo.db.projects.find_one_and_update(
@@ -998,7 +1027,7 @@ class RetrieveOrCreateThumbnails(MethodView):
             return json_response({"processing": True}, status=202)
         elif (self._project['thumbnails']['preview'] and
               self._project['thumbnails']['preview'].get('position') == position):
-            return json_response({"thumbnails": self._project['thumbnails']['preview']})
+            return json_response(self._project['thumbnails']['preview'])
         elif self._project['metadata']['duration'] < position:
             return BadRequest(
                 f"Requested position:{position} is more than video's duration:{self._project['metadata']['duration']}."
@@ -1016,29 +1045,6 @@ class RetrieveOrCreateThumbnails(MethodView):
                 position
             )
             return json_response({"processing": True}, status=202)
-
-    def _save_thumbnail(self, doc, stream, metadata):
-        filename, ext = os.path.splitext(doc['filename'])
-        thumbnail_filename = f"{filename}_thumbnail.png"
-        storage_id = app.fs.put(
-            stream, thumbnail_filename, None,
-            asset_type='thumbnails', storage_id=doc['storage_id'], content_type='image/png'
-        )
-        doc = app.mongo.db.projects.find_one_and_update(
-            {'_id': doc['_id']},
-            {'$set': {
-                'preview_thumbnail': {
-                    'filename': thumbnail_filename,
-                    'storage_id': storage_id,
-                    'mimetype': 'image/png',
-                    'width': metadata.get('width'),
-                    'height': metadata.get('height'),
-                    'size': metadata.get('size'),
-                }
-            }},
-            return_document=ReturnDocument.AFTER
-        )
-        return json_response(doc)
 
 
 class GetRawVideo(MethodView):
@@ -1121,19 +1127,19 @@ class GetRawThumbnail(MethodView):
         Get thumbnail file
         ---
         parameters:
-        - name: project_id
-          in: path
+        - in: path
+          name: project_id
           type: string
           required: True
           description: Unique project id
-        - name: type
-          in: query
+        - in: query
+          name: type
           type: string
-          description: 'timeline' or 'preview'
-        - name: index
-          in: query
+          description: timeline or preview
+        - in: query
+          name: index
           type: integer
-          description: index of timeline thumbnail to read, used only when type=preview
+          description: index of timeline thumbnail to read, used only when type is preview
         produces:
           - image/png
         responses:
