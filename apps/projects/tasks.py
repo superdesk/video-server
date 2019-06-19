@@ -97,7 +97,8 @@ def generate_timeline_thumbnails(self, project_json, amount):
             thumbnails_amount=amount)
 
         for count, (stream, meta) in enumerate(thumbnails_generator, 1):
-            filename = f"{project['filename'].rsplit('.', 1)[0]}_timeline_{count}-{amount}.png"
+            ext = app.config.get('CODEC_EXTENSION_MAP')[meta.get('codec_name')]
+            filename = f"{project['filename'].rsplit('.', 1)[0]}_timeline_{count}-{amount}.{ext}"
             # save to storage
             storage_id = app.fs.put(
                 content=stream,
@@ -105,13 +106,13 @@ def generate_timeline_thumbnails(self, project_json, amount):
                 project_id=None,
                 asset_type='thumbnails',
                 storage_id=project['storage_id'],
-                content_type='image/png'
+                content_type=meta.get('mimetype')
             )
             timeline_thumbnails.append(
                 {
                     'filename': filename,
                     'storage_id': storage_id,
-                    'mimetype': meta.get('mimetype')[0],
+                    'mimetype': meta.get('mimetype'),
                     'width': meta.get('width'),
                     'height': meta.get('height'),
                     'size': meta.get('size')
@@ -170,7 +171,8 @@ def generate_preview_thumbnail(self, project_json, position):
             duration=project['metadata']['duration'],
             position=position
         )
-        filename = f"{project['filename'].rsplit('.', 1)[0]}_preview-{position}.png"
+        ext = app.config.get('CODEC_EXTENSION_MAP')[meta.get('codec_name')]
+        filename = f"{project['filename'].rsplit('.', 1)[0]}_preview-{position}.{ext}"
         # save to storage
         storage_id = app.fs.put(
             content=stream,
@@ -178,14 +180,14 @@ def generate_preview_thumbnail(self, project_json, position):
             project_id=None,
             asset_type='thumbnails',
             storage_id=project['storage_id'],
-            content_type='image/png'
+            content_type=meta.get('mimetype')
         )
         logger.info(f"Created and saved preview thumbnail at position {position} to {app.fs.__class__.__name__} "
                     f"in project {project.get('_id')}.")
         preview_thumbnail = {
             'filename': filename,
             'storage_id': storage_id,
-            'mimetype': meta.get('mimetype')[0],
+            'mimetype': meta.get('mimetype'),
             'width': meta.get('width'),
             'height': meta.get('height'),
             'size': meta.get('size'),

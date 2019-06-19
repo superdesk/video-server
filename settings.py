@@ -69,11 +69,16 @@ BROKER_CONNECTION_MAX_RETRIES = MAX_RETRIES
 #: Codec support
 CODEC_SUPPORT_VIDEO = json.loads(env('CODEC_SUPPORT_VIDEO', '["vp8", "vp9", "h264", "theora", "av1"]'))
 CODEC_SUPPORT_IMAGE = json.loads(env('CODEC_SUPPORT_IMAGE', '["bmp", "mjpeg", "png"]'))
-# CODEC_EXTENSION_MAP = {
-#     'bmp': 'bmp',
-#     'png': 'png',
-#     'mjpeg': 'jpeg'
-# }
+CODEC_EXTENSION_MAP = {
+    'bmp': 'bmp',
+    'png': 'png',
+    'mjpeg': 'jpeg'
+}
+CODEC_MIMETYPE_MAP = {
+    'bmp': 'image/bmp',
+    'png': 'image/png',
+    'mjpeg': 'image/jpeg'
+}
 
 #: media storage
 MEDIA_STORAGE = env('MEDIA_STORAGE', 'filesystem')

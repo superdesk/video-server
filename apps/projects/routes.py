@@ -953,23 +953,30 @@ class RetrieveOrCreateThumbnails(MethodView):
         if metadata.get('codec_name') not in app.config.get('CODEC_SUPPORT_IMAGE'):
             raise BadRequest(f"Codec: '{metadata.get('codec_name')}' is not supported.")
 
+        # check if busy
         if self._project['processing']['thumbnail_preview']:
             return json_response({'processing': True}, status=202)
 
-        filename, _ = os.path.splitext(self._project['filename'])
-        original_ext = request.files['file'].filename.rsplit('.', 1)[-1].lower()
-        thumbnail_filename = f"{filename}_preview-custom.{original_ext}"
         # save to fs
+        thumbnail_filename = "{filename}_preview-custom.{original_ext}".format(
+            filename=os.path.splitext(self._project['filename'])[0],
+            original_ext=request.files['file'].filename.rsplit('.', 1)[-1].lower()
+        )
+        mimetype = app.config.get('CODEC_MIMETYPE_MAP')[metadata.get('codec_name')]
         storage_id = app.fs.put(
             content=file_stream,
             filename=thumbnail_filename,
             project_id=None,
             asset_type='thumbnails',
             storage_id=self._project['storage_id'],
-            content_type='image/png'
+            content_type=mimetype
         )
+
         # delete old file
-        app.fs.delete(self._project['thumbnails']['preview'].get('storage_id'))
+        if self._project['thumbnails']['preview'] \
+                and storage_id != self._project['thumbnails']['preview']['storage_id']:
+            app.fs.delete(self._project['thumbnails']['preview']['storage_id'])
+
         # save new thumbnail info
         self._project = app.mongo.db.projects.find_one_and_update(
             {'_id': self._project['_id']},
@@ -977,7 +984,7 @@ class RetrieveOrCreateThumbnails(MethodView):
                 'thumbnails.preview': {
                     'filename': thumbnail_filename,
                     'storage_id': storage_id,
-                    'mimetype': 'image/png',
+                    'mimetype': mimetype,
                     'width': metadata.get('width'),
                     'height': metadata.get('height'),
                     'size': metadata.get('size'),
@@ -1155,7 +1162,8 @@ class GetRawThumbnail(MethodView):
         if document['type'] == 'preview':
             if not self._project['thumbnails']['preview']:
                 raise NotFound()
-            byte = app.fs.get(self._project['thumbnails']['preview']['storage_id'])
+            thumbnail = self._project['thumbnails']['preview']
+            byte = app.fs.get(thumbnail['storage_id'])
         # timeline
         else:
             try:
@@ -1165,7 +1173,7 @@ class GetRawThumbnail(MethodView):
             byte = app.fs.get(thumbnail['storage_id'])
 
         res = make_response(byte)
-        res.headers['Content-Type'] = 'image/png'
+        res.headers['Content-Type'] = thumbnail['mimetype']
         return res
 
 

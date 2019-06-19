@@ -21,7 +21,7 @@ def create_file_name(ext):
     :return: generated filename
     """
 
-    return "%s.%s" % (uuid.uuid4().hex, ext)
+    return "%s.%s" % (uuid.uuid4().hex, ext.lower())
 
 
 def paginate(cursor, page):

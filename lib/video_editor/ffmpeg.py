@@ -127,7 +127,7 @@ class FFMPEGVideoEditor(VideoEditorInterface):
             try:
                 # get metadata
                 thumbnail_metadata = self._get_meta(output_file)
-                thumbnail_metadata['mimetype'] = 'image/bmp',
+                thumbnail_metadata['mimetype'] = 'image/png'
                 # read binary
                 with open(output_file, "rb") as f:
                     content = f.read()
@@ -163,11 +163,11 @@ class FFMPEGVideoEditor(VideoEditorInterface):
             # subprocess bash -> ffmpeg in the loop
             subprocess.run([path_script, path_video, output_file, str(frame_per_second), str(thumbnails_amount)])
             for i in range(0, thumbnails_amount):
-                thumbnail_path =  f'{output_file}{i}.bmp'
+                thumbnail_path =  f'{output_file}{i}.png'
                 try:
                     # get metadata
                     thumbnail_metadata = self._get_meta(thumbnail_path)
-                    thumbnail_metadata['mimetype'] = 'image/bmp',
+                    thumbnail_metadata['mimetype'] = 'image/png'
                     # read binary
                     with open(thumbnail_path, "rb") as f:
                         content = f.read()
