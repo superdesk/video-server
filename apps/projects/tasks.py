@@ -115,7 +115,6 @@ def generate_timeline_thumbnails(self, project_json, amount):
                     'width': meta.get('width'),
                     'height': meta.get('height'),
                     'size': meta.get('size')
-                    # 'url': get_url_for_media(project.get('_id'), 'thumbnail') + f'?index={count}'
                 }
             )
         logger.info(f"Created and saved {len(timeline_thumbnails)} thumbnails to {app.fs.__class__.__name__} "

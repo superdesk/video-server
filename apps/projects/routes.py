@@ -12,7 +12,7 @@ from pymongo.errors import ServerSelectionTimeoutError
 from werkzeug.exceptions import BadRequest, InternalServerError, NotFound
 
 from lib.utils import (
-    create_file_name, json_response, get_url_for_media, validate_document,
+    create_file_name, json_response, add_urls, validate_document,
     get_request_address, save_activity_log, paginate
 )
 from lib.video_editor import get_video_editor
@@ -54,7 +54,7 @@ class ListUploadProject(MethodView):
                   example: fa5079a38e0a4197864aa2ccb07f3bea.mp4
                 url:
                   type: string
-                  example: https://example.com/url_raw/fa5079a38e0a4197864aa2ccb07f3bea4
+                  example: https://example.com/raw/fa5079a38e0a4197864aa2ccb07f3bea4
                 storage_id:
                   type: string
                   example: 2019/5/1/fa5079a38e0a4197864aa2ccb07f3bea.mp4
@@ -151,7 +151,7 @@ class ListUploadProject(MethodView):
             'thumbnails': {
                 'timeline': [],
                 'preview': None
-            },
+            }
         }
         app.mongo.db.projects.insert_one(project)
 
@@ -183,6 +183,7 @@ class ListUploadProject(MethodView):
             raise InternalServerError(str(e))
 
         save_activity_log('upload', project['_id'])
+        add_urls(project)
 
         return json_response(project, status=201)
 
@@ -223,7 +224,7 @@ class ListUploadProject(MethodView):
                         example: fa5079a38e0a4197864aa2ccb07f3bea.mp4
                       url:
                         type: string
-                        example: https://example.com/url_raw/fa5079a38e0a4197864aa2ccb07f3bea
+                        example: https://example.com/raw/fa5079a38e0a4197864aa2ccb07f3bea
                       storage_id:
                         type: string
                         example: 2019/5/fa5079a38e0a4197864aa2ccb07f3bea.mp4
@@ -294,6 +295,7 @@ class ListUploadProject(MethodView):
             cursor=app.mongo.db.projects.find(),
             page=page
         ))
+        add_urls(projects)
 
         return json_response(
             {
@@ -370,7 +372,7 @@ class RetrieveEditDestroyProject(MethodView):
                   example: fa5079a38e0a4197864aa2ccb07f3bea.mp4
                 url:
                   type: string
-                  example: https://example.com/url_raw/fa5079a38e0a4197864aa2ccb07f3bea
+                  example: https://example.com/raw/fa5079a38e0a4197864aa2ccb07f3bea
                 storage_id:
                   type: string
                   example: 2019/5/fa5079a38e0a4197864aa2ccb07f3bea.mp4
@@ -436,6 +438,7 @@ class RetrieveEditDestroyProject(MethodView):
                   example: 5cbd5acfe24f6045607e51aa
         """
 
+        add_urls(self._project)
         return json_response(self._project)
 
     def put(self, project_id):
@@ -498,7 +501,7 @@ class RetrieveEditDestroyProject(MethodView):
                   example: fa5079a38e0a4197864aa2ccb07f3bea.mp4
                 url:
                   type: string
-                  example: https://example.com/url_raw/fa5079a38e0a4197864aa2ccb07f3bea
+                  example: https://example.com/raw/fa5079a38e0a4197864aa2ccb07f3bea
                 storage_id:
                   type: string
                   example: 2019/5/fa5079a38e0a4197864aa2ccb07f3bea.mp4
@@ -642,7 +645,7 @@ class RetrieveEditDestroyProject(MethodView):
                   example: fa5079a38e0a4197864aa2ccb07f3bea_v2.mp4
                 url:
                   type: string
-                  example: https://example.com/url_raw/fa5079a38e0a4197864aa2ccb07f3bea
+                  example: https://example.com/raw/fa5079a38e0a4197864aa2ccb07f3bea
                 storage_id:
                   type: string
                   example: 2019/5/fa5079a38e0a4197864aa2ccb07f3bea.mp4
@@ -705,7 +708,6 @@ class RetrieveEditDestroyProject(MethodView):
             'preview_thumbnail': self._project.get('preview_thumbnail')
         }
         app.mongo.db.projects.insert_one(new_doc)
-        new_doc['predict_url'] = get_url_for_media(new_doc.get('_id'), 'video')
         task_edit_video.delay(json_util.dumps(new_doc), document)
         save_activity_log("POST PROJECT", self._project['_id'], document)
         return json_response(new_doc)
@@ -811,6 +813,7 @@ class RetrieveOrCreateThumbnails(MethodView):
                   example: {}
         """
         document = validate_document(request.args.to_dict(), self.SCHEMA_THUMBNAILS)
+        add_urls(self._project)
 
         if document['type'] == 'timeline':
             return self._get_timeline_thumbnails(
@@ -852,7 +855,7 @@ class RetrieveOrCreateThumbnails(MethodView):
                   example: fa5079a38e0a4197864aa2ccb07f3bea.mp4
                 url:
                   type: string
-                  example: https://example.com/url_raw/fa5079a38e0a4197864aa2ccb07f3bea
+                  example: https://example.com/raw/fa5079a38e0a4197864aa2ccb07f3bea
                 storage_id:
                   type: string
                   example: 2019/5/fa5079a38e0a4197864aa2ccb07f3bea.mp4
@@ -1026,7 +1029,6 @@ class RetrieveOrCreateThumbnails(MethodView):
             {'$set': {
                 'preview_thumbnail': {
                     'filename': thumbnail_filename,
-                    'url': get_url_for_media(doc.get('_id'), 'thumbnail'),
                     'storage_id': storage_id,
                     'mimetype': 'image/png',
                     'width': metadata.get('width'),
@@ -1166,5 +1168,5 @@ bp.add_url_rule('/', view_func=ListUploadProject.as_view('upload_project'))
 bp.add_url_rule('/<project_id>', view_func=RetrieveEditDestroyProject.as_view('retrieve_edit_destroy_project'))
 bp.add_url_rule('/<project_id>/thumbnails',
                 view_func=RetrieveOrCreateThumbnails.as_view('retrieve_or_create_thumbnails'))
-bp.add_url_rule('/<project_id>/url_raw/video', view_func=GetRawVideo.as_view('get_raw_video'))
-bp.add_url_rule('/<project_id>/url_raw/thumbnail', view_func=GetRawThumbnail.as_view('get_raw_thumbnail'))
+bp.add_url_rule('/<project_id>/raw/video', view_func=GetRawVideo.as_view('get_raw_video'))
+bp.add_url_rule('/<project_id>/raw/thumbnail', view_func=GetRawThumbnail.as_view('get_raw_thumbnail'))

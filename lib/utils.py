@@ -67,6 +67,28 @@ def get_url_for_media(project_id, media_type):
     return '/'.join(x.strip('/') for x in (app.config.get('VIDEO_SERVER_URL'), str(project_id), suffix))
 
 
+def add_urls(doc):
+
+    def _handle_doc(doc):
+        """
+        Add url for project's video, timeline thumbnails and preview thumbnail.
+        """
+        if '_id' in doc:
+            doc['url'] = get_url_for_media(doc['_id'], 'video')
+
+            for index, thumb in enumerate(doc['thumbnails']['timeline']):
+                thumb['url'] = get_url_for_media(doc.get('_id'), 'thumbnail') + f'?type=timeline&index={index}'
+
+            if doc['thumbnails']['preview']:
+                doc['thumbnails']['preview']['url'] = get_url_for_media(doc.get('_id'), 'thumbnail') + '?type=preview'
+
+    if type(doc) is dict:
+        _handle_doc(doc)
+    elif type(doc) is list:
+        docs = doc
+        for _doc in docs:
+            _handle_doc(_doc)
+
 def save_activity_log(action, project_id, payload=None):
     """
     Inserts an activity record into `activity` collection
