@@ -18,7 +18,7 @@ from lib.utils import (
 from lib.video_editor import get_video_editor
 from lib.views import MethodView
 
-from .tasks import task_edit_video, generate_timeline_thumbnails, generate_preview_thumbnail
+from .tasks import edit_video, generate_timeline_thumbnails, generate_preview_thumbnail
 from . import bp
 
 logger = logging.getLogger(__name__)
@@ -310,46 +310,6 @@ class ListUploadProject(MethodView):
 
 
 class RetrieveEditDestroyProject(MethodView):
-    SCHEMA_EDIT = {
-        'capture': {
-            'type': 'dict',
-            'required': False,
-            'empty': True,
-        },
-        'cut': {
-            'type': 'dict',
-            'required': False,
-            'empty': True,
-            'schema': {
-                'start': {'type': 'float', 'required': True},
-                'end': {'type': 'float', 'required': True},
-            },
-        },
-        'rotate': {
-            'type': 'dict',
-            'required': False,
-            'empty': True,
-            'schema': {
-                'degree': {'type': 'integer', 'required': True}
-            },
-        },
-        'quality': {
-            'type': 'dict',
-            'required': False,
-            'empty': True,
-        },
-        'crop': {
-            'type': 'dict',
-            'required': False,
-            'empty': True,
-            'schema': {
-                'width': {'type': 'float', 'required': True},
-                'height': {'type': 'float', 'required': True},
-                'x': {'type': 'float', 'required': True},
-                'y': {'type': 'float', 'required': True}
-            }
-        }
-    }
 
     def get(self, project_id):
         """
@@ -566,151 +526,210 @@ class RetrieveEditDestroyProject(MethodView):
                   type: string
                   example: 5cbd5acfe24f6045607e51aa
         """
-        document = validate_document(request.get_json(), self.SCHEMA_EDIT)
 
-        if self._project.get('processing') is True:
-            return json_response({'processing': self._project['processing']}, status=202)
-        if not self._project.get('version') >= 2:
-            raise BadRequest("Only PUT action for edited video version 2")
+        request_json = request.get_json()
+        document = validate_document(
+            request_json if request_json else {},
+            self.schema_edit
+        )
+        metadata = self._project['metadata']
 
-        # Update processing is True when begin edit video
-        doc = app.mongo.db.projects.find_one_and_update(
+        # validate trim
+        if 'trim' in document:
+            if document['trim']['start'] >= document['trim']['end']:
+                raise BadRequest({"trim": [{"start": ["must be less than 'end' value"]}]})
+            elif (document['trim']['end'] - document['trim']['start'] <= app.config.get('MIN_TRIM_DURATION')) \
+                    or (metadata['duration'] - document['trim']['start'] < app.config.get('MIN_TRIM_DURATION')):
+                raise BadRequest({"trim": [
+                    {"start": [f"trimmed video must be at least {app.config.get('MIN_TRIM_DURATION')} seconds"]}
+                ]})
+            elif document['trim']['end'] > metadata['duration']:
+                raise BadRequest({"trim": [
+                    {"end": [f"outside of initial video's length"]}
+                ]})
+            elif document['trim']['start'] == 0 and document['trim']['end'] == metadata['duration']:
+                raise BadRequest({"trim": [
+                    {"end": ["trim is duplicating an entire video"]}
+                ]})
+        # validate crop
+        if 'crop' in document:
+            if metadata['width'] - document['crop']['x'] < app.config.get('MIN_VIDEO_WIDTH'):
+                raise BadRequest({"crop": [{"x": ["less than minimum allowed crop width"]}]})
+            elif metadata['height'] - document['crop']['y'] < app.config.get('MIN_VIDEO_HEIGHT'):
+                raise BadRequest({"crop": [{"y": ["less than minimum allowed crop height"]}]})
+            elif document['crop']['x'] + document['crop']['width'] > metadata['width']:
+                raise BadRequest({"crop": [{"width": ["crop's frame is outside a video's frame"]}]})
+            elif document['crop']['y'] + document['crop']['height'] > metadata['height']:
+                raise BadRequest({"crop": [{"height": ["crop's frame is outside a video's frame"]}]})
+        # validate scale
+        if 'scale' in document:
+            width = metadata['width']
+            if 'crop' in document:
+                width = document['crop']['width']
+            if document['scale'] == width:
+                raise BadRequest({"trim": [
+                    {"scale": ["video or crop option already has exactly the same width"]}
+                ]})
+            elif not app.config.get('ALLOW_INTERPOLATION') and document['scale'] > width:
+                raise BadRequest({"trim": [
+                    {"scale": ["interpolation of pixels is not allowed"]}
+                ]})
+            elif app.config.get('ALLOW_INTERPOLATION') \
+                    and document['scale'] > width \
+                    and width >= app.config.get('INTERPOLATION_LIMIT'):
+                raise BadRequest({"trim": [
+                    {"scale": [f"interpolation is permitted only for videos which have width less than "
+                               f"{app.config.get('INTERPOLATION_LIMIT')}px"]}
+                ]})
+
+        if self._project['processing']['video']:
+            return json_response({'processing': True}, status=202)
+
+        # if not self._project.get('version') >= 2:
+        #     raise BadRequest("Only PUT action for edited video version 2")
+
+        # set processing flag
+        self._project = app.mongo.db.projects.find_one_and_update(
             {'_id': self._project['_id']},
-            {'$set': {
-                'processing': True,
-            }},
+            {'$set': {'processing.video': True}},
             return_document=ReturnDocument.AFTER
         )
-        save_activity_log("PUT PROJECT", doc['_id'], document)
-        task_edit_video.delay(json_util.dumps(doc), document, action='put')
-        return json_response(doc)
+        save_activity_log("PUT PROJECT", self._project['_id'], document)
 
-    def post(self, project_id):
-        """
-        Edit video. This method creates a new project.
-        ---
-        consumes:
-        - application/json
-        parameters:
-        - in: path
-          name: project_id
-          type: string
-          required: True
-          description: Unique project id
-        - in: body
-          name: action
-          description: Actions want to apply to the video
-          required: True
-          schema:
-            type: object
-            properties:
-              cut:
-                type: object
-                properties:
-                  start:
-                    type: integer
-                    example: 5
-                  end:
-                    type: integer
-                    example: 10
-              crop:
-                type: object
-                properties:
-                  width:
-                    type: integer
-                    example: 480
-                  height:
-                    type: integer
-                    example: 360
-                  x:
-                    type: integer
-                    example: 10
-                  y:
-                    type: integer
-                    example: 10
-              rotate:
-                type: object
-                properties:
-                  degree:
-                    type: integer
-                    example: 90
-        responses:
-          200:
-            description: OK
-            schema:
-              type: object
-              properties:
-                filename:
-                  type: string
-                  example: fa5079a38e0a4197864aa2ccb07f3bea_v2.mp4
-                url:
-                  type: string
-                  example: https://example.com/raw/fa5079a38e0a4197864aa2ccb07f3bea
-                storage_id:
-                  type: string
-                  example: 2019/5/fa5079a38e0a4197864aa2ccb07f3bea.mp4
-                metadata:
-                  type: object
-                  example: {}
-                mime_type:
-                  type: string
-                  example: video/mp4
-                create_time:
-                  type: string
-                  example: 2019-05-01T09:00:00+00:00
-                original_filename:
-                  type: string
-                  example: video.mp4
-                request_address:
-                  type: string
-                  example: 127.0.0.1
-                version:
-                  type: integer
-                  example: 2
-                parent:
-                  type: object
-                  parameters:
-                    _id:
-                      type: object
-                      parameters:
-                        $oid:
-                          type: string
-                          example: 5ccbc4104dfd9b8fa153d60e
-                processing:
-                  type: boolean
-                  example: False
-                thumbnails:
-                  type: object
-                  example: {}
-                _id:
-                  type: string
-                  example: 5cbd5acfe24f6045607e51aa
-        """
-        document = validate_document(request.get_json(), self.SCHEMA_EDIT)
+        # run task
+        edit_video.delay(
+            json_util.dumps(self._project),
+            changes=document
+        )
 
-        filename, ext = os.path.splitext(self._project['filename'])
-        if self._project.get('version') >= 2:
-            raise BadRequest("Only POST action for original video version 1")
-        version = self._project.get('version', 1) + 1
-        new_file_name = f'{filename}_v{version}{ext}'
-        new_doc = {
-            'filename': new_file_name,
-            'storage_id': self._project.get('storage_id'),
-            'metadata': None,
-            'request_address': get_request_address(request.headers.environ),
-            'version': version,
-            'processing': True,
-            'mime_type': self._project.get('mime_type'),
-            'parent': {
-                '_id': self._project.get('_id'),
-            },
-            'thumbnails': {},
-            'preview_thumbnail': self._project.get('preview_thumbnail')
-        }
-        app.mongo.db.projects.insert_one(new_doc)
-        task_edit_video.delay(json_util.dumps(new_doc), document)
-        save_activity_log("POST PROJECT", self._project['_id'], document)
-        return json_response(new_doc)
+        return json_response({"processing": True}, status=200)
+
+    # def post(self, project_id):
+    #     """
+    #     Edit video. This method creates a new project.
+    #     ---
+    #     consumes:
+    #     - application/json
+    #     parameters:
+    #     - in: path
+    #       name: project_id
+    #       type: string
+    #       required: True
+    #       description: Unique project id
+    #     - in: body
+    #       name: action
+    #       description: Actions want to apply to the video
+    #       required: True
+    #       schema:
+    #         type: object
+    #         properties:
+    #           cut:
+    #             type: object
+    #             properties:
+    #               start:
+    #                 type: integer
+    #                 example: 5
+    #               end:
+    #                 type: integer
+    #                 example: 10
+    #           crop:
+    #             type: object
+    #             properties:
+    #               width:
+    #                 type: integer
+    #                 example: 480
+    #               height:
+    #                 type: integer
+    #                 example: 360
+    #               x:
+    #                 type: integer
+    #                 example: 10
+    #               y:
+    #                 type: integer
+    #                 example: 10
+    #           rotate:
+    #             type: object
+    #             properties:
+    #               degree:
+    #                 type: integer
+    #                 example: 90
+    #     responses:
+    #       200:
+    #         description: OK
+    #         schema:
+    #           type: object
+    #           properties:
+    #             filename:
+    #               type: string
+    #               example: fa5079a38e0a4197864aa2ccb07f3bea_v2.mp4
+    #             url:
+    #               type: string
+    #               example: https://example.com/raw/fa5079a38e0a4197864aa2ccb07f3bea
+    #             storage_id:
+    #               type: string
+    #               example: 2019/5/fa5079a38e0a4197864aa2ccb07f3bea.mp4
+    #             metadata:
+    #               type: object
+    #               example: {}
+    #             mime_type:
+    #               type: string
+    #               example: video/mp4
+    #             create_time:
+    #               type: string
+    #               example: 2019-05-01T09:00:00+00:00
+    #             original_filename:
+    #               type: string
+    #               example: video.mp4
+    #             request_address:
+    #               type: string
+    #               example: 127.0.0.1
+    #             version:
+    #               type: integer
+    #               example: 2
+    #             parent:
+    #               type: object
+    #               parameters:
+    #                 _id:
+    #                   type: object
+    #                   parameters:
+    #                     $oid:
+    #                       type: string
+    #                       example: 5ccbc4104dfd9b8fa153d60e
+    #             processing:
+    #               type: boolean
+    #               example: False
+    #             thumbnails:
+    #               type: object
+    #               example: {}
+    #             _id:
+    #               type: string
+    #               example: 5cbd5acfe24f6045607e51aa
+    #     """
+    #     document = validate_document(request.get_json(), self.SCHEMA_EDIT)
+    #
+    #     filename, ext = os.path.splitext(self._project['filename'])
+    #     if self._project.get('version') >= 2:
+    #         raise BadRequest("Only POST action for original video version 1")
+    #     version = self._project.get('version', 1) + 1
+    #     new_file_name = f'{filename}_v{version}{ext}'
+    #     new_doc = {
+    #         'filename': new_file_name,
+    #         'storage_id': self._project.get('storage_id'),
+    #         'metadata': None,
+    #         'request_address': get_request_address(request.headers.environ),
+    #         'version': version,
+    #         'processing': True,
+    #         'mime_type': self._project.get('mime_type'),
+    #         'parent': {
+    #             '_id': self._project.get('_id'),
+    #         },
+    #         'thumbnails': {},
+    #         'preview_thumbnail': self._project.get('preview_thumbnail')
+    #     }
+    #     app.mongo.db.projects.insert_one(new_doc)
+    #     edit_video.delay(json_util.dumps(new_doc), document)
+    #     save_activity_log("POST PROJECT", self._project['_id'], document)
+    #     return json_response(new_doc)
 
     def delete(self, project_id):
         """
@@ -733,6 +752,68 @@ class RetrieveEditDestroyProject(MethodView):
         app.mongo.db.projects.delete_one({'_id': self._project['_id']})
 
         return json_response(status=204)
+
+    @property
+    def schema_edit(self):
+        return {
+            'trim': {
+                'type': 'dict',
+                'required': False,
+                'schema': {
+                    'start': {
+                        'type': 'float',
+                        'min': 0,
+                        'required': True
+                    },
+                    'end': {
+                        'type': 'float',
+                        'min': 1,
+                        'required': True
+                    },
+                }
+            },
+            'rotate': {
+                'type': 'integer',
+                'required': False,
+                'allowed': [-270, -180, -90, 90, 180, 270]
+            },
+            'scale': {
+                'type': 'integer',
+                'min': app.config.get('MIN_VIDEO_WIDTH'),
+                'max': app.config.get('MAX_VIDEO_WIDTH'),
+                'required': False
+            },
+            'crop': {
+                'type': 'dict',
+                'required': False,
+                'empty': True,
+                'schema': {
+                    'width': {
+                        'type': 'integer',
+                        'min': app.config.get('MIN_VIDEO_WIDTH'),
+                        'max': app.config.get('MAX_VIDEO_WIDTH'),
+                        'required': True
+                    },
+                    'height': {
+                        'type': 'integer',
+                        'min': app.config.get('MIN_VIDEO_HEIGHT'),
+                        'max': app.config.get('MAX_VIDEO_HEIGHT'),
+                        'required': True
+                    },
+                    'x': {
+                        'type': 'integer',
+                        'required': True,
+                        'min': 0
+                    },
+                    'y': {
+                        'type': 'integer',
+                        'required': True,
+                        'min': 0
+                    }
+                }
+            }
+        }
+
 
 
 class RetrieveOrCreateThumbnails(MethodView):
@@ -1021,7 +1102,7 @@ class RetrieveOrCreateThumbnails(MethodView):
                 json_util.dumps(self._project),
                 amount
             )
-            return json_response({"processing": True}, status=202)
+            return json_response({"processing": True}, status=200)
 
     def _get_preview_thumbnail(self, position):
         """
@@ -1051,7 +1132,7 @@ class RetrieveOrCreateThumbnails(MethodView):
                 json_util.dumps(self._project),
                 position
             )
-            return json_response({"processing": True}, status=202)
+            return json_response({"processing": True}, status=200)
 
 
 class GetRawVideo(MethodView):

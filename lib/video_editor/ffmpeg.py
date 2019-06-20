@@ -3,6 +3,7 @@ import os
 import subprocess
 import logging
 
+from flask import current_app as app
 from lib.utils import create_file_name, create_temp_file
 
 from .interface import VideoEditorInterface
@@ -13,6 +14,17 @@ logger = logging.getLogger(__name__)
 class FFMPEGVideoEditor(VideoEditorInterface):
     """
     FFMPEG based video editor
+
+    Links:
+      https://ffmpeg.org/ffmpeg.html#Detailed-description
+      http://ffmpeg.org/ffmpeg.html#Generic-options
+      http://ffmpeg.org/ffmpeg.html#Main-options
+      https://ffmpeg.org/ffmpeg.html#Stream-copy
+      https://ffmpeg.org/ffmpeg-filters.html
+      https://ffmpeg.org/ffmpeg-filters.html#crop
+      https://ffmpeg.org/ffmpeg-all.html#transpose
+      http://ffmpeg.org/ffmpeg-filters.html#scale
+      https://trac.ffmpeg.org/wiki/Scaling
     """
 
     def get_meta(self, filestream, extension='tmp'):
@@ -30,78 +42,84 @@ class FFMPEGVideoEditor(VideoEditorInterface):
 
         return metadata
 
-    def edit_video(self, stream_file, filename, metadata, video_cut=None, video_crop=None, video_rotate=None,
-                   video_quality=None):
+    def edit_video(self, stream_file, filename, metadata, trim=None, crop=None, rotate=None, scale=None):
         """
         Use ffmpeg tool for edit video
         :param stream_file:
         :param filename:
         :param metadata:
-        :param video_cut:
-        :param video_crop:
+        :param trim:
+        :param crop:
         :param video_rotate:
         :param video_quality:
         :return:
         """
-        path_video = ''
+
+        path_input = create_temp_file(stream_file, filename)
+        path_output = '{}_edit.{}'.format(*path_input.rsplit('.', 1))
+        filter_string = ''
+
         try:
-            path_video = create_temp_file(stream_file, filename)
-
-            if not metadata:
-                metadata = self._get_meta(path_video)
-
-            duration = float(metadata['duration'])
-            if (not video_cut or (video_cut['start'] == 0 and int(video_cut['end']) == int(duration))) \
-                    and not video_crop \
-                    and (not video_rotate or int(video_rotate['degree']) % 360 == 0) \
-                    and not video_quality:
-                return None, {}
-            path_output = path_video + "_edit" + os.path.splitext(filename)[1]
-            # use copy data
-            # set option and run cut first
-            if video_cut:
-                path_video = self._edit_video(path_video, path_output,
-                                              ["-ss", str(video_cut["start"]), "-t",
-                                               str(int(video_cut["end"]) - int(video_cut["start"])), "-c", "copy"])
-
-            # use filter data
-            str_filter = ""
-            # set option for crop
-            if video_crop:
-                # get max width, height if crop over the video
-                if int(video_crop.get('width')) > int(metadata.get('width')):
-                    video_crop['width'] = int(metadata.get('width'))
-                if int(video_crop.get('height')) > int(metadata.get('height')):
-                    video_crop['height'] = int(metadata.get('height'))
-                str_filter += "crop=%s:%s:%s:%s" % (
-                    video_crop["width"], video_crop["height"], video_crop["x"], video_crop["y"])
-            # set option for rotate
-            if video_rotate:
-                delta90 = round((int(video_rotate['degree'] % 360) / 90))
-                if delta90 != 0:
-                    rotate_string = ''
-                    if delta90 == 1:
-                        rotate_string = "transpose=1"
-                    if delta90 == 2:
-                        rotate_string = "transpose=2,transpose=2"
-                    if delta90 == 3:
-                        rotate_string = "transpose=2"
-                    str_filter += "," if str_filter != "" else ''
-                    str_filter += rotate_string
-            # set option for quality
-            if video_quality:
-                str_filter += "," if str_filter != "" else ''
-                str_filter += "scale=%s:-2" % video_quality['quality']
-            if str_filter != '':
-                path_video = self._edit_video(path_video, path_output,
-                                              ["-filter:v", str_filter, "-max_muxing_queue_size", "1024", "-threads",
-                                               "5", "-preset", "ultrafast", "-strict", "-2", "-c:a", "copy"
-                                               ])
-            content = open(path_video, "rb+").read()
-            metadata_edit_file = self._get_meta(path_video)
+            # trim
+            if trim:
+                self._run_ffmpeg(
+                    path_input=path_input,
+                    path_output=path_output,
+                    options=(
+                        '-ss', str(trim['start']),
+                        '-t', str(trim['end'] - trim['start']),
+                        '-qscale', '0',
+                        '-threads', str(app.config.get('FFMPEG_THREADS'))
+                    )
+                )
+            # crop
+            # https://ffmpeg.org/ffmpeg-filters.html#crop
+            if crop:
+                filter_string += f'crop={crop["width"]}:{crop["height"]}:{crop["x"]}:{crop["y"]}'
+            # scale
+            # http://ffmpeg.org/ffmpeg-filters.html#scale
+            # https://trac.ffmpeg.org/wiki/Scaling
+            if scale:
+                filter_string += ',' if filter_string != '' else ''
+                filter_string += f"scale={scale}:-2"
+            # rotate
+            # https://ffmpeg.org/ffmpeg-all.html#transpose
+            # 0 = 90CounterCLockwise and Vertical Flip (default)
+            # 1 = 90Clockwise
+            # 2 = 90CounterClockwise
+            # 3 = 90Clockwise and Vertical Flip
+            if rotate:
+                rotate_string = ''
+                if rotate == 90:
+                    rotate_string = 'transpose=1'
+                elif rotate == -90:
+                    rotate_string = 'transpose=2'
+                elif rotate == 180:
+                    rotate_string = 'transpose=1,transpose=1'
+                elif rotate == -180:
+                    rotate_string = 'transpose=2,transpose=2'
+                elif rotate == 270:
+                    rotate_string = 'transpose=1,transpose=1,transpose=1'
+                elif rotate == -270:
+                    rotate_string = 'transpose=2,transpose=2,transpose=2'
+                filter_string += ',' if filter_string != '' else ''
+                filter_string += rotate_string
+            # run ffmpeg -filter:v to apply all filters
+            if filter_string:
+                self._run_ffmpeg(
+                    path_input=path_input,
+                    path_output=path_output,
+                    options=(
+                        '-filter:v', filter_string,
+                        '-threads', str(app.config.get('FFMPEG_THREADS')),
+                        '-preset', app.config.get('FFMPEG_PRESET')
+                    )
+                )
+            content = open(path_input, 'rb+').read()
+            metadata_edit_file = self._get_meta(path_input)
         finally:
-            if path_video:
-                os.remove(path_video)
+            if path_input:
+                os.remove(path_input)
         return content, metadata_edit_file
 
     def capture_thumbnail(self, stream_file, filename, duration, position):
@@ -178,23 +196,21 @@ class FFMPEGVideoEditor(VideoEditorInterface):
         finally:
             os.remove(path_video)
 
-    def _edit_video(self, path_video, path_output, para=[]):
+    def _run_ffmpeg(self, path_input, path_output, options=tuple()):
         """
-             Use ffmpeg to cutting video via start time and end time, and get the total frames of video.
         :param path_video:
         :param path_output:
-        :param para:
+        :param options:
         :return:
         """
         try:
-            # cut video
-            subprocess.run(["ffmpeg", "-v", "error", "-i", path_video, *para, path_output])
-
+            # run ffmpeg with provided options
+            subprocess.run(["ffmpeg", "-loglevel", "error", "-i", path_input, *options, path_output])
             # replace tmp origin
-
-            subprocess.run(["cp", "-r", path_output, path_video])
-            return path_video
+            subprocess.run(["cp", "-r", path_output, path_input])
+            return path_input
         finally:
+            # delete old tmp input file
             os.remove(path_output)
 
     def _get_meta(self, file_path):
@@ -212,11 +228,14 @@ class FFMPEGVideoEditor(VideoEditorInterface):
 
         video_data = json.loads(output.decode("utf-8"))
 
-        data = None
         for stream in video_data['streams']:
             if stream['codec_type'] == 'video':
                 data = stream
                 break
+        else:
+            raise Exception(f'codec_type "video" was not found in streams. '
+                            f'Streams: {video_data["streams"]}. '
+                            f'File: {file_path}')
 
         video_meta_keys = ('codec_name', 'codec_long_name', 'width', 'height', 'r_frame_rate', 'bit_rate',
                            'nb_frames', 'duration')

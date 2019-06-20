@@ -88,6 +88,7 @@ FS_MEDIA_STORAGE_PATH = env('FS_MEDIA_STORAGE_PATH', DEFAULT_PATH)
 #: media tool
 DEFAULT_MEDIA_TOOL = env('DEFAULT_MEDIA_TOOL', 'ffmpeg')
 
+#: urls
 VIDEO_SERVER_URL = env('VIDEO_SERVER_URL', 'http://localhost:5050/projects')
 VIDEO_URL_SUFFIX = env('VIDEO_URL_SUFFIX', 'raw/video')
 THUMBNAIL_URL_SUFFIX = env('THUMBNAIL_URL_SUFFIX', 'raw/thumbnail')
@@ -98,3 +99,22 @@ DEFAULT_TOTAL_TIMELINE_THUMBNAILS = int(env('DEFAULT_TOTAL_TIMELINE_THUMBNAILS',
 
 #: set PORT for video server
 VIDEO_SERVER_PORT = env('VIDEO_SERVER_PORT', 5050)
+
+#: video edit constraints
+ALLOW_INTERPOLATION = strtobool(env('ALLOW_INTERPOLATION', 'True'))
+INTERPOLATION_LIMIT = env('INTERPOLATION_LIMIT', 1280)
+MIN_TRIM_DURATION = env('MIN_TRIM_DURATION', 2)
+MIN_VIDEO_WIDTH = env('MIN_VIDEO_WIDTH', 320)
+MAX_VIDEO_WIDTH = env('MAX_VIDEO_WIDTH', 3840)
+MIN_VIDEO_HEIGHT = env('MIN_VIDEO_HEIGHT', 180)
+MAX_VIDEO_HEIGHT = env('MAX_VIDEO_HEIGHT', 2160)
+
+#: ffmpeg command line defaults
+# the default is the number of available CPUs (0)
+FFMPEG_THREADS = env('FFMPEG_THREADS', '0')
+# The default is medium.
+# The preset determines how fast the encoding process will be – at the expense of compression efficiency.
+# Put differently, if you choose ultrafast, the encoding process is going to run fast,
+# but the file size will be larger when compared to medium. The visual quality will be the same.
+# Valid presets are ultrafast, superfast, veryfast, faster, fast, medium, slow, slower, veryslow and placebo.
+FFMPEG_PRESET = env('FFMPEG_PRESET', 'medium')

@@ -14,73 +14,76 @@ logger = logging.getLogger(__name__)
 
 
 @celery.task(bind=True, default_retry_delay=10)
-def task_edit_video(self, sdoc, updates, action='post'):
+def edit_video(self, project_json, changes, duplicate=False):
     """
     Task use tool for edit video and record the data and update status after finished,
-    :param file_path: full path edit video
-    :param sdoc: type json string, data info edit video
-    :param updates: type dictionary, changes apply to the video
-    :param action: put/replace action for new edited video
-    :param retry:
-    :return:
+    :param project_json: project json
+    :param changes: changes apply to the video
+    :param duplicate: duplicate project or not
     """
-    doc = json_util.loads(sdoc)
-    storage_id = doc['storage_id']
+
+    project = json_util.loads(project_json)
+    video_editor = get_video_editor()
+
     try:
-        video_stream = app.fs.get(doc['storage_id'])
-
         # Use tool for editing video
-        video_editor = get_video_editor()
         edited_video_stream, metadata = video_editor.edit_video(
-            video_stream,
-            doc['filename'],
-            doc.get('metadata'),
-            updates.get('cut'),
-            updates.get('crop'),
-            updates.get('rotate'),
-            updates.get('quality')
+            stream_file=app.fs.get(project['storage_id']),
+            filename=project['filename'],
+            metadata=project['metadata'],
+            **changes
         )
-        if action == 'post':
-            new_storage_id = app.fs.put(
-                edited_video_stream, doc.get('filename'),
-                project_id=None, asset_type='thumbnails', storage_id=storage_id, content_type=None)
-        elif action == 'put':
-            new_storage_id = app.fs.replace(edited_video_stream, storage_id, None)
+
+        if duplicate:
+            pass
+            # new_storage_id = app.fs.put(
+            #     edited_video_stream,
+            #     project.get('filename'),
+            #     project_id=None,
+            #     asset_type='thumbnails',
+            #     storage_id=project['storage_id'],
+            #     content_type=None
+            # )
         else:
-            raise KeyError(f'Invalid action `{action}`')
-
-        # create url for preview video
-        url = get_url_for_media(doc.get('_id'), 'video')
-        # Update data status is True and data video when edit was finished
-        app.mongo.db.projects.find_one_and_update(
-            {'_id': doc['_id']},
-            {'$set': {
-                'processing': False,
-                'metadata': metadata,
-                'storage_id': new_storage_id,
-                'thumbnails': {},
-                'url': url
-            }},
-            return_document=ReturnDocument.AFTER
-        )
-        # Delete all old thumbnails
-        for thumbnail in next(iter(doc['thumbnails'].values()), []):
-            app.fs.delete(thumbnail['storage_id'])
-
+            new_storage_id = app.fs.replace(
+                edited_video_stream,
+                project['storage_id'],
+                None
+            )
+            logger.info(f"Replaced file {project['storage_id']} in {app.fs.__class__.__name__} "
+                        f"in project {project.get('_id')}")
     except Exception as exc:
         logger.exception(exc)
         try:
             self.retry(max_retries=app.config.get('MAX_RETRIES', 3))
         except MaxRetriesExceededError:
-            if doc['version'] >= 2:
-                app.mongo.db.projects.delete_one({'_id': doc['_id']})
-            else:
-                app.mongo.db.projects.update_one(
-                    {'_id': doc['_id']},
-                    {'$set': {
-                        'processing': False,
-                    }}
-                )
+            app.mongo.db.projects.update_one(
+                {'_id': ObjectId(project.get('_id'))},
+                {"$set": {
+                    'processing.video': False,
+                }},
+                upsert=False
+            )
+    else:
+        # delete old timeline thumbnails
+        old_timeline_thumbnails = project['thumbnails'].get('timeline', [])
+        for old_thumbnail in old_timeline_thumbnails:
+            app.fs.delete(old_thumbnail.get('storage_id'))
+        logger.info(f"Removed {len(old_timeline_thumbnails)} old thumbnails from {app.fs.__class__.__name__} "
+                    f"in project {project.get('_id')}")
+
+        # update project record
+        app.mongo.db.projects.find_one_and_update(
+            {'_id': project['_id']},
+            {'$set': {
+                'processing.video': False,
+                'metadata': metadata,
+                'thumbnails.timeline': {},
+                'version': project['version'] + 1
+            }},
+            return_document=ReturnDocument.BEFORE
+        )
+        logger.info(f"Finished editing for project {project.get('_id')}.")
 
 
 @celery.task(bind=True, default_retry_delay=10)

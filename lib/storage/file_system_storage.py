@@ -104,22 +104,22 @@ class FileSystemStorage(MediaStorageInterface):
         :param content: stream file
         :param storage_id: storage_id of file
         :param content_type: content type of file
-        :return:
         """
+
+        file_path = self._get_file_path(storage_id)
+        # check if dir exists, if not create it
+        file_dir = os.path.dirname(file_path)
+        if not os.path.exists(file_dir):
+            os.makedirs(file_dir)
+        # write stream to file
         try:
-            file_path = self._get_file_path(storage_id)
-            # check if dir exists, if not create it
-            file_dir = os.path.dirname(file_path)
-            if not os.path.exists(file_dir):
-                os.makedirs(file_dir)
-            # write stream to file
             with open(file_path, "wb") as f:
                 f.write(content)
-            logger.info('Replace media file %s in storage' % storage_id)
-            return storage_id
-        except Exception as ex:
-            logger.error('Cannot replace file %s ex: %s' % (storage_id, ex))
-            return None
+        except Exception as e:
+            logger.error(f'FileSystemStorage:replace: {e}')
+            raise e
+        else:
+            logger.info(f'Replaced file {storage_id} in fs storage')
 
     def delete(self, storage_id):
         """

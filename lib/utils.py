@@ -111,7 +111,6 @@ def validate_document(document, schema, **kwargs):
     :return: normalized and validated document
     :raise: `BadRequest` if `document` is not valid
     """
-
     validator = Validator(schema, **kwargs)
     if not validator.validate(document):
         raise BadRequest(validator.errors)
