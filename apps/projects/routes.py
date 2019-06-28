@@ -1,7 +1,7 @@
-import base64
-import logging
 import os
 import re
+import copy
+import logging
 from datetime import datetime
 
 from bson import json_util
@@ -311,6 +311,67 @@ class ListUploadProject(MethodView):
 
 class RetrieveEditDestroyProject(MethodView):
 
+    @property
+    def schema_edit(self):
+        return {
+            'trim': {
+                'type': 'dict',
+                'required': False,
+                'schema': {
+                    'start': {
+                        'type': 'float',
+                        'min': 0,
+                        'required': True
+                    },
+                    'end': {
+                        'type': 'float',
+                        'min': 1,
+                        'required': True
+                    },
+                }
+            },
+            'rotate': {
+                'type': 'integer',
+                'required': False,
+                'allowed': [-270, -180, -90, 90, 180, 270]
+            },
+            'scale': {
+                'type': 'integer',
+                'min': app.config.get('MIN_VIDEO_WIDTH'),
+                'max': app.config.get('MAX_VIDEO_WIDTH'),
+                'required': False
+            },
+            'crop': {
+                'type': 'dict',
+                'required': False,
+                'empty': True,
+                'schema': {
+                    'width': {
+                        'type': 'integer',
+                        'min': app.config.get('MIN_VIDEO_WIDTH'),
+                        'max': app.config.get('MAX_VIDEO_WIDTH'),
+                        'required': True
+                    },
+                    'height': {
+                        'type': 'integer',
+                        'min': app.config.get('MIN_VIDEO_HEIGHT'),
+                        'max': app.config.get('MAX_VIDEO_HEIGHT'),
+                        'required': True
+                    },
+                    'x': {
+                        'type': 'integer',
+                        'required': True,
+                        'min': 0
+                    },
+                    'y': {
+                        'type': 'integer',
+                        'required': True,
+                        'min': 0
+                    }
+                }
+            }
+        }
+
     def get(self, project_id):
         """
         Retrieve project details
@@ -527,6 +588,13 @@ class RetrieveEditDestroyProject(MethodView):
                   example: 5cbd5acfe24f6045607e51aa
         """
 
+        if self._project['processing']['video']:
+            return json_response({'processing': True}, status=202)
+
+        # TODO do we really need this restriction?
+        # if self._project.get('version') == 1:
+        #     raise BadRequest("Project with version 1 can't be edited. Use POST instead.")
+
         request_json = request.get_json()
         document = validate_document(
             request_json if request_json else {},
@@ -582,12 +650,6 @@ class RetrieveEditDestroyProject(MethodView):
                                f"{app.config.get('INTERPOLATION_LIMIT')}px"]}
                 ]})
 
-        if self._project['processing']['video']:
-            return json_response({'processing': True}, status=202)
-
-        # if not self._project.get('version') >= 2:
-        #     raise BadRequest("Only PUT action for edited video version 2")
-
         # set processing flag
         self._project = app.mongo.db.projects.find_one_and_update(
             {'_id': self._project['_id']},
@@ -603,133 +665,6 @@ class RetrieveEditDestroyProject(MethodView):
         )
 
         return json_response({"processing": True}, status=200)
-
-    # def post(self, project_id):
-    #     """
-    #     Edit video. This method creates a new project.
-    #     ---
-    #     consumes:
-    #     - application/json
-    #     parameters:
-    #     - in: path
-    #       name: project_id
-    #       type: string
-    #       required: True
-    #       description: Unique project id
-    #     - in: body
-    #       name: action
-    #       description: Actions want to apply to the video
-    #       required: True
-    #       schema:
-    #         type: object
-    #         properties:
-    #           cut:
-    #             type: object
-    #             properties:
-    #               start:
-    #                 type: integer
-    #                 example: 5
-    #               end:
-    #                 type: integer
-    #                 example: 10
-    #           crop:
-    #             type: object
-    #             properties:
-    #               width:
-    #                 type: integer
-    #                 example: 480
-    #               height:
-    #                 type: integer
-    #                 example: 360
-    #               x:
-    #                 type: integer
-    #                 example: 10
-    #               y:
-    #                 type: integer
-    #                 example: 10
-    #           rotate:
-    #             type: object
-    #             properties:
-    #               degree:
-    #                 type: integer
-    #                 example: 90
-    #     responses:
-    #       200:
-    #         description: OK
-    #         schema:
-    #           type: object
-    #           properties:
-    #             filename:
-    #               type: string
-    #               example: fa5079a38e0a4197864aa2ccb07f3bea_v2.mp4
-    #             url:
-    #               type: string
-    #               example: https://example.com/raw/fa5079a38e0a4197864aa2ccb07f3bea
-    #             storage_id:
-    #               type: string
-    #               example: 2019/5/fa5079a38e0a4197864aa2ccb07f3bea.mp4
-    #             metadata:
-    #               type: object
-    #               example: {}
-    #             mime_type:
-    #               type: string
-    #               example: video/mp4
-    #             create_time:
-    #               type: string
-    #               example: 2019-05-01T09:00:00+00:00
-    #             original_filename:
-    #               type: string
-    #               example: video.mp4
-    #             request_address:
-    #               type: string
-    #               example: 127.0.0.1
-    #             version:
-    #               type: integer
-    #               example: 2
-    #             parent:
-    #               type: object
-    #               parameters:
-    #                 _id:
-    #                   type: object
-    #                   parameters:
-    #                     $oid:
-    #                       type: string
-    #                       example: 5ccbc4104dfd9b8fa153d60e
-    #             processing:
-    #               type: boolean
-    #               example: False
-    #             thumbnails:
-    #               type: object
-    #               example: {}
-    #             _id:
-    #               type: string
-    #               example: 5cbd5acfe24f6045607e51aa
-    #     """
-    #     document = validate_document(request.get_json(), self.SCHEMA_EDIT)
-    #
-    #     filename, ext = os.path.splitext(self._project['filename'])
-    #     if self._project.get('version') >= 2:
-    #         raise BadRequest("Only POST action for original video version 1")
-    #     version = self._project.get('version', 1) + 1
-    #     new_file_name = f'{filename}_v{version}{ext}'
-    #     new_doc = {
-    #         'filename': new_file_name,
-    #         'storage_id': self._project.get('storage_id'),
-    #         'metadata': None,
-    #         'request_address': get_request_address(request.headers.environ),
-    #         'version': version,
-    #         'processing': True,
-    #         'mime_type': self._project.get('mime_type'),
-    #         'parent': {
-    #             '_id': self._project.get('_id'),
-    #         },
-    #         'thumbnails': {},
-    #         'preview_thumbnail': self._project.get('preview_thumbnail')
-    #     }
-    #     app.mongo.db.projects.insert_one(new_doc)
-    #     edit_video.delay(json_util.dumps(new_doc), document)
-    #     save_activity_log("POST PROJECT", self._project['_id'], document)
-    #     return json_response(new_doc)
 
     def delete(self, project_id):
         """
@@ -753,67 +688,107 @@ class RetrieveEditDestroyProject(MethodView):
 
         return json_response(status=204)
 
-    @property
-    def schema_edit(self):
-        return {
-            'trim': {
-                'type': 'dict',
-                'required': False,
-                'schema': {
-                    'start': {
-                        'type': 'float',
-                        'min': 0,
-                        'required': True
-                    },
-                    'end': {
-                        'type': 'float',
-                        'min': 1,
-                        'required': True
-                    },
-                }
-            },
-            'rotate': {
-                'type': 'integer',
-                'required': False,
-                'allowed': [-270, -180, -90, 90, 180, 270]
-            },
-            'scale': {
-                'type': 'integer',
-                'min': app.config.get('MIN_VIDEO_WIDTH'),
-                'max': app.config.get('MAX_VIDEO_WIDTH'),
-                'required': False
-            },
-            'crop': {
-                'type': 'dict',
-                'required': False,
-                'empty': True,
-                'schema': {
-                    'width': {
-                        'type': 'integer',
-                        'min': app.config.get('MIN_VIDEO_WIDTH'),
-                        'max': app.config.get('MAX_VIDEO_WIDTH'),
-                        'required': True
-                    },
-                    'height': {
-                        'type': 'integer',
-                        'min': app.config.get('MIN_VIDEO_HEIGHT'),
-                        'max': app.config.get('MAX_VIDEO_HEIGHT'),
-                        'required': True
-                    },
-                    'x': {
-                        'type': 'integer',
-                        'required': True,
-                        'min': 0
-                    },
-                    'y': {
-                        'type': 'integer',
-                        'required': True,
-                        'min': 0
-                    }
-                }
-            }
-        }
 
+class DuplicateProject(MethodView):
+
+    def post(self, project_id):
+        if any(self._project['processing'].values()):
+            return json_response({"processing": True}, status=202)
+
+        # deepcopy & save a child_project
+        child_project = copy.deepcopy(self._project)
+        del child_project['_id']
+        del child_project['storage_id']
+        child_project['parent'] = self._project['_id']
+        child_project['create_time'] = datetime.utcnow()
+        child_project['version'] += 1
+        child_project['thumbnails'] = {
+            'timeline': [],
+            'preview': None
+        }
+        app.mongo.db.projects.insert_one(child_project)
+
+        # put a video file stream into storage
+        try:
+            storage_id = app.fs.put(
+                content=app.fs.get(self._project['storage_id']),
+                filename=child_project['filename'],
+                project_id=child_project['_id'],
+                content_type=child_project['mime_type']
+            )
+        except Exception as e:
+            # remove record from db
+            app.mongo.db.projects.delete_one({'_id': child_project['_id']})
+            raise InternalServerError(str(e))
+
+        try:
+            # set 'storage_id' for child_project
+            child_project = app.mongo.db.projects.find_one_and_update(
+                {'_id': child_project['_id']},
+                {'$set': {'storage_id': storage_id}},
+                return_document=ReturnDocument.AFTER
+            )
+
+            # save preview thumbnail
+            if self._project['thumbnails']['preview']:
+                storage_id = app.fs.put(
+                    content=app.fs.get(self._project['thumbnails']['preview']['storage_id']),
+                    filename=self._project['thumbnails']['preview']['filename'],
+                    project_id=None,
+                    asset_type='thumbnails',
+                    storage_id=child_project['storage_id'],
+                    content_type=self._project['thumbnails']['preview']['mimetype']
+                )
+                child_project['thumbnails']['preview'] = self._project['thumbnails']['preview']
+                child_project['thumbnails']['preview']['storage_id'] = storage_id
+                # set preview thumbnail in db
+                child_project = app.mongo.db.projects.find_one_and_update(
+                    {'_id': child_project['_id']},
+                    {"$set": {
+                        'thumbnails.preview': child_project['thumbnails']['preview']
+                    }},
+                    return_document=ReturnDocument.AFTER
+                )
+
+            # save timeline thumbnails
+            timeline_thumbnails = []
+            for thumbnail in self._project['thumbnails']['timeline']:
+                storage_id = app.fs.put(
+                    content=app.fs.get(thumbnail['storage_id']),
+                    filename=thumbnail['filename'],
+                    project_id=None,
+                    asset_type='thumbnails',
+                    storage_id=child_project['storage_id'],
+                    content_type=thumbnail['mimetype']
+                )
+                timeline_thumbnails.append({
+                    'filename': thumbnail['filename'],
+                    'storage_id': storage_id,
+                    'mimetype': thumbnail['mimetype'],
+                    'width': thumbnail['width'],
+                    'height': thumbnail['height'],
+                    'size': thumbnail['size']
+                })
+            if timeline_thumbnails:
+                child_project = app.mongo.db.projects.find_one_and_update(
+                    {'_id': child_project['_id']},
+                    {"$set": {
+                        'thumbnails.timeline': timeline_thumbnails
+                    }},
+                    return_document=ReturnDocument.AFTER
+                )
+
+        except Exception as e:
+            # delete child_project dir
+            app.fs.delete_dir(storage_id)
+            # remove record from db
+            app.mongo.db.projects.delete_one({'_id': child_project['_id']})
+            raise InternalServerError(str(e))
+
+        save_activity_log('duplicated', self._project['_id'])
+        add_urls(child_project)
+
+        return json_response(child_project, status=201)
 
 
 class RetrieveOrCreateThumbnails(MethodView):
@@ -1259,9 +1234,27 @@ class GetRawThumbnail(MethodView):
 
 
 # register all urls
-bp.add_url_rule('/', view_func=ListUploadProject.as_view('upload_project'))
-bp.add_url_rule('/<project_id>', view_func=RetrieveEditDestroyProject.as_view('retrieve_edit_destroy_project'))
-bp.add_url_rule('/<project_id>/thumbnails',
-                view_func=RetrieveOrCreateThumbnails.as_view('retrieve_or_create_thumbnails'))
-bp.add_url_rule('/<project_id>/raw/video', view_func=GetRawVideo.as_view('get_raw_video'))
-bp.add_url_rule('/<project_id>/raw/thumbnail', view_func=GetRawThumbnail.as_view('get_raw_thumbnail'))
+bp.add_url_rule(
+    '/',
+    view_func=ListUploadProject.as_view('upload_project')
+)
+bp.add_url_rule(
+    '/<project_id>',
+    view_func=RetrieveEditDestroyProject.as_view('retrieve_edit_destroy_project')
+)
+bp.add_url_rule(
+    '/<project_id>/duplicate',
+    view_func=DuplicateProject.as_view('duplicate_project')
+)
+bp.add_url_rule(
+    '/<project_id>/thumbnails',
+    view_func=RetrieveOrCreateThumbnails.as_view('retrieve_or_create_thumbnails')
+)
+bp.add_url_rule(
+    '/<project_id>/raw/video',
+    view_func=GetRawVideo.as_view('get_raw_video')
+)
+bp.add_url_rule(
+    '/<project_id>/raw/thumbnail',
+    view_func=GetRawThumbnail.as_view('get_raw_thumbnail')
+)
