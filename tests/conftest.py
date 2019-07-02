@@ -47,9 +47,14 @@ def client(test_app):
         yield client
 
 
-@pytest.fixture(scope='session')
-def filestream():
-    test_path = os.path.dirname(os.path.abspath(__file__))
-    with open(f'{test_path}/storage/fixtures/sample.mp4', 'rb') as f:
-        filestream = f.read()
-    return filestream
+@pytest.fixture(scope='function')
+def filestreams(request):
+    filestreams = []
+
+    for filename in request.param:
+        test_path = os.path.dirname(os.path.abspath(__file__))
+        with open(f'{test_path}/storage/fixtures/{filename}', 'rb') as f:
+            filestream = f.read()
+        filestreams.append(filestream)
+
+    return filestreams

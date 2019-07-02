@@ -83,6 +83,10 @@ class FileSystemStorage(MediaStorageInterface):
             storage_id = f'{os.path.dirname(storage_id)}/{asset_type}/{filename}'
 
         file_path = self._get_file_path(storage_id)
+        # check if file exists
+        if os.path.exists(file_path):
+            raise Exception(f'File {file_path} already exists, use "replace" method instead.')
+
         # check if dir exists, if not create it
         file_dir = os.path.dirname(file_path)
         if not os.path.exists(file_dir):
