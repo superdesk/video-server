@@ -591,10 +591,6 @@ class RetrieveEditDestroyProject(MethodView):
         if self._project['processing']['video']:
             return json_response({'processing': True}, status=202)
 
-        # TODO do we really need this restriction?
-        # if self._project.get('version') == 1:
-        #     raise BadRequest("Project with version 1 can't be edited. Use POST instead.")
-
         request_json = request.get_json()
         document = validate_document(
             request_json if request_json else {},
@@ -606,7 +602,7 @@ class RetrieveEditDestroyProject(MethodView):
         if 'trim' in document:
             if document['trim']['start'] >= document['trim']['end']:
                 raise BadRequest({"trim": [{"start": ["must be less than 'end' value"]}]})
-            elif (document['trim']['end'] - document['trim']['start'] <= app.config.get('MIN_TRIM_DURATION')) \
+            elif (document['trim']['end'] - document['trim']['start'] < app.config.get('MIN_TRIM_DURATION')) \
                     or (metadata['duration'] - document['trim']['start'] < app.config.get('MIN_TRIM_DURATION')):
                 raise BadRequest({"trim": [
                     {"start": [f"trimmed video must be at least {app.config.get('MIN_TRIM_DURATION')} seconds"]}

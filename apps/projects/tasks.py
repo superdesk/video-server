@@ -5,7 +5,6 @@ from flask import current_app as app
 from pymongo import ReturnDocument
 
 from celery.exceptions import MaxRetriesExceededError
-from lib.utils import get_url_for_media, create_temp_file
 from lib.video_editor import get_video_editor
 
 from celery_app import celery
@@ -14,12 +13,11 @@ logger = logging.getLogger(__name__)
 
 
 @celery.task(bind=True, default_retry_delay=10)
-def edit_video(self, project_json, changes, duplicate=False):
+def edit_video(self, project_json, changes):
     """
     Task use tool for edit video and record the data and update status after finished,
     :param project_json: project json
     :param changes: changes apply to the video
-    :param duplicate: duplicate project or not
     """
 
     project = json_util.loads(project_json)
@@ -34,24 +32,13 @@ def edit_video(self, project_json, changes, duplicate=False):
             **changes
         )
 
-        if duplicate:
-            pass
-            # new_storage_id = app.fs.put(
-            #     edited_video_stream,
-            #     project.get('filename'),
-            #     project_id=None,
-            #     asset_type='thumbnails',
-            #     storage_id=project['storage_id'],
-            #     content_type=None
-            # )
-        else:
-            new_storage_id = app.fs.replace(
-                edited_video_stream,
-                project['storage_id'],
-                None
-            )
-            logger.info(f"Replaced file {project['storage_id']} in {app.fs.__class__.__name__} "
-                        f"in project {project.get('_id')}")
+        app.fs.replace(
+            edited_video_stream,
+            project['storage_id'],
+            None
+        )
+        logger.info(f"Replaced file {project['storage_id']} in {app.fs.__class__.__name__} "
+                    f"in project {project.get('_id')}")
     except Exception as exc:
         logger.exception(exc)
         try:
