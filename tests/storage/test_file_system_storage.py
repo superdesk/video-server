@@ -100,7 +100,7 @@ def test_fs_storage_get_range(test_app, filestreams):
             asset_type='project'
         )
         filestream = storage.get(storage_id)
-        assert len(filestream) == 2298664
+        assert len(filestream) == 2617862
 
         filestream_range = storage.get_range(storage_id, 0, 1000000)
         assert len(filestream_range) == 1000000
@@ -109,7 +109,7 @@ def test_fs_storage_get_range(test_app, filestreams):
         assert len(filestream_range) == 1000000
 
         filestream_range = storage.get_range(storage_id, 2000000, 1000000)
-        assert len(filestream_range) == 298664
+        assert len(filestream_range) == 617862
 
         filestream_range = storage.get_range(storage_id, 3000000, 1000000)
         assert len(filestream_range) == 0

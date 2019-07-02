@@ -8,14 +8,13 @@ class VideoEditorInterface(metaclass=abc.ABCMeta):
         pass
 
     @abc.abstractmethod
-    def edit_video(self, stream_file, filename, metadata, video_cut=None, video_crop=None, video_rotate=None,
-                   video_quality=None):
+    def edit_video(self, stream_file, filename, trim=None, crop=None, rotate=None, scale=None):
         pass
 
     @abc.abstractmethod
-    def capture_thumbnail(self, stream_file, filename, metadata, capture_time):
+    def capture_thumbnail(self, stream_file, filename, duration, position):
         pass
 
     @abc.abstractmethod
-    def capture_timeline_thumbnails(self, stream_file, filename, metadata, number_frames):
+    def capture_timeline_thumbnails(self, stream_file, filename, duration, thumbnails_amount):
         pass

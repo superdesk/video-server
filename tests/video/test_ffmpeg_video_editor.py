@@ -1,73 +1,132 @@
-import sys
-import os
-
-from flask import current_app as app
+import pytest
 
 from lib.video_editor.ffmpeg import FFMPEGVideoEditor
 
-editor = FFMPEGVideoEditor()
+
+@pytest.mark.parametrize('filestreams', [('sample_0.mp4',)], indirect=True)
+def test_ffmpeg_video_editor_trim(test_app, filestreams):
+    editor = FFMPEGVideoEditor()
+    mp4_stream = filestreams[0]
+
+    with test_app.app_context():
+        content, metadata = editor.edit_video(
+            stream_file=mp4_stream,
+            filename='test_ffmpeg_video_editor_cut_video.mp4',
+            trim={'start': 2, 'end': 10}
+        )
+        assert metadata['duration'] == 8.0
+        content, metadata = editor.edit_video(
+            stream_file=mp4_stream,
+            filename='test_ffmpeg_video_editor_cut_video.mp4',
+            trim={'start': 0, 'end': 3}
+        )
+        assert metadata['duration'] == 3.0
 
 
-def test_ffmpeg_video_editor_cut_video(filestream):
-    content, metadata = editor.edit_video(
-        filestream, 'test_ffmpeg_video_editor_cut_video.mp4', None,
-        video_cut={'start': 2, 'end': 10}
-    )
+@pytest.mark.parametrize('filestreams', [('sample_0.mp4',)], indirect=True)
+def test_ffmpeg_video_editor_crop(test_app, filestreams):
+    editor = FFMPEGVideoEditor()
+    mp4_stream = filestreams[0]
 
-    assert metadata['width'] == 640
-    assert metadata['height'] == 480
-    assert metadata['duration'] == 8.027031
-    assert metadata['size'] == 666985
-    assert metadata['bit_rate'] == 332180
-
-
-def test_ffmpeg_video_editor_crop_video(filestream):
-    content, metadata = editor.edit_video(
-        filestream, 'test_ffmpeg_video_editor_crop_video.mp4', None,
-        video_crop={'width': 500, 'height': 400, 'x': 10, 'y': 10}
-    )
-
-    assert metadata['width'] == 500
-    assert metadata['height'] == 400
-    if sys.platform == 'linux':
-        assert metadata['bit_rate'] == 553486
-        assert metadata['size'] == 2353910
+    with test_app.app_context():
+        content, metadata = editor.edit_video(
+            stream_file=mp4_stream,
+            filename='test_ffmpeg_video_editor_cut_video.mp4',
+            crop={
+                'x': 0,
+                'y': 0,
+                'width': 640,
+                'height': 480
+            }
+        )
+        assert metadata['width'] == 640
+        assert metadata['height'] == 480
 
 
-def test_ffmpeg_video_editor_rotate_video(filestream):
-    content, metadata = editor.edit_video(
-        filestream, 'test_ffmpeg_video_editor_rotate_video.mp4', None,
-        video_rotate={'degree': 90}
-    )
+@pytest.mark.parametrize('filestreams', [('sample_0.mp4',)], indirect=True)
+def test_ffmpeg_video_editor_rotate(test_app, filestreams):
+    editor = FFMPEGVideoEditor()
+    mp4_stream = filestreams[0]
 
-    assert metadata['width'] == 480
-    assert metadata['height'] == 640
-
-
-def test_ffmpeg_video_editor_generate_thumbnails(client, filestream):
-    metadata = editor.get_meta(filestream)
-    fs_path = app.config['FS_MEDIA_STORAGE_PATH']
-    filename = 'test_ffmpeg_video_editor_generate_thumbnails'
-    storage_id_list = set()
-    for index, (thumbnail, thumbnail_meta) in enumerate(
-        editor.capture_list_timeline_thumbnails(
-            filestream,
-            filename,
-            metadata,
-            app.config.get('AMOUNT_FRAMES', 40))):
-        storage_id = app.fs.put(
-            thumbnail, f'filename_{index}.png', None,
-            asset_type='thumbnails', storage_id=f'{fs_path}/{filename}.mp4')
-        storage_id_list.add(storage_id)
-
-    assert all(os.path.exists(storage_id) for storage_id in storage_id_list)
+    with test_app.app_context():
+        content, metadata = editor.edit_video(
+            stream_file=mp4_stream,
+            filename='test_ffmpeg_video_editor_cut_video.mp4',
+            rotate=90
+        )
+        assert metadata['width'] == 720
+        assert metadata['height'] == 1280
 
 
-def test_ffmpeg_video_editor_capture_thumbnail(filestream):
-    metadata = editor.get_meta(filestream)
-    stream_meta, thumbnail_meta = editor.capture_thumbnail(
-        filestream, 'test_ffmpeg_video_editor_capture_thumbnail', metadata, 10
-    )
+@pytest.mark.parametrize('filestreams', [('sample_0.mp4',)], indirect=True)
+def test_ffmpeg_video_editor_scale(test_app, filestreams):
+    editor = FFMPEGVideoEditor()
+    mp4_stream = filestreams[0]
 
-    assert thumbnail_meta['codec_name'] == 'png'
-    assert thumbnail_meta['size'] == 317273
+    with test_app.app_context():
+        content, metadata = editor.edit_video(
+            stream_file=mp4_stream,
+            filename='test_ffmpeg_video_editor_cut_video.mp4',
+            scale=640
+        )
+        assert metadata['width'] == 640
+        # keep ratio
+        assert metadata['height'] == 720 / 2
+
+
+@pytest.mark.parametrize('filestreams', [('sample_0.mp4',)], indirect=True)
+def test_ffmpeg_video_editor_all_methods(test_app, filestreams):
+    editor = FFMPEGVideoEditor()
+    mp4_stream = filestreams[0]
+
+    with test_app.app_context():
+        content, metadata = editor.edit_video(
+            stream_file=mp4_stream,
+            filename='test_ffmpeg_video_editor_cut_video.mp4',
+            trim={'start': 0, 'end': 3},
+            crop={
+                'x': 0,
+                'y': 0,
+                'width': 640,
+                'height': 480
+            },
+            scale=320,
+            rotate=90
+
+        )
+        assert metadata['duration'] == 3.0
+        assert metadata['width'] == 240
+        assert metadata['height'] == 320
+
+
+@pytest.mark.parametrize('filestreams', [('sample_0.mp4',)], indirect=True)
+def test_ffmpeg_video_editor_capture_timeline_thumbnails(test_app, filestreams):
+    editor = FFMPEGVideoEditor()
+    mp4_stream = filestreams[0]
+
+    with test_app.app_context():
+        filename = 'test_ffmpeg_video_editor_cut_video.mp4'
+        thumbnails_generator = editor.capture_timeline_thumbnails(mp4_stream, filename, 15, 10)
+
+        for i, (thumbnail, meta) in enumerate(thumbnails_generator):
+            assert thumbnail.__class__ is bytes
+            assert meta['codec_name'] == 'png'
+            assert meta['mimetype'] == 'image/png'
+            assert meta['width'] == 89
+            assert meta['height'] == 50
+
+
+@pytest.mark.parametrize('filestreams', [('sample_0.mp4',)], indirect=True)
+def test_ffmpeg_video_editor_capture_thumbnail(test_app, filestreams):
+    editor = FFMPEGVideoEditor()
+    mp4_stream = filestreams[0]
+
+    with test_app.app_context():
+        filename = 'test_ffmpeg_video_editor_cut_video.mp4'
+        thumbnail, meta = editor.capture_thumbnail(mp4_stream, filename, 15, 5)
+
+        assert thumbnail.__class__ is bytes
+        assert meta['codec_name'] == 'png'
+        assert meta['mimetype'] == 'image/png'
+        assert meta['width'] == 1280
+        assert meta['height'] == 720

@@ -42,12 +42,11 @@ class FFMPEGVideoEditor(VideoEditorInterface):
 
         return metadata
 
-    def edit_video(self, stream_file, filename, metadata, trim=None, crop=None, rotate=None, scale=None):
+    def edit_video(self, stream_file, filename, trim=None, crop=None, rotate=None, scale=None):
         """
         Use ffmpeg tool for edit video
         :param stream_file:
         :param filename:
-        :param metadata:
         :param trim:
         :param crop:
         :param video_rotate:

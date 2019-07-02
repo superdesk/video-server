@@ -28,7 +28,6 @@ def edit_video(self, project_json, changes):
         edited_video_stream, metadata = video_editor.edit_video(
             stream_file=app.fs.get(project['storage_id']),
             filename=project['filename'],
-            metadata=project['metadata'],
             **changes
         )
 
