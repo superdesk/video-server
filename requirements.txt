@@ -10,3 +10,4 @@ PyYAML==5.1
 gunicorn==19.7.1
 honcho==1.0.1
 pytest
+pytest-cov
