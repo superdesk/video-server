@@ -14,10 +14,13 @@ def test_app(request):
     :return: flask app
     """
     test_app = get_app()
+    test_app.config['ITEMS_PER_PAGE'] = 2
     test_app.config['TESTING'] = True
     test_app.config['MONGO_DBNAME'] = 'sd_video_editor_test'
     test_app.config['MONGO_URI'] = 'mongodb://localhost:27017/sd_video_editor_test'
     test_app.config['FS_MEDIA_STORAGE_PATH'] = os.path.join(os.path.dirname(__file__), 'media', 'projects')
+    test_app.config['CELERY_TASK_ALWAYS_EAGER'] = True
+    test_app.config['MIN_TRIM_DURATION'] = 2
 
     if not os.path.exists(test_app.config['FS_MEDIA_STORAGE_PATH']):
         os.makedirs(test_app.config['FS_MEDIA_STORAGE_PATH'])

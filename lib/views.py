@@ -25,7 +25,7 @@ class MethodView(FlaskMethodView):
         try:
             doc = app.mongo.db.projects.find_one({'_id': bson.ObjectId(project_id)})
         except bson.errors.InvalidId as e:
-            raise BadRequest(str(e))
+            raise NotFound(f"Project with id '{project_id}' was not found.")
 
         if not doc:
             raise NotFound(f"Project with id '{project_id}' was not found.")

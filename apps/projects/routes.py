@@ -1232,7 +1232,7 @@ class GetRawThumbnail(MethodView):
 # register all urls
 bp.add_url_rule(
     '/',
-    view_func=ListUploadProject.as_view('upload_project')
+    view_func=ListUploadProject.as_view('list_upload_project')
 )
 bp.add_url_rule(
     '/<project_id>',
