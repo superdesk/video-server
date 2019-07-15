@@ -64,7 +64,7 @@ def edit_video(self, project_json, changes):
             {'$set': {
                 'processing.video': False,
                 'metadata': metadata,
-                'thumbnails.timeline': {},
+                'thumbnails.timeline': [],
                 'version': project['version'] + 1
             }},
             return_document=ReturnDocument.BEFORE

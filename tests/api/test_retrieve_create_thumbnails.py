@@ -29,6 +29,35 @@ def test_capture_timeline_thumbnails_success(test_app, client, projects):
 
 
 @pytest.mark.parametrize('projects', [('sample_0.mp4',)], indirect=True)
+def test_capture_timeline_thumbnails_remove_old(test_app, client, projects):
+    project = projects[0]
+    amount = 3
+
+    with test_app.test_request_context():
+        # generate 3 timeline thumbnails
+        url = url_for(
+            'projects.retrieve_or_create_thumbnails', project_id=project['_id']
+        ) + f'?type=timeline&amount={amount}'
+        client.get(url)
+        # generate 4 timeline thumbnails
+        amount = 4
+        url = url_for(
+            'projects.retrieve_or_create_thumbnails', project_id=project['_id']
+        ) + f'?type=timeline&amount={amount}'
+        resp = client.get(url)
+        resp_data = json.loads(resp.data)
+        assert resp.status == '200 OK'
+        assert resp_data == {'processing': True}
+
+        resp = client.get(url)
+        resp_data = json.loads(resp.data)
+        assert resp.status == '200 OK'
+        assert len(resp_data) == amount
+        for thumbnail_data in resp_data:
+            assert test_app.fs.get(thumbnail_data['storage_id']).__class__ is bytes
+
+
+@pytest.mark.parametrize('projects', [('sample_0.mp4',)], indirect=True)
 def test_capture_timeline_thumbnails_202_resp(test_app, client, projects):
     project = projects[0]
     amount = 3

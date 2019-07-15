@@ -476,3 +476,39 @@ def test_edit_project_scale_and_crop_success(test_app, client, projects):
         resp_data = json.loads(resp.data)
         assert resp_data['metadata']['width'] == 640
         assert resp_data['metadata']['height'] == 640
+
+
+@pytest.mark.parametrize('projects', [('sample_0.mp4',)], indirect=True)
+def test_edit_project_remove_thumbnails(test_app, client, projects):
+    project = projects[0]
+
+    with test_app.test_request_context():
+        # capture 3 timeline thumbnails
+        url = url_for(
+            'projects.retrieve_or_create_thumbnails', project_id=project['_id']
+        ) + '?type=timeline&amount=3'
+        client.get(url)
+        # capture preview thumbnail
+        url = url_for(
+            'projects.retrieve_or_create_thumbnails', project_id=project['_id']
+        ) + '?type=preview&position=2'
+        client.get(url)
+        # edit request
+        url = url_for('projects.retrieve_edit_destroy_project', project_id=project['_id'])
+        resp = client.put(
+            url,
+            data=json.dumps({
+                "rotate": 90
+            }),
+            content_type='application/json'
+        )
+        resp_data = json.loads(resp.data)
+        assert resp.status == '200 OK'
+        assert resp_data == {'processing': True}
+        # get details
+        resp = client.get(url)
+        resp_data = json.loads(resp.data)
+
+        assert resp_data['thumbnails']['timeline'] == []
+        # we keep preview thumbnail
+        assert resp_data['thumbnails']['preview'] != None
