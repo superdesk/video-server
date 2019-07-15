@@ -1088,8 +1088,9 @@ class RetrieveOrCreateThumbnails(MethodView):
               self._project['thumbnails']['preview'].get('position') == position):
             return json_response(self._project['thumbnails']['preview'])
         elif self._project['metadata']['duration'] < position:
-            return BadRequest(
-                f"Requested position:{position} is more than video's duration:{self._project['metadata']['duration']}."
+            raise BadRequest(
+                f"Requested position: '{position}' is more than video's duration: "
+                f"'{self._project['metadata']['duration']}'."
             )
         else:
             # set processing flag
@@ -1134,6 +1135,7 @@ class GetRawVideo(MethodView):
         length = self._project['metadata'].get('size')
         if video_range:
             start = int(re.split('[= | -]', video_range)[1])
+            # TODO doublecheck streaming range
             end = length - 1
             chunksize = end - start + 1
             headers = {

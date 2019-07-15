@@ -3,4 +3,6 @@ omit = .env/*,
        tests/*,
        app.py,
        celery_app.py,
-       settings.py
+       settings.py,
+       apps/swagger/*,
+       lib/logging.py

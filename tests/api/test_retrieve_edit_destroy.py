@@ -1,5 +1,5 @@
 import json
-from io import BytesIO
+from bson import ObjectId
 
 import pytest
 from flask import url_for
@@ -82,10 +82,11 @@ def test_edit_project_202_response(test_app, client, projects):
     project = projects[0]
 
     with test_app.test_request_context():
-        # set processing to true in db
-        _id = list(test_app.mongo.db.projects.find().limit(1))[0]['_id']
+        # since we use CELERY_TASK_ALWAYS_EAGER, task will be executed immediately,
+        # it means next request will return a finshed result,
+        # since we want to test 202 response, we must set processing flag in db directly
         test_app.mongo.db.projects.find_one_and_update(
-            {'_id': _id},
+            {'_id': ObjectId(project['_id'])},
             {'$set': {'processing.video': True}}
         )
 
