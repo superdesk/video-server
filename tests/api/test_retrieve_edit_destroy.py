@@ -5,24 +5,13 @@ import pytest
 from flask import url_for
 
 
-@pytest.mark.parametrize('filestreams', [('sample_0.mp4',)], indirect=True)
-def test_retrieve_project_success(test_app, client, filestreams):
-    mp4_stream = filestreams[0]
-    filename = 'sample_0.mp4'
+@pytest.mark.parametrize('projects', [('sample_0.mp4',)], indirect=True)
+def test_retrieve_project_success(test_app, client, projects):
+    project = projects[0]
 
     with test_app.test_request_context():
-        # create a project
-        url = url_for('projects.list_upload_project')
-        resp = client.post(
-            url,
-            data={
-                'file': (BytesIO(mp4_stream), filename)
-            },
-            content_type='multipart/form-data'
-        )
-        resp_data = json.loads(resp.data)
         # retrieve project
-        url = url_for('projects.retrieve_edit_destroy_project', project_id=resp_data['_id'])
+        url = url_for('projects.retrieve_edit_destroy_project', project_id=project['_id'])
         resp = client.get(url)
         resp_data = json.loads(resp.data)
 
@@ -33,7 +22,7 @@ def test_retrieve_project_success(test_app, client, filestreams):
         assert 'create_time' in resp_data
         assert resp_data['mime_type'] == 'video/mp4'
         assert resp_data['request_address'] == '127.0.0.1'
-        assert resp_data['original_filename'] == filename
+        assert resp_data['original_filename'] == project['original_filename']
         assert resp_data['version'] == 1
         assert resp_data['parent'] == None
         assert resp_data['processing'] == {'video': False, 'thumbnail_preview': False, 'thumbnails_timeline': False}
@@ -51,96 +40,48 @@ def test_retrieve_project_success(test_app, client, filestreams):
         assert 'size' in resp_data['metadata']
 
 
-@pytest.mark.parametrize('filestreams', [('sample_0.mp4',)], indirect=True)
-def test_retrieve_project_404(test_app, client, filestreams):
-    mp4_stream = filestreams[0]
-    filename = 'sample_0.mp4'
+@pytest.mark.parametrize('projects', [('sample_0.mp4',)], indirect=True)
+def test_retrieve_project_404(test_app, client, projects):
+    project = projects[0]
 
     with test_app.test_request_context():
-        # create a project
-        url = url_for('projects.list_upload_project')
-        resp = client.post(
-            url,
-            data={
-                'file': (BytesIO(mp4_stream), filename)
-            },
-            content_type='multipart/form-data'
-        )
-        resp_data = json.loads(resp.data)
-
         # retrieve project
         url = url_for('projects.retrieve_edit_destroy_project', project_id="definitely_not_object_id")
         resp = client.get(url)
         assert resp.status == '404 NOT FOUND'
 
-        url = url_for('projects.retrieve_edit_destroy_project', project_id=resp_data['_id'])
+        url = url_for('projects.retrieve_edit_destroy_project', project_id=project['_id'])
         client.delete(url)
         resp = client.get(url)
         assert resp.status == '404 NOT FOUND'
 
 
-@pytest.mark.parametrize('filestreams', [('sample_0.mp4',)], indirect=True)
-def test_destroy_project_success(test_app, client, filestreams):
-    mp4_stream = filestreams[0]
-    filename = 'sample_0.mp4'
+@pytest.mark.parametrize('projects', [('sample_0.mp4',)], indirect=True)
+def test_destroy_project_success(test_app, client, projects):
+    project = projects[0]
 
     with test_app.test_request_context():
-        # create a project
-        url = url_for('projects.list_upload_project')
-        resp = client.post(
-            url,
-            data={
-                'file': (BytesIO(mp4_stream), filename)
-            },
-            content_type='multipart/form-data'
-        )
-        resp_data = json.loads(resp.data)
-
-        url = url_for('projects.retrieve_edit_destroy_project', project_id=resp_data['_id'])
+        url = url_for('projects.retrieve_edit_destroy_project', project_id=project['_id'])
         resp = client.delete(url)
         assert resp.status == '204 NO CONTENT'
 
 
-@pytest.mark.parametrize('filestreams', [('sample_0.mp4',)], indirect=True)
-def test_destroy_project_fails(test_app, client, filestreams):
-    mp4_stream = filestreams[0]
-    filename = 'sample_0.mp4'
+@pytest.mark.parametrize('projects', [('sample_0.mp4',)], indirect=True)
+def test_destroy_project_fails(test_app, client, projects):
+    project = projects[0]
 
     with test_app.test_request_context():
-        # create a project
-        url = url_for('projects.list_upload_project')
-        resp = client.post(
-            url,
-            data={
-                'file': (BytesIO(mp4_stream), filename)
-            },
-            content_type='multipart/form-data'
-        )
-        resp_data = json.loads(resp.data)
-
-        url = url_for('projects.retrieve_edit_destroy_project', project_id=resp_data['_id'])
+        url = url_for('projects.retrieve_edit_destroy_project', project_id=project['_id'])
         client.delete(url)
         resp = client.delete(url)
         assert resp.status == '404 NOT FOUND'
 
 
-@pytest.mark.parametrize('filestreams', [('sample_0.mp4',)], indirect=True)
-def test_edit_project_202_response(test_app, client, filestreams):
-    mp4_stream = filestreams[0]
-    filename = 'sample_0.mp4'
+@pytest.mark.parametrize('projects', [('sample_0.mp4',)], indirect=True)
+def test_edit_project_202_response(test_app, client, projects):
+    project = projects[0]
 
     with test_app.test_request_context():
-        # create a project
-        url = url_for('projects.list_upload_project')
-        resp = client.post(
-            url,
-            data={
-                'file': (BytesIO(mp4_stream), filename)
-            },
-            content_type='multipart/form-data'
-        )
-        resp_data = json.loads(resp.data)
-
         # set processing to true in db
         _id = list(test_app.mongo.db.projects.find().limit(1))[0]['_id']
         test_app.mongo.db.projects.find_one_and_update(
@@ -149,7 +90,7 @@ def test_edit_project_202_response(test_app, client, filestreams):
         )
 
         # edit request
-        url = url_for('projects.retrieve_edit_destroy_project', project_id=resp_data['_id'])
+        url = url_for('projects.retrieve_edit_destroy_project', project_id=project['_id'])
         start = 2.0
         end = 6.0
         resp = client.put(
@@ -165,25 +106,13 @@ def test_edit_project_202_response(test_app, client, filestreams):
         assert resp.status == '202 ACCEPTED'
 
 
-@pytest.mark.parametrize('filestreams', [('sample_0.mp4',)], indirect=True)
-def test_edit_project_trim_success(test_app, client, filestreams):
-    mp4_stream = filestreams[0]
-    filename = 'sample_0.mp4'
+@pytest.mark.parametrize('projects', [('sample_0.mp4',)], indirect=True)
+def test_edit_project_trim_success(test_app, client, projects):
+    project = projects[0]
 
     with test_app.test_request_context():
-        # create a project
-        url = url_for('projects.list_upload_project')
-        resp = client.post(
-            url,
-            data={
-                'file': (BytesIO(mp4_stream), filename)
-            },
-            content_type='multipart/form-data'
-        )
-        resp_data = json.loads(resp.data)
-
         # edit request
-        url = url_for('projects.retrieve_edit_destroy_project', project_id=resp_data['_id'])
+        url = url_for('projects.retrieve_edit_destroy_project', project_id=project['_id'])
         start = 2.0
         end = 6.0
         resp = client.put(
@@ -206,23 +135,12 @@ def test_edit_project_trim_success(test_app, client, filestreams):
         assert resp_data['metadata']['duration'] == end - start
 
 
-@pytest.mark.parametrize('filestreams', [('sample_0.mp4',)], indirect=True)
-def test_edit_project_trim_fail(test_app, client, filestreams):
-    mp4_stream = filestreams[0]
-    filename = 'sample_0.mp4'
+@pytest.mark.parametrize('projects', [('sample_0.mp4',)], indirect=True)
+def test_edit_project_trim_fail(test_app, client, projects):
+    project = projects[0]
 
     with test_app.test_request_context():
-        # create a project
-        url = url_for('projects.list_upload_project')
-        resp = client.post(
-            url,
-            data={
-                'file': (BytesIO(mp4_stream), filename)
-            },
-            content_type='multipart/form-data'
-        )
-        resp_data = json.loads(resp.data)
-        url = url_for('projects.retrieve_edit_destroy_project', project_id=resp_data['_id'])
+        url = url_for('projects.retrieve_edit_destroy_project', project_id=project['_id'])
 
         # edit request
         resp = client.put(
@@ -285,25 +203,13 @@ def test_edit_project_trim_fail(test_app, client, filestreams):
         assert resp_data == {'message': {'trim': [{'end': ['trim is duplicating an entire video']}]}}
 
 
-@pytest.mark.parametrize('filestreams', [('sample_0.mp4',)], indirect=True)
-def test_edit_project_rotate_success(test_app, client, filestreams):
-    mp4_stream = filestreams[0]
-    filename = 'sample_0.mp4'
+@pytest.mark.parametrize('projects', [('sample_0.mp4',)], indirect=True)
+def test_edit_project_rotate_success(test_app, client, projects):
+    project = projects[0]
 
     with test_app.test_request_context():
-        # create a project
-        url = url_for('projects.list_upload_project')
-        resp = client.post(
-            url,
-            data={
-                'file': (BytesIO(mp4_stream), filename)
-            },
-            content_type='multipart/form-data'
-        )
-        resp_data = json.loads(resp.data)
-
         # edit request
-        url = url_for('projects.retrieve_edit_destroy_project', project_id=resp_data['_id'])
+        url = url_for('projects.retrieve_edit_destroy_project', project_id=project['_id'])
         resp = client.put(
             url,
             data=json.dumps({
@@ -321,25 +227,13 @@ def test_edit_project_rotate_success(test_app, client, filestreams):
         assert resp_data['metadata']['height'] == 1280
 
 
-@pytest.mark.parametrize('filestreams', [('sample_0.mp4',)], indirect=True)
-def test_edit_project_rotate_fail(test_app, client, filestreams):
-    mp4_stream = filestreams[0]
-    filename = 'sample_0.mp4'
+@pytest.mark.parametrize('projects', [('sample_0.mp4',)], indirect=True)
+def test_edit_project_rotate_fail(test_app, client, projects):
+    project = projects[0]
 
     with test_app.test_request_context():
-        # create a project
-        url = url_for('projects.list_upload_project')
-        resp = client.post(
-            url,
-            data={
-                'file': (BytesIO(mp4_stream), filename)
-            },
-            content_type='multipart/form-data'
-        )
-        resp_data = json.loads(resp.data)
-
         # edit request
-        url = url_for('projects.retrieve_edit_destroy_project', project_id=resp_data['_id'])
+        url = url_for('projects.retrieve_edit_destroy_project', project_id=project['_id'])
         resp = client.put(
             url,
             data=json.dumps({
@@ -350,25 +244,13 @@ def test_edit_project_rotate_fail(test_app, client, filestreams):
         assert resp.status == '400 BAD REQUEST'
 
 
-@pytest.mark.parametrize('filestreams', [('sample_0.mp4',)], indirect=True)
-def test_edit_project_crop_success(test_app, client, filestreams):
-    mp4_stream = filestreams[0]
-    filename = 'sample_0.mp4'
+@pytest.mark.parametrize('projects', [('sample_0.mp4',)], indirect=True)
+def test_edit_project_crop_success(test_app, client, projects):
+    project = projects[0]
 
     with test_app.test_request_context():
-        # create a project
-        url = url_for('projects.list_upload_project')
-        resp = client.post(
-            url,
-            data={
-                'file': (BytesIO(mp4_stream), filename)
-            },
-            content_type='multipart/form-data'
-        )
-        resp_data = json.loads(resp.data)
-
         # edit request
-        url = url_for('projects.retrieve_edit_destroy_project', project_id=resp_data['_id'])
+        url = url_for('projects.retrieve_edit_destroy_project', project_id=project['_id'])
         resp = client.put(
             url,
             data=json.dumps({
@@ -391,23 +273,12 @@ def test_edit_project_crop_success(test_app, client, filestreams):
         assert resp_data['metadata']['height'] == 480
 
 
-@pytest.mark.parametrize('filestreams', [('sample_0.mp4',)], indirect=True)
-def test_edit_project_crop_fail(test_app, client, filestreams):
-    mp4_stream = filestreams[0]
-    filename = 'sample_0.mp4'
+@pytest.mark.parametrize('projects', [('sample_0.mp4',)], indirect=True)
+def test_edit_project_crop_fail(test_app, client, projects):
+    project = projects[0]
 
     with test_app.test_request_context():
-        # create a project
-        url = url_for('projects.list_upload_project')
-        resp = client.post(
-            url,
-            data={
-                'file': (BytesIO(mp4_stream), filename)
-            },
-            content_type='multipart/form-data'
-        )
-        resp_data = json.loads(resp.data)
-        url = url_for('projects.retrieve_edit_destroy_project', project_id=resp_data['_id'])
+        url = url_for('projects.retrieve_edit_destroy_project', project_id=project['_id'])
 
         # edit request
         resp = client.put(
@@ -478,25 +349,13 @@ def test_edit_project_crop_fail(test_app, client, filestreams):
         assert resp_data == {'message': {'crop': [{'height': ["crop's frame is outside a video's frame"]}]}}
 
 
-@pytest.mark.parametrize('filestreams', [('sample_0.mp4',)], indirect=True)
-def test_edit_project_scale_success(test_app, client, filestreams):
-    mp4_stream = filestreams[0]
-    filename = 'sample_0.mp4'
+@pytest.mark.parametrize('projects', [('sample_0.mp4',)], indirect=True)
+def test_edit_project_scale_success(test_app, client, projects):
+    project = projects[0]
 
     with test_app.test_request_context():
-        # create a project
-        url = url_for('projects.list_upload_project')
-        resp = client.post(
-            url,
-            data={
-                'file': (BytesIO(mp4_stream), filename)
-            },
-            content_type='multipart/form-data'
-        )
-        resp_data = json.loads(resp.data)
-
         # edit request
-        url = url_for('projects.retrieve_edit_destroy_project', project_id=resp_data['_id'])
+        url = url_for('projects.retrieve_edit_destroy_project', project_id=project['_id'])
         resp = client.put(
             url,
             data=json.dumps({
@@ -514,23 +373,12 @@ def test_edit_project_scale_success(test_app, client, filestreams):
         assert resp_data['metadata']['height'] == 360
 
 
-@pytest.mark.parametrize('filestreams', [('sample_0.mp4',)], indirect=True)
-def test_edit_project_scale_fail(test_app, client, filestreams):
-    mp4_stream = filestreams[0]
-    filename = 'sample_0.mp4'
+@pytest.mark.parametrize('projects', [('sample_0.mp4',)], indirect=True)
+def test_edit_project_scale_fail(test_app, client, projects):
+    project = projects[0]
 
     with test_app.test_request_context():
-        # create a project
-        url = url_for('projects.list_upload_project')
-        resp = client.post(
-            url,
-            data={
-                'file': (BytesIO(mp4_stream), filename)
-            },
-            content_type='multipart/form-data'
-        )
-        resp_data = json.loads(resp.data)
-        url = url_for('projects.retrieve_edit_destroy_project', project_id=resp_data['_id'])
+        url = url_for('projects.retrieve_edit_destroy_project', project_id=project['_id'])
 
         # edit request
         resp = client.put(
@@ -599,25 +447,13 @@ def test_edit_project_scale_fail(test_app, client, filestreams):
         }
 
 
-@pytest.mark.parametrize('filestreams', [('sample_0.mp4',)], indirect=True)
-def test_edit_project_scale_and_crop_success(test_app, client, filestreams):
-    mp4_stream = filestreams[0]
-    filename = 'sample_0.mp4'
+@pytest.mark.parametrize('projects', [('sample_0.mp4',)], indirect=True)
+def test_edit_project_scale_and_crop_success(test_app, client, projects):
+    project = projects[0]
 
     with test_app.test_request_context():
-        # create a project
-        url = url_for('projects.list_upload_project')
-        resp = client.post(
-            url,
-            data={
-                'file': (BytesIO(mp4_stream), filename)
-            },
-            content_type='multipart/form-data'
-        )
-        resp_data = json.loads(resp.data)
-
         # edit request
-        url = url_for('projects.retrieve_edit_destroy_project', project_id=resp_data['_id'])
+        url = url_for('projects.retrieve_edit_destroy_project', project_id=project['_id'])
         resp = client.put(
             url,
             data=json.dumps({

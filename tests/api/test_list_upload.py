@@ -165,7 +165,7 @@ def test_list_projects(test_app, client, filestreams):
                 },
                 content_type='multipart/form-data'
             )
-        # list prohects (1st page)
+        # list projects (1st page)
         resp = client.get(url)
         resp_data = json.loads(resp.data)
         assert resp.status == '200 OK'

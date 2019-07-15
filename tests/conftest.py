@@ -1,7 +1,10 @@
 import os
+import json
 import shutil
+from io import BytesIO
 
 import pytest
+from flask import url_for
 
 from app import get_app
 
@@ -61,3 +64,26 @@ def filestreams(request):
         filestreams.append(filestream)
 
     return filestreams
+
+
+@pytest.fixture(scope='function')
+def projects(request, test_app, client):
+    projects = []
+
+    for filename in request.param:
+        test_path = os.path.dirname(os.path.abspath(__file__))
+        with open(f'{test_path}/storage/fixtures/{filename}', 'rb') as f:
+            filestream = f.read()
+        with test_app.test_request_context():
+            # create a project
+            url = url_for('projects.list_upload_project')
+            resp = client.post(
+                url,
+                data={
+                    'file': (BytesIO(filestream), filename)
+                },
+                content_type='multipart/form-data'
+            )
+            projects.append(json.loads(resp.data))
+
+    return projects
