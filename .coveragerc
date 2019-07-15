@@ -1,2 +1,6 @@
 [run]
-omit = .env/*
+omit = .env/*,
+       tests/*,
+       app.py,
+       celery_app.py,
+       settings.py

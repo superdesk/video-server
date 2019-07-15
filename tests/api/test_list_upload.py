@@ -1,8 +1,10 @@
 import json
 from io import BytesIO
+from unittest import mock
 
 import pytest
 from flask import url_for
+from pymongo.errors import ServerSelectionTimeoutError
 
 
 @pytest.mark.parametrize('filestreams', [('sample_0.mp4',)], indirect=True)
@@ -92,6 +94,49 @@ def test_upload_project_wrong_contenttype(test_app, client, filestreams):
         resp_data = json.loads(resp.data)
         assert resp.status == '400 BAD REQUEST'
         assert resp_data['message'] == {'file': ['required field']}
+
+
+@pytest.mark.parametrize('filestreams', [('sample_0.mp4',)], indirect=True)
+@mock.patch('apps.projects.routes.app.fs.put', side_effect=Exception('Some error'))
+def test_upload_project_broken_fs_put(mock_fs_put, test_app, client, filestreams):
+    mp4_stream = filestreams[0]
+    filename = 'sample_0.mp4'
+
+    with test_app.test_request_context():
+        url = url_for('projects.list_upload_project')
+        resp = client.post(
+            url,
+            data={
+                'file': (BytesIO(mp4_stream), filename)
+            },
+            content_type='multipart/form-data'
+        )
+        resp_data = json.loads(resp.data)
+        assert resp.status == '500 INTERNAL SERVER ERROR'
+        assert resp_data == {'message': 'Some error'}
+        assert list(test_app.mongo.db.projects.find()) == []
+
+
+@pytest.mark.parametrize('filestreams', [('sample_0.mp4',)], indirect=True)
+@mock.patch('pymongo.collection.Collection.find_one_and_update',
+            side_effect=ServerSelectionTimeoutError('Timeout error'))
+def test_upload_project_cant_set_storage_id(mock_find_one_and_update, test_app, client, filestreams):
+    mp4_stream = filestreams[0]
+    filename = 'sample_0.mp4'
+
+    with test_app.test_request_context():
+        url = url_for('projects.list_upload_project')
+        resp = client.post(
+            url,
+            data={
+                'file': (BytesIO(mp4_stream), filename)
+            },
+            content_type='multipart/form-data'
+        )
+        resp_data = json.loads(resp.data)
+        assert resp.status == '500 INTERNAL SERVER ERROR'
+        assert resp_data == {'message': 'Timeout error'}
+        assert list(test_app.mongo.db.projects.find()) == []
 
 
 @pytest.mark.parametrize('filestreams', [('sample_0.mp4',)], indirect=True)

@@ -125,6 +125,47 @@ def test_destroy_project_fails(test_app, client, filestreams):
 
 
 @pytest.mark.parametrize('filestreams', [('sample_0.mp4',)], indirect=True)
+def test_edit_project_202_response(test_app, client, filestreams):
+    mp4_stream = filestreams[0]
+    filename = 'sample_0.mp4'
+
+    with test_app.test_request_context():
+        # create a project
+        url = url_for('projects.list_upload_project')
+        resp = client.post(
+            url,
+            data={
+                'file': (BytesIO(mp4_stream), filename)
+            },
+            content_type='multipart/form-data'
+        )
+        resp_data = json.loads(resp.data)
+
+        # set processing to true in db
+        _id = list(test_app.mongo.db.projects.find().limit(1))[0]['_id']
+        test_app.mongo.db.projects.find_one_and_update(
+            {'_id': _id},
+            {'$set': {'processing.video': True}}
+        )
+
+        # edit request
+        url = url_for('projects.retrieve_edit_destroy_project', project_id=resp_data['_id'])
+        start = 2.0
+        end = 6.0
+        resp = client.put(
+            url,
+            data=json.dumps({
+                "trim": {
+                    "start": start,
+                    "end": end
+                }
+            }),
+            content_type='application/json'
+        )
+        assert resp.status == '202 ACCEPTED'
+
+
+@pytest.mark.parametrize('filestreams', [('sample_0.mp4',)], indirect=True)
 def test_edit_project_trim_success(test_app, client, filestreams):
     mp4_stream = filestreams[0]
     filename = 'sample_0.mp4'
@@ -541,3 +582,60 @@ def test_edit_project_scale_fail(test_app, client, filestreams):
         assert resp_data == {'message': {
             'trim': [{'scale': ['interpolation is permitted only for videos which have width less than 1280px']}]}
         }
+
+        # edit request
+        test_app.config['ALLOW_INTERPOLATION'] = False
+        resp = client.put(
+            url,
+            data=json.dumps({
+                "scale": 1440
+            }),
+            content_type='application/json'
+        )
+        resp_data = json.loads(resp.data)
+        assert resp.status == '400 BAD REQUEST'
+        assert resp_data == {'message': {
+            'trim': [{'scale': ['interpolation of pixels is not allowed']}]}
+        }
+
+
+@pytest.mark.parametrize('filestreams', [('sample_0.mp4',)], indirect=True)
+def test_edit_project_scale_and_crop_success(test_app, client, filestreams):
+    mp4_stream = filestreams[0]
+    filename = 'sample_0.mp4'
+
+    with test_app.test_request_context():
+        # create a project
+        url = url_for('projects.list_upload_project')
+        resp = client.post(
+            url,
+            data={
+                'file': (BytesIO(mp4_stream), filename)
+            },
+            content_type='multipart/form-data'
+        )
+        resp_data = json.loads(resp.data)
+
+        # edit request
+        url = url_for('projects.retrieve_edit_destroy_project', project_id=resp_data['_id'])
+        resp = client.put(
+            url,
+            data=json.dumps({
+                "scale": 640,
+                "crop": {
+                    "x": 0,
+                    "y": 0,
+                    "width": 400,
+                    "height": 400
+                }
+            }),
+            content_type='application/json'
+        )
+        resp_data = json.loads(resp.data)
+        assert resp.status == '200 OK'
+        assert resp_data == {'processing': True}
+        # get details
+        resp = client.get(url)
+        resp_data = json.loads(resp.data)
+        assert resp_data['metadata']['width'] == 640
+        assert resp_data['metadata']['height'] == 640
