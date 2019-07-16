@@ -37,6 +37,3 @@ def init_celery(app):
 def handle_exception(exc):
     """Log exception to logger."""
     logger.exception(exc)
-
-
-

@@ -24,7 +24,7 @@ def test_retrieve_project_success(test_app, client, projects):
         assert resp_data['request_address'] == '127.0.0.1'
         assert resp_data['original_filename'] == project['original_filename']
         assert resp_data['version'] == 1
-        assert resp_data['parent'] == None
+        assert resp_data['parent'] is None
         assert resp_data['processing'] == {'video': False, 'thumbnail_preview': False, 'thumbnails_timeline': False}
         assert resp_data['thumbnails'] == {'timeline': [], 'preview': None}
         assert resp_data['url'] == f'http://localhost:5050/projects/{resp_data["_id"]}/raw/video'
@@ -132,7 +132,7 @@ def test_edit_project_trim_success(test_app, client, projects):
         # get details
         resp = client.get(url)
         resp_data = json.loads(resp.data)
-        assert resp_data['processing']['video'] == False
+        assert not resp_data['processing']['video']
         assert resp_data['metadata']['duration'] == end - start
 
 
@@ -511,4 +511,4 @@ def test_edit_project_remove_thumbnails(test_app, client, projects):
 
         assert resp_data['thumbnails']['timeline'] == []
         # we keep preview thumbnail
-        assert resp_data['thumbnails']['preview'] != None
+        assert resp_data['thumbnails']['preview'] is not None

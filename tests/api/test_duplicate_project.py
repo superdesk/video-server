@@ -99,7 +99,7 @@ def test_duplicate_project_with_thumbnails(test_app, client, projects):
         resp_data = json.loads(resp.data)
 
         assert resp.status == '201 CREATED'
-        assert resp_data['thumbnails']['preview'] != None
+        assert resp_data['thumbnails']['preview'] is not None
         assert test_app.fs.get(resp_data['thumbnails']['preview']['storage_id']).__class__ is bytes
         assert len(resp_data['thumbnails']['timeline']) == amount
         for thumbn_data in resp_data['thumbnails']['timeline']:

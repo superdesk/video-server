@@ -156,6 +156,7 @@ def test_upload_custom_preview_thumbnail_success(test_app, client, projects, fil
         assert resp.status == '200 OK'
         assert test_app.fs.get(resp_data['storage_id']).__class__ is bytes
 
+
 @pytest.mark.parametrize('projects', [('sample_0.mp4',)], indirect=True)
 def test_upload_custom_preview_thumbnail_no_file(test_app, client, projects):
     project = projects[0]

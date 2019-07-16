@@ -32,7 +32,7 @@ def test_upload_project_success(test_app, client, filestreams):
         assert resp_data['request_address'] == '127.0.0.1'
         assert resp_data['original_filename'] == filename
         assert resp_data['version'] == 1
-        assert resp_data['parent'] == None
+        assert resp_data['parent'] is None
         assert resp_data['processing'] == {'video': False, 'thumbnail_preview': False, 'thumbnails_timeline': False}
         assert resp_data['thumbnails'] == {'timeline': [], 'preview': None}
         assert resp_data['url'] == f'http://localhost:5050/projects/{resp_data["_id"]}/raw/video'
@@ -183,11 +183,15 @@ def test_list_projects(test_app, client, filestreams):
         assert resp_data['_items'][0]['request_address'] == '127.0.0.1'
         assert resp_data['_items'][0]['original_filename'] == filename
         assert resp_data['_items'][0]['version'] == 1
-        assert resp_data['_items'][0]['parent'] == None
-        assert resp_data['_items'][0]['processing'] == {'video': False, 'thumbnail_preview': False, 'thumbnails_timeline': False}
+        assert resp_data['_items'][0]['parent'] is None
+        assert resp_data['_items'][0]['processing'] == {
+            'video': False,
+            'thumbnail_preview': False,
+            'thumbnails_timeline': False
+        }
         assert resp_data['_items'][0]['thumbnails'] == {'timeline': [], 'preview': None}
-        assert resp_data['_items'][0]['url'] == \
-               f'http://localhost:5050/projects/{resp_data["_items"][0]["_id"]}/raw/video'
+        assert resp_data['_items'][0]['url'] == f'http://localhost:5050/projects' \
+                                                f'/{resp_data["_items"][0]["_id"]}/raw/video'
         # list 1nd page explicitly
         resp = client.get(url, query_string={'page': 1})
         resp_data = json.loads(resp.data)
@@ -205,6 +209,3 @@ def test_list_projects(test_app, client, filestreams):
             'max_results': test_app.config.get('ITEMS_PER_PAGE'),
             'total': 3
         }
-
-
-
