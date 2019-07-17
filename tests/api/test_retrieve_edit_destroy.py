@@ -108,6 +108,21 @@ def test_edit_project_202_response(test_app, client, projects):
 
 
 @pytest.mark.parametrize('projects', [('sample_0.mp4',)], indirect=True)
+def test_edit_project_no_edit_rules_provided(test_app, client, projects):
+    project = projects[0]
+
+    with test_app.test_request_context():
+        # edit request
+        url = url_for('projects.retrieve_edit_destroy_project', project_id=project['_id'])
+        resp = client.put(
+            url,
+            data=json.dumps({}),
+            content_type='application/json'
+        )
+        assert resp.status == '400 BAD REQUEST'
+
+
+@pytest.mark.parametrize('projects', [('sample_0.mp4',)], indirect=True)
 def test_edit_project_trim_success(test_app, client, projects):
     project = projects[0]
 

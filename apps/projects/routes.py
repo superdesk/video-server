@@ -34,7 +34,7 @@ class ListUploadProject(MethodView):
 
     def post(self):
         """
-        Create new project record in DB and save file into file storage
+        Upload video file and create new project for it
         ---
         consumes:
           - multipart/form-data
@@ -42,82 +42,97 @@ class ListUploadProject(MethodView):
         - in: formData
           name: file
           type: file
-          description: file object to upload
+          description: video file to upload
         responses:
           201:
-            description: CREATED
+            description: Created project details
             schema:
-              type: object
-              properties:
-                filename:
-                  type: string
-                  example: fa5079a38e0a4197864aa2ccb07f3bea.mp4
-                url:
-                  type: string
-                  example: https://example.com/raw/fa5079a38e0a4197864aa2ccb07f3bea4
-                storage_id:
-                  type: string
-                  example: 2019/5/1/fa5079a38e0a4197864aa2ccb07f3bea.mp4
-                metadata:
-                  type: object
-                  properties:
-                    codec_name:
-                      type: string
-                      example: h264
-                    codec_long_name:
-                      type: string
-                      example: H.264 / AVC / MPEG-4 AVC / MPEG-4 part 10
-                    width:
-                      type: int
-                      example: 640
-                    height:
-                      type: int
-                      example: 360
-                    duration:
-                      type: float
-                      example: 300.014000
-                    bit_rate:
-                      type: int
-                      example: 287654
-                    nb_frames:
-                      type: int
-                      example: 7654
-                    r_frame_rate:
-                      type: string
-                      example: 24/1
-                    format_name:
-                      type: string
-                      example: mov,mp4,m4a,3gp,3g2,mj2
-                    size:
-                      type: int
-                      example: 14567890
-                mime_type:
-                  type: string
-                  example: video/mp4
-                create_time:
-                  type: string
-                  example: 2019-05-01T09:00:00+00:00
-                original_filename:
-                  type: string
-                  example: video.mp4
-                request_address:
-                  type: string
-                  example: 127.0.0.1
-                version:
-                  type: integer
-                  example: 1
-                parent:
-                  type: object
-                  example: {}
-                processing:
-                  type: boolean
-                  example: False
-                thumbnails:
-                  type: object
-                  example: {}
-                _id:
-                  type: string
-                  example: 5cbd5acfe24f6045607e51aa
+                type: object
+                properties:
+                  _id:
+                    type: string
+                    example: 5cbd5acfe24f6045607e51aa
+                  filename:
+                    type: string
+                    example: fa5079a38e0a4197864aa2ccb07f3bea.mp4
+                  storage_id:
+                    type: string
+                    example: 2019/7/2/5cbd5acfe24f6045607e51aa/9c8e970807104c848afceea44fa07d1a.mp4
+                  metadata:
+                    type: object
+                    properties:
+                      codec_name:
+                        type: string
+                        example: h264
+                      codec_long_name:
+                        type: string
+                        example: H.264 / AVC / MPEG-4 AVC / MPEG-4 part 10
+                      width:
+                        type: int
+                        example: 640
+                      height:
+                        type: int
+                        example: 360
+                      duration:
+                        type: float
+                        example: 300.014000
+                      bit_rate:
+                        type: int
+                        example: 287654
+                      nb_frames:
+                        type: int
+                        example: 7654
+                      r_frame_rate:
+                        type: string
+                        example: 24/1
+                      format_name:
+                        type: string
+                        example: mov,mp4,m4a,3gp,3g2,mj2
+                      size:
+                        type: int
+                        example: 14567890
+                  url:
+                    type: string
+                    example: http://localhost:5050/projects/5cbd5acfe24f6045607e51aa/raw/video
+                  mime_type:
+                    type: string
+                    example: video/mp4
+                  create_time:
+                    type: string
+                    example: 2019-07-02T15:02:32+00:00
+                  original_filename:
+                    type: string
+                    example: video.mp4
+                  request_address:
+                    type: string
+                    example: 127.0.0.1
+                  version:
+                    type: integer
+                    example: 1
+                  parent:
+                    type: string
+                    example: 5d2c8078fe985e7587b50de7
+                  processing:
+                    type: object
+                    properties:
+                      video:
+                        type: boolean
+                        example: False
+                      thumbnail_preview:
+                        type: boolean
+                        example: False
+                      thumbnails_timeline:
+                        type: boolean
+                        example: False
+                  thumbnails:
+                    type: object
+                    properties:
+                      timeline:
+                        type: array
+                        example: []
+                      preview:
+                        type: object
+                        example: {}
         """
 
         # validate request
@@ -189,7 +204,7 @@ class ListUploadProject(MethodView):
 
     def get(self):
         """
-        Get list of projects in DB
+        List of projects
         ---
         parameters:
         - name: page
@@ -219,15 +234,15 @@ class ListUploadProject(MethodView):
                   items:
                     type: object
                     properties:
+                      _id:
+                        type: string
+                        example: 5cbd5acfe24f6045607e51aa
                       filename:
                         type: string
                         example: fa5079a38e0a4197864aa2ccb07f3bea.mp4
-                      url:
-                        type: string
-                        example: https://example.com/raw/fa5079a38e0a4197864aa2ccb07f3bea
                       storage_id:
                         type: string
-                        example: 2019/5/fa5079a38e0a4197864aa2ccb07f3bea.mp4
+                        example: 2019/7/2/5cbd5acfe24f6045607e51aa/9c8e970807104c848afceea44fa07d1a.mp4
                       metadata:
                         type: object
                         properties:
@@ -261,12 +276,15 @@ class ListUploadProject(MethodView):
                           size:
                             type: int
                             example: 14567890
+                      url:
+                        type: string
+                        example: http://localhost:5050/projects/5cbd5acfe24f6045607e51aa/raw/video
                       mime_type:
                         type: string
                         example: video/mp4
                       create_time:
                         type: string
-                        example: 2019-05-01T09:00:00+00:00
+                        example: 2019-07-02T15:02:32+00:00
                       original_filename:
                         type: string
                         example: video.mp4
@@ -277,17 +295,29 @@ class ListUploadProject(MethodView):
                         type: integer
                         example: 1
                       parent:
-                        type: object
-                        example: {}
+                        type: string
+                        example: 5d2c8078fe985e7587b50de7
                       processing:
-                        type: boolean
-                        example: False
+                        type: object
+                        properties:
+                          video:
+                            type: boolean
+                            example: False
+                          thumbnail_preview:
+                            type: boolean
+                            example: False
+                          thumbnails_timeline:
+                            type: boolean
+                            example: False
                       thumbnails:
                         type: object
-                        example: {}
-                      _id:
-                        type: string
-                        example: 5cbd5acfe24f6045607e51aa
+                        properties:
+                          timeline:
+                            type: array
+                            example: []
+                          preview:
+                            type: object
+                            example: {}
         """
 
         page = request.args.get('page', 1, type=int)
@@ -384,79 +414,94 @@ class RetrieveEditDestroyProject(MethodView):
               description: Unique project id
         responses:
           200:
-            description: OK
+            description: Project details
             schema:
-              type: object
-              properties:
-                filename:
-                  type: string
-                  example: fa5079a38e0a4197864aa2ccb07f3bea.mp4
-                url:
-                  type: string
-                  example: https://example.com/raw/fa5079a38e0a4197864aa2ccb07f3bea
-                storage_id:
-                  type: string
-                  example: 2019/5/fa5079a38e0a4197864aa2ccb07f3bea.mp4
-                metadata:
-                  type: object
-                  properties:
-                    codec_name:
-                      type: string
-                      example: h264
-                    codec_long_name:
-                      type: string
-                      example: H.264 / AVC / MPEG-4 AVC / MPEG-4 part 10
-                    width:
-                      type: integer
-                      example: 640
-                    height:
-                      type: integer
-                      example: 360
-                    duration:
-                      type: float
-                      example: 300.014000
-                    bit_rate:
-                      type: int
-                      example: 287654
-                    nb_frames:
-                      type: int
-                      example: 7654
-                    r_frame_rate:
-                      type: string
-                      example: 24/1
-                    format_name:
-                      type: string
-                      example: mov,mp4,m4a,3gp,3g2,mj2
-                    size:
-                      type: int
-                      example: 14567890
-                mime_type:
-                  type: string
-                  example: video/mp4
-                create_time:
-                  type: string
-                  example: 2019-05-01T09:00:00+00:00
-                original_filename:
-                  type: string
-                  example: video.mp4
-                request_address:
-                  type: string
-                  example: 127.0.0.1
-                version:
-                  type: integer
-                  example: 1
-                parent:
-                  type: object
-                  example: {}
-                processing:
-                  type: boolean
-                  example: False
-                thumbnails:
-                  type: object
-                  example: {}
-                _id:
-                  type: string
-                  example: 5cbd5acfe24f6045607e51aa
+                type: object
+                properties:
+                  _id:
+                    type: string
+                    example: 5cbd5acfe24f6045607e51aa
+                  filename:
+                    type: string
+                    example: fa5079a38e0a4197864aa2ccb07f3bea.mp4
+                  storage_id:
+                    type: string
+                    example: 2019/7/2/5cbd5acfe24f6045607e51aa/9c8e970807104c848afceea44fa07d1a.mp4
+                  metadata:
+                    type: object
+                    properties:
+                      codec_name:
+                        type: string
+                        example: h264
+                      codec_long_name:
+                        type: string
+                        example: H.264 / AVC / MPEG-4 AVC / MPEG-4 part 10
+                      width:
+                        type: int
+                        example: 640
+                      height:
+                        type: int
+                        example: 360
+                      duration:
+                        type: float
+                        example: 300.014000
+                      bit_rate:
+                        type: int
+                        example: 287654
+                      nb_frames:
+                        type: int
+                        example: 7654
+                      r_frame_rate:
+                        type: string
+                        example: 24/1
+                      format_name:
+                        type: string
+                        example: mov,mp4,m4a,3gp,3g2,mj2
+                      size:
+                        type: int
+                        example: 14567890
+                  url:
+                    type: string
+                    example: http://localhost:5050/projects/5cbd5acfe24f6045607e51aa/raw/video
+                  mime_type:
+                    type: string
+                    example: video/mp4
+                  create_time:
+                    type: string
+                    example: 2019-07-02T15:02:32+00:00
+                  original_filename:
+                    type: string
+                    example: video.mp4
+                  request_address:
+                    type: string
+                    example: 127.0.0.1
+                  version:
+                    type: integer
+                    example: 1
+                  parent:
+                    type: string
+                    example: 5d2c8078fe985e7587b50de7
+                  processing:
+                    type: object
+                    properties:
+                      video:
+                        type: boolean
+                        example: False
+                      thumbnail_preview:
+                        type: boolean
+                        example: False
+                      thumbnails_timeline:
+                        type: boolean
+                        example: False
+                  thumbnails:
+                    type: object
+                    properties:
+                      timeline:
+                        type: array
+                        example: []
+                      preview:
+                        type: object
+                        example: {}
         """
 
         add_urls(self._project)
@@ -464,7 +509,7 @@ class RetrieveEditDestroyProject(MethodView):
 
     def put(self, project_id):
         """
-        Edit video. This method does not create a new project.
+        Edit project's video
         ---
         consumes:
         - application/json
@@ -476,12 +521,12 @@ class RetrieveEditDestroyProject(MethodView):
           description: Unique project id
         - in: body
           name: action
-          description: Actions want to apply to the video
+          description: Changes to apply for the video
           required: True
           schema:
             type: object
             properties:
-              cut:
+              trim:
                 type: object
                 properties:
                   start:
@@ -506,86 +551,29 @@ class RetrieveEditDestroyProject(MethodView):
                     type: integer
                     example: 10
               rotate:
-                type: object
-                properties:
-                  degree:
-                    type: integer
-                    example: 90
+                type: integer
+                enum: [-270, -180, -90, 90, 180, 270]
+                example: 90
+              scale:
+                type: integer
+                example: 800
         responses:
           200:
-            description: OK
+            description: Editing started
             schema:
               type: object
               properties:
-                filename:
-                  type: string
-                  example: fa5079a38e0a4197864aa2ccb07f3bea.mp4
-                url:
-                  type: string
-                  example: https://example.com/raw/fa5079a38e0a4197864aa2ccb07f3bea
-                storage_id:
-                  type: string
-                  example: 2019/5/fa5079a38e0a4197864aa2ccb07f3bea.mp4
-                metadata:
-                  type: object
-                  properties:
-                    codec_name:
-                      type: string
-                      example: h264
-                    codec_long_name:
-                      type: string
-                      example: H.264 / AVC / MPEG-4 AVC / MPEG-4 part 10
-                    width:
-                      type: integer
-                      example: 640
-                    height:
-                      type: integer
-                      example: 360
-                    duration:
-                      type: float
-                      example: 300.014000
-                    bit_rate:
-                      type: int
-                      example: 287654
-                    nb_frames:
-                      type: int
-                      example: 7654
-                    r_frame_rate:
-                      type: string
-                      example: 24/1
-                    format_name:
-                      type: string
-                      example: mov,mp4,m4a,3gp,3g2,mj2
-                    size:
-                      type: int
-                      example: 14567890
-                mime_type:
-                  type: string
-                  example: video/mp4
-                create_time:
-                  type: string
-                  example: 2019-05-01T09:00:00+00:00
-                original_filename:
-                  type: string
-                  example: video.mp4
-                request_address:
-                  type: string
-                  example: 127.0.0.1
-                version:
-                  type: integer
-                  example: 1
-                parent:
-                  type: object
-                  example: {}
                 processing:
                   type: boolean
-                  example: False
-                thumbnails:
-                  type: object
-                  example: {}
-                _id:
-                  type: string
-                  example: 5cbd5acfe24f6045607e51aa
+                  example: True
+          202:
+            description: Previous editing was not finished yet
+            schema:
+              type: object
+              properties:
+                processing:
+                  type: boolean
+                  example: True
         """
 
         if self._project['processing']['video']:
@@ -596,6 +584,11 @@ class RetrieveEditDestroyProject(MethodView):
             request_json if request_json else {},
             self.schema_edit
         )
+
+        if not document:
+            raise BadRequest(f"At least one of the edit rules is required. "
+                             f"Available edit rules are: {', '.join(self.schema_edit.keys())}")
+
         metadata = self._project['metadata']
 
         # validate trim
@@ -664,7 +657,7 @@ class RetrieveEditDestroyProject(MethodView):
 
     def delete(self, project_id):
         """
-        Delete project from db and video from filestorage.
+        Delete project from db and related files from a storage.
         ---
         parameters:
         - name: project_id
@@ -688,6 +681,107 @@ class RetrieveEditDestroyProject(MethodView):
 class DuplicateProject(MethodView):
 
     def post(self, project_id):
+        """
+        Duplicate project
+        ---
+        parameters:
+            - name: project_id
+              in: path
+              type: string
+              required: true
+              description: Unique project id
+        responses:
+          201:
+            description: Project was duplicated
+            schema:
+                type: object
+                properties:
+                  _id:
+                    type: string
+                    example: 5cbd5acfe24f6045607e51aa
+                  filename:
+                    type: string
+                    example: fa5079a38e0a4197864aa2ccb07f3bea.mp4
+                  storage_id:
+                    type: string
+                    example: 2019/7/2/5cbd5acfe24f6045607e51aa/9c8e970807104c848afceea44fa07d1a.mp4
+                  metadata:
+                    type: object
+                    properties:
+                      codec_name:
+                        type: string
+                        example: h264
+                      codec_long_name:
+                        type: string
+                        example: H.264 / AVC / MPEG-4 AVC / MPEG-4 part 10
+                      width:
+                        type: int
+                        example: 640
+                      height:
+                        type: int
+                        example: 360
+                      duration:
+                        type: float
+                        example: 300.014000
+                      bit_rate:
+                        type: int
+                        example: 287654
+                      nb_frames:
+                        type: int
+                        example: 7654
+                      r_frame_rate:
+                        type: string
+                        example: 24/1
+                      format_name:
+                        type: string
+                        example: mov,mp4,m4a,3gp,3g2,mj2
+                      size:
+                        type: int
+                        example: 14567890
+                  url:
+                    type: string
+                    example: http://localhost:5050/projects/5cbd5acfe24f6045607e51aa/raw/video
+                  mime_type:
+                    type: string
+                    example: video/mp4
+                  create_time:
+                    type: string
+                    example: 2019-07-02T15:02:32+00:00
+                  original_filename:
+                    type: string
+                    example: video.mp4
+                  request_address:
+                    type: string
+                    example: 127.0.0.1
+                  version:
+                    type: integer
+                    example: 1
+                  parent:
+                    type: string
+                    example: 5d2c8078fe985e7587b50de7
+                  processing:
+                    type: object
+                    properties:
+                      video:
+                        type: boolean
+                        example: False
+                      thumbnail_preview:
+                        type: boolean
+                        example: False
+                      thumbnails_timeline:
+                        type: boolean
+                        example: False
+                  thumbnails:
+                    type: object
+                    properties:
+                      timeline:
+                        type: array
+                        example: []
+                      preview:
+                        type: object
+                        example: {}
+        """
+
         if any(self._project['processing'].values()):
             return json_response({"processing": True}, status=202)
 
@@ -830,38 +924,32 @@ class RetrieveOrCreateThumbnails(MethodView):
 
     def get(self, project_id):
         """
-        Get or capture video thumbnails.
-        Generate new thumbnails if it is empty or `amount` argument different from current total thumbnails.
-        Or capture preview thumbnail at `position`.
+        Get or create thumbnail for preview or thumbnails for timeline.
+        If `type` is `timeline` - return a list of thumbnails for timeline or start task to generate thumbnails.
+        If `type` is `preview` - return a preview thumbnail or start task to generate it.
         ---
-        consumes:
-        - application/json
         parameters:
         - in: path
           name: project_id
           type: string
           required: True
           description: Unique project id
+        - name: type
+          in: query
+          type: string
+          enum: [preview, timeline]
         - name: amount
           in: query
           type: integer
-          description: number thumbnails to create
+          description: Amount of thumbnails to generate for a timeline. Used only when `type` is `timeline`.
         - name: position
           in: query
           type: float
-          description: position to capture preview thumbnail
+          description: Position in the video where preview thumbnail should be captured.
+                       Used only when `type` is `preview`.
         responses:
           200:
-            description: OK
-            schema:
-              type: object
-              properties:
-                processing:
-                  type: boolean
-                  example: True
-                thumbnails:
-                  type: object
-                  example: {}
+            description: Timeline/preview thumbnails information or status that thumbnails generation task was started.
         """
         document = validate_document(request.args.to_dict(), self.SCHEMA_THUMBNAILS)
         add_urls(self._project)
@@ -875,26 +963,20 @@ class RetrieveOrCreateThumbnails(MethodView):
 
     def post(self, project_id):
         """
-        Update video preview thumbnail
+        Upload custom preview thumbnail.
         ---
         consumes:
-        - application/json
+         - multipart/form-data
         parameters:
         - in: path
           name: project_id
           type: string
           required: True
           description: Unique project id
-        - in: body
-          name: body
-          description: Thumbnail data
+        - in: formData
+          name: file
+          description: image file
           required: True
-          schema:
-            type: object
-            properties:
-              data:
-                type: string
-                description: base64 image data want to upload
         responses:
           200:
             description: OK
@@ -903,94 +985,28 @@ class RetrieveOrCreateThumbnails(MethodView):
               properties:
                 filename:
                   type: string
-                  example: fa5079a38e0a4197864aa2ccb07f3bea.mp4
+                  example: 059ec59cd21543d2a014687619a85ca7_preview-custom.jpeg
                 url:
                   type: string
-                  example: https://example.com/raw/fa5079a38e0a4197864aa2ccb07f3bea
+                  example: http://localhost:5050/projects/5d2ee69cfe985e50884006f9/raw/thumbnail?type=preview
                 storage_id:
                   type: string
-                  example: 2019/5/fa5079a38e0a4197864aa2ccb07f3bea.mp4
-                metadata:
-                  type: object
-                  properties:
-                    codec_name:
-                      type: string
-                      example: h264
-                    codec_long_name:
-                      type: string
-                      example: H.264 / AVC / MPEG-4 AVC / MPEG-4 part 10
-                    width:
-                      type: string
-                      example: 640
-                    height:
-                      type: string
-                      example: 360
-                    duration:
-                      type: float
-                      example: 300.014000
-                    bit_rate:
-                      type: int
-                      example: 287654
-                    nb_frames:
-                      type: int
-                      example: 7654
-                    r_frame_rate:
-                      type: string
-                      example: 24/1
-                    format_name:
-                      type: string
-                      example: mov,mp4,m4a,3gp,3g2,mj2
-                    size:
-                      type: int
-                      example: 14567890
+                  example: 2019/7/17/5d2ee69cfe985e50884006f9/thumbnails/059ec59cd21543d2a014687619_preview-custom.jpeg
                 mime_type:
                   type: string
                   example: video/mp4
-                create_time:
-                  type: string
-                  example: 2019-05-01T09:00:00+00:00
-                original_filename:
-                  type: string
-                  example: video.mp4
-                request_address:
-                  type: string
-                  example: 127.0.0.1
-                version:
+                width:
                   type: integer
-                  example: 1
-                parent:
-                  type: object
-                  example: {}
-                processing:
-                  type: boolean
-                  example: False
-                thumbnails:
-                  type: object
-                  example: {}
-                _id:
+                  example: 640
+                height:
+                  type: integer
+                  example: 360
+                size:
+                  type: integer
+                  example: 300000
+                positoin:
                   type: string
-                  example: 5cbd5acfe24f6045607e51aa
-                preview_thumbnail:
-                  type: object
-                  properties:
-                    filename:
-                      type: string
-                      example: fa5079a38e0a4197864aa2ccb07f3bea_thumbnail.png
-                    storage_id:
-                      type: string
-                      example: 2019/5/fa5079a38e0a4197864aa2ccb07f3bea_thumbnail.png
-                    mimetype:
-                      type: string
-                      example: "image/png"
-                    width:
-                      type: integer
-                      example: 640
-                    height:
-                      type: integer
-                      example: 360
-                    size:
-                      type: int
-                      example: 300000
+                  example: custom
         """
 
         # validate request
@@ -1110,7 +1126,8 @@ class RetrieveOrCreateThumbnails(MethodView):
 class GetRawVideo(MethodView):
     def get(self, project_id):
         """
-        Get video
+        Get video stream.
+        If `HTTP_RANGE` header is specified - return chunked video stream, else full file.
         ---
         parameters:
         - in: path
@@ -1121,9 +1138,19 @@ class GetRawVideo(MethodView):
           - video/mp4
         responses:
           200:
-            description: OK
-            schema:
-              type: file
+            description: Video stream
+            content:
+              video/mp4:
+                schema:
+                  type: string
+                  format: binary
+          206:
+            description: Chunked stream
+            content:
+              video/mp4:
+                schema:
+                  type: string
+                  format: binary
         """
 
         # video is processing
@@ -1152,7 +1179,7 @@ class GetRawVideo(MethodView):
 
         headers = {
             'Content-Length': length,
-            'Content-Type': 'video/mp4',
+            'Content-Type': self._project.get("mime_type"),
         }
         stream = app.fs.get(self._project.get('storage_id'))
         res = make_response(stream)
@@ -1193,21 +1220,24 @@ class GetRawThumbnail(MethodView):
           type: string
           required: True
           description: Unique project id
-        - in: query
-          name: type
+        - name: type
+          in: query
           type: string
-          description: timeline or preview
+          enum: [preview, timeline]
         - in: query
           name: index
           type: integer
-          description: index of timeline thumbnail to read, used only when type is preview
+          description: Index of timeline thumbnail to read. Used only when `type` is `timeline`.
         produces:
           - image/png
         responses:
           200:
-            description: OK
-            schema:
-              type: file
+            description: thumbnail image
+            content:
+              image/png:
+                schema:
+                  type: string
+                  format: binary
         """
 
         document = validate_document(request.args.to_dict(), self.SCHEMA_THUMBNAILS)
