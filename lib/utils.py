@@ -18,13 +18,25 @@ def create_file_name(ext):
     """
     Generates a filename using uuid4
     :param ext: file extension
+    :type ext: str
     :return: generated filename
+    :rtype: str
     """
 
     return "%s.%s" % (uuid.uuid4().hex, ext.lower())
 
 
 def paginate(cursor, page):
+    """
+    Apply pagination for mongo cursor
+    :param cursor: mongo cursor with projects list
+    :type cursor: pymongo.cursor.Cursor
+    :param page: page to apply
+    :type page: int
+    :return: mongo cursor with projects list with skiped items according to page number
+    :rtype: pymongo.cursor.Cursor
+    """
+
     page_size = app.config.get('ITEMS_PER_PAGE')
     # сalculate number of documents to skip
     skip = page_size * (page - 1)
@@ -36,7 +48,13 @@ def paginate(cursor, page):
 
 def json_response(doc=None, status=200):
     """
-    Serialize mongodb documents and return Response with applicaton/json mimetype
+    Serialize document fetched from mongo and return flask response with applicaton/json mimetype.
+    :param doc: document fetched from mongo
+    :type doc: dict
+    :param status: http respponse status
+    :type status: int
+    :return: flask http response
+    :rtype: flask.wrappers.Response
     """
 
     class JSONEncoder(json.JSONEncoder):
@@ -50,37 +68,40 @@ def json_response(doc=None, status=200):
     return Response(JSONEncoder().encode(doc), status=status, mimetype='application/json')
 
 
-def get_url_for_media(project_id, media_type):
-    """
-    Get url project for reviewing media
-    :param project_id: id of project
-    :return:
-    """
-
-    if media_type == 'video':
-        suffix = app.config.get('VIDEO_URL_SUFFIX')
-    elif media_type == 'thumbnail':
-        suffix = app.config.get('THUMBNAIL_URL_SUFFIX')
-    else:
-        raise KeyError('Invalid media_type')
-
-    return '/'.join(x.strip('/') for x in (app.config.get('VIDEO_SERVER_URL'), str(project_id), suffix))
-
-
 def add_urls(doc):
+    """
+    Add urls for project's media
+    :param doc: project or list of projects
+    :type doc: dict or list
+    """
+
+    def _get_url_for_media(project_id, media_type):
+        """
+        Build and return url for a project's media
+        :param project_id: id of project
+        :type project_id: bson.objectid.ObjectId
+        :return: url for project's media
+        :rtype: str
+        """
+
+        if media_type == 'video':
+            suffix = app.config.get('VIDEO_URL_SUFFIX')
+        elif media_type == 'thumbnail':
+            suffix = app.config.get('THUMBNAIL_URL_SUFFIX')
+        else:
+            raise KeyError('Invalid media_type')
+
+        return '/'.join(x.strip('/') for x in (app.config.get('VIDEO_SERVER_URL'), str(project_id), suffix))
 
     def _handle_doc(doc):
-        """
-        Add url for project's video, timeline thumbnails and preview thumbnail.
-        """
         if '_id' in doc:
-            doc['url'] = get_url_for_media(doc['_id'], 'video')
+            doc['url'] = _get_url_for_media(doc['_id'], 'video')
 
             for index, thumb in enumerate(doc['thumbnails']['timeline']):
-                thumb['url'] = get_url_for_media(doc.get('_id'), 'thumbnail') + f'?type=timeline&index={index}'
+                thumb['url'] = _get_url_for_media(doc.get('_id'), 'thumbnail') + f'?type=timeline&index={index}'
 
             if doc['thumbnails']['preview']:
-                doc['thumbnails']['preview']['url'] = get_url_for_media(doc.get('_id'), 'thumbnail') + '?type=preview'
+                doc['thumbnails']['preview']['url'] = _get_url_for_media(doc.get('_id'), 'thumbnail') + '?type=preview'
 
     if type(doc) is dict:
         _handle_doc(doc)
@@ -92,6 +113,11 @@ def add_urls(doc):
 def save_activity_log(action, project_id, payload=None):
     """
     Inserts an activity record into `activity` collection
+    :param action: action
+    :type action: str
+    :param project_id: project related to log record
+    :type project_id: bson.objectid.ObjectId
+    :param payload: additional log information
     """
 
     app.mongo.db.activity.insert_one({
@@ -106,11 +132,15 @@ def validate_document(document, schema, **kwargs):
     """
     Validate `document` against provided `schema`
     :param document: document for validation
+    :type document: dict
     :param schema: validation schema
+    :type schema: dict
     :param kwargs: additional arguments for `Validator`
     :return: normalized and validated document
+    :rtype: dict
     :raise: `BadRequest` if `document` is not valid
     """
+
     validator = Validator(schema, **kwargs)
     if not validator.validate(document):
         raise BadRequest(validator.errors)
@@ -124,9 +154,12 @@ def get_request_address(request_headers):
 def create_temp_file(file_stream, file_name):
     """
     Saves `file_stream` into /tmp directory
-    :param file_stream: bytes file stream to save
+    :param file_stream: file to save
+    :type file_stream: bytes
     :param file_name: file name used to save `file_stream`
+    :type file_name: str
     :return: file path
+    :rtype: str
     """
 
     tmp_path = f"{tempfile.gettempdir()}/tmp_video_server_{file_name}"

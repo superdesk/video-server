@@ -14,7 +14,9 @@ class MethodView(FlaskMethodView):
         super().__init__(*args, **kwargs)
 
     def dispatch_request(self, *args, **kwargs):
-        # automatically preload project from db if `project_id` is in request
+        """
+        Automatically preload project from db if `project_id` is in request.
+        """
         if 'project_id' in kwargs:
             self._project = self._get_project_or_404(kwargs['project_id'])
 

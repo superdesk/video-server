@@ -1069,7 +1069,9 @@ class RetrieveOrCreateThumbnails(MethodView):
         """
         Get list or create thumbnails for timeline
         :param amount: amount of thumbnails
+        :type amount: int
         :return: json response
+        :rtype: flask.wrappers.Response
         """
         # resource is busy
         if self._project['processing']['thumbnails_timeline']:
@@ -1095,7 +1097,9 @@ class RetrieveOrCreateThumbnails(MethodView):
         """
         Get or create thumbnail for preview
         :param position: video position to capture a frame
+        :type position: int
         :return: json response
+        :rtype: flask.wrappers.Response
         """
         # resource is busy
         if self._project['processing']['thumbnail_preview']:

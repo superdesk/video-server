@@ -29,10 +29,13 @@ class FFMPEGVideoEditor(VideoEditorInterface):
 
     def get_meta(self, filestream, extension='tmp'):
         """
-        Use ffmpeg tool for getting metadata of video file
-        :param filestream:
-        :return:
+        Use ffmpeg tool for getting metadata of file
+        :param filestream: file to get meta from
+        :type filestream: bytes
+        :return: metadata
+        :rtype: dict
         """
+
         file_name = create_file_name(extension)
         file_temp_path = create_temp_file(filestream, file_name)
         try:
@@ -45,12 +48,18 @@ class FFMPEGVideoEditor(VideoEditorInterface):
     def edit_video(self, stream_file, filename, trim=None, crop=None, rotate=None, scale=None):
         """
         Use ffmpeg tool for edit video
-        :param stream_file:
-        :param filename:
-        :param trim:
-        :param crop:
-        :param video_rotate:
-        :param video_quality:
+        :param stream_file: file to edit
+        :type stream_file: bytes
+        :param filename: filename for tmp file
+        :type filename: str
+        :param trim: trim editing rules
+        :type trim: dict
+        :param crop: crop editing rules
+        :type crop: dict
+        :param video_rotate: rotate degree
+        :type video_rotate: int
+        :param scale: width scale to
+        :type scale: int
         :return:
         """
 
@@ -124,11 +133,16 @@ class FFMPEGVideoEditor(VideoEditorInterface):
     def capture_thumbnail(self, stream_file, filename, duration, position):
         """
         Use ffmpeg tool to capture video frame at a position.
-        :param stream_file: binary file stream
-        :param filename: video's file name
+        :param stream_file: video file
+        :type stream_file: bytes
+        :param filename: tmp video's file name
+        :type filename: str
         :param duration: video's duration
+        :type duration: int
         :param position: video position to capture a frame
+        :type position: int
         :return: file stream, metadata
+        :rtype: bytes, dict
         """
 
         path_video = create_temp_file(stream_file, filename)
@@ -158,11 +172,16 @@ class FFMPEGVideoEditor(VideoEditorInterface):
     def capture_timeline_thumbnails(self, stream_file, filename, duration, thumbnails_amount):
         """
         Capture thumbnails for timeline.
-        :param stream_file: binary file stream
-        :param filename: video's file name
+        :param stream_file: video file
+        :type stream_file: bytes
+        :param filename: tmp video's file name
+        :type filename: str
         :param duration: video's duration
+        :type duration: int
         :param thumbnails_amount: total number of thumbnails to capture
+        :type thumbnails_amount: int
         :return: file stream, metadata generator
+        :return: bytes, generator
         """
 
         path_video = create_temp_file(stream_file, filename)
@@ -197,10 +216,15 @@ class FFMPEGVideoEditor(VideoEditorInterface):
 
     def _run_ffmpeg(self, path_input, path_output, options=tuple()):
         """
-        :param path_video:
-        :param path_output:
-        :param options:
-        :return:
+        Subprocess `ffmpeg` command.
+        :param path_input: input file path
+        :type path_input: str
+        :param path_output: outut file path
+        :type path_output: str
+        :param options: options for ffmpeg cmd
+        :type options: tuple
+        :return: file path to edited file
+        :rtype: str
         """
         try:
             # run ffmpeg with provided options
@@ -216,7 +240,9 @@ class FFMPEGVideoEditor(VideoEditorInterface):
         """
         Get metada using `ffprobe` command
         :param file_path: path to a file to retrieve a metadata
-        :return:
+        :type file_path: str
+        :return: metadata
+        :rtype: dict
         """
 
         cmd = ('ffprobe', '-v', 'error', '-print_format', 'json', '-show_streams', '-show_format', file_path)

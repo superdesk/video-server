@@ -7,8 +7,9 @@ from .moviepy import MoviePyVideoEditor
 def get_video_editor(name=None):
     """
     Instantinates and returns selected video editor
-    :param name:
-    :return:
+    :param name: name of video editor. Options: 'ffmpeg'
+    :type name: str
+    :return: instance of video editor
     """
 
     if not name:
