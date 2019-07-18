@@ -197,7 +197,8 @@ class ListUploadProject(MethodView):
             app.mongo.db.projects.delete_one({'_id': project['_id']})
             raise InternalServerError(str(e))
 
-        save_activity_log('upload', project['_id'])
+        logger.info(f"New project was created. ID: {project['_id']}")
+        save_activity_log('UPLOAD', project['_id'], project)
         add_urls(project)
 
         return json_response(project, status=201)
@@ -645,7 +646,8 @@ class RetrieveEditDestroyProject(MethodView):
             {'$set': {'processing.video': True}},
             return_document=ReturnDocument.AFTER
         )
-        save_activity_log("PUT PROJECT", self._project['_id'], document)
+        logger.info(f"New project editing task was started. ID: {self._project['_id']}")
+        save_activity_log("EDIT", self._project['_id'], document)
 
         # run task
         edit_video.delay(
@@ -672,7 +674,8 @@ class RetrieveEditDestroyProject(MethodView):
 
         # remove project dir from storage
         app.fs.delete_dir(self._project['storage_id'])
-        save_activity_log("DELETE PROJECT", self._project['_id'])
+        logger.info(f"Project was deleted. ID: {self._project['_id']}")
+        save_activity_log("DELETE", self._project['_id'])
         app.mongo.db.projects.delete_one({'_id': self._project['_id']})
 
         return json_response(status=204)
@@ -875,7 +878,8 @@ class DuplicateProject(MethodView):
             app.mongo.db.projects.delete_one({'_id': child_project['_id']})
             raise InternalServerError(str(e))
 
-        save_activity_log('duplicated', self._project['_id'])
+        logger.info(f"Project was duplicated. Parent ID: {self._project['_id']}. Child ID: {child_project['_id']}")
+        save_activity_log('DUPLICATE', self._project['_id'], child_project)
         add_urls(child_project)
 
         return json_response(child_project, status=201)
