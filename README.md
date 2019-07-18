@@ -1,41 +1,77 @@
-# Superdesk Video Server
-_Apr 2019,   
+# HTTP API video editor
+
+Friendly HTTP API video editor with pluggable file storage, video editing backend, and streaming capabilities.
+
 [![Build Status](https://travis-ci.org/superdesk/video-server.svg?branch=master)](https://travis-ci.org/superdesk/video-server)
 [![Coverage Status](https://coveralls.io/repos/github/superdesk/video-server/badge.svg?branch=master)](https://coveralls.io/github/superdesk/video-server?branch=master)
 
-## Overview
-This is a server for process video for [superdesk](https://github.com/superdesk/video-server).  
-It allows to edit video such as cut, crop, rotate, quality and capture thumbnails for video. 
+## Main features
+- upload video
+- edit video:
+    * trim
+    * rotate
+    * scale
+    * crop
+- manage video projects:
+    * retrieve
+    * list
+    * create
+    * duplicate
+    * delete
+- capture and save thumbnails for preview and timeline
+- upload custom thumbnail for preview
+- get thumbnails
+- stream video
 
-## Configure Superdesk
-You only configure it in server and run it as stand alone service.
-
-### Requirements
+### Installing
 
 These services must be installed, configured and running:
 
- * MongoDB 
  * Python (>= 3.6)
- * RabbitMQ
- * Ffmpeg
+ * FFmpeg
+ * MongoDB 
+ * RabbitMQ (celery backend)
 
-## Install for Development
+After required services were installed and running, 
+you will need to clone the repo and install python dependencies:
 
-First you will need to clone the repo from GitHub.  
-In the root folder where your current superdesk folder is, run the following:
+NOTE: use [virtualenv](https://docs.python.org/3/library/venv.html) and [pip](https://pypi.org/project/pip/) to install python modules.
+
 ```
+# clone project
 git clone git@github.com:superdesk/video-server.git
 
+# install python dependencies
 pip3 install -r requirement.txt
 
+# run gunicorn process for http api and celery for delayed jobs
 honcho start
 ```
 
-## Run Tests
 
-simple run with py.test
+## Running the tests
+
+Just run from the project's root:
+
 ```
-cd video-server
 pytest
 ```
 
+or 
+
+```
+pytest --cov-report term-missing --cov
+```
+if you want to get a coverage report into your terminal screen
+
+## Getting Started
+
+Once server is started you can access a swagger via http://0.0.0.0:5050/swagger/ 
+
+
+## Authors
+
+* **Loi Tran**
+* **Oleg Pshenichniy**
+* **Petr Jašek**
+* **Thanh Nguyen**
