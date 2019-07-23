@@ -580,6 +580,9 @@ class RetrieveEditDestroyProject(MethodView):
         if self._project['processing']['video']:
             return json_response({'processing': True}, status=202)
 
+        if self._project['version'] == 1:
+            raise BadRequest(f"Video with version 1 is not editable, use duplicated project instead.")
+
         request_json = request.get_json()
         document = validate_document(
             request_json if request_json else {},

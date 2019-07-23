@@ -5,7 +5,7 @@ import pytest
 from flask import url_for
 
 
-@pytest.mark.parametrize('projects', [('sample_0.mp4',)], indirect=True)
+@pytest.mark.parametrize('projects', [({'file': 'sample_0.mp4', 'duplicate': False},)], indirect=True)
 def test_retrieve_project_success(test_app, client, projects):
     project = projects[0]
 
@@ -40,7 +40,7 @@ def test_retrieve_project_success(test_app, client, projects):
         assert 'size' in resp_data['metadata']
 
 
-@pytest.mark.parametrize('projects', [('sample_0.mp4',)], indirect=True)
+@pytest.mark.parametrize('projects', [({'file': 'sample_0.mp4', 'duplicate': False},)], indirect=True)
 def test_retrieve_project_404(test_app, client, projects):
     project = projects[0]
 
@@ -56,7 +56,7 @@ def test_retrieve_project_404(test_app, client, projects):
         assert resp.status == '404 NOT FOUND'
 
 
-@pytest.mark.parametrize('projects', [('sample_0.mp4',)], indirect=True)
+@pytest.mark.parametrize('projects', [({'file': 'sample_0.mp4', 'duplicate': False},)], indirect=True)
 def test_destroy_project_success(test_app, client, projects):
     project = projects[0]
 
@@ -66,7 +66,7 @@ def test_destroy_project_success(test_app, client, projects):
         assert resp.status == '204 NO CONTENT'
 
 
-@pytest.mark.parametrize('projects', [('sample_0.mp4',)], indirect=True)
+@pytest.mark.parametrize('projects', [({'file': 'sample_0.mp4', 'duplicate': False},)], indirect=True)
 def test_destroy_project_fails(test_app, client, projects):
     project = projects[0]
 
@@ -77,7 +77,7 @@ def test_destroy_project_fails(test_app, client, projects):
         assert resp.status == '404 NOT FOUND'
 
 
-@pytest.mark.parametrize('projects', [('sample_0.mp4',)], indirect=True)
+@pytest.mark.parametrize('projects', [({'file': 'sample_0.mp4', 'duplicate': False},)], indirect=True)
 def test_edit_project_202_response(test_app, client, projects):
     project = projects[0]
 
@@ -107,7 +107,7 @@ def test_edit_project_202_response(test_app, client, projects):
         assert resp.status == '202 ACCEPTED'
 
 
-@pytest.mark.parametrize('projects', [('sample_0.mp4',)], indirect=True)
+@pytest.mark.parametrize('projects', [({'file': 'sample_0.mp4', 'duplicate': True},)], indirect=True)
 def test_edit_project_no_edit_rules_provided(test_app, client, projects):
     project = projects[0]
 
@@ -122,7 +122,29 @@ def test_edit_project_no_edit_rules_provided(test_app, client, projects):
         assert resp.status == '400 BAD REQUEST'
 
 
-@pytest.mark.parametrize('projects', [('sample_0.mp4',)], indirect=True)
+@pytest.mark.parametrize('projects', [({'file': 'sample_0.mp4', 'duplicate': False},)], indirect=True)
+def test_edit_project_version_1(test_app, client, projects):
+    project = projects[0]
+
+    with test_app.test_request_context():
+        # edit request
+        url = url_for('projects.retrieve_edit_destroy_project', project_id=project['_id'])
+        start = 2.0
+        end = 6.0
+        resp = client.put(
+            url,
+            data=json.dumps({
+                "trim": {
+                    "start": start,
+                    "end": end
+                }
+            }),
+            content_type='application/json'
+        )
+        assert resp.status == '400 BAD REQUEST'
+
+
+@pytest.mark.parametrize('projects', [({'file': 'sample_0.mp4', 'duplicate': True},)], indirect=True)
 def test_edit_project_trim_success(test_app, client, projects):
     project = projects[0]
 
@@ -151,7 +173,7 @@ def test_edit_project_trim_success(test_app, client, projects):
         assert resp_data['metadata']['duration'] == end - start
 
 
-@pytest.mark.parametrize('projects', [('sample_0.mp4',)], indirect=True)
+@pytest.mark.parametrize('projects', [({'file': 'sample_0.mp4', 'duplicate': True},)], indirect=True)
 def test_edit_project_trim_fail(test_app, client, projects):
     project = projects[0]
 
@@ -219,7 +241,7 @@ def test_edit_project_trim_fail(test_app, client, projects):
         assert resp_data == {'message': {'trim': [{'end': ['trim is duplicating an entire video']}]}}
 
 
-@pytest.mark.parametrize('projects', [('sample_0.mp4',)], indirect=True)
+@pytest.mark.parametrize('projects', [({'file': 'sample_0.mp4', 'duplicate': True},)], indirect=True)
 def test_edit_project_rotate_success(test_app, client, projects):
     project = projects[0]
 
@@ -243,7 +265,7 @@ def test_edit_project_rotate_success(test_app, client, projects):
         assert resp_data['metadata']['height'] == 1280
 
 
-@pytest.mark.parametrize('projects', [('sample_0.mp4',)], indirect=True)
+@pytest.mark.parametrize('projects', [({'file': 'sample_0.mp4', 'duplicate': False},)], indirect=True)
 def test_edit_project_rotate_fail(test_app, client, projects):
     project = projects[0]
 
@@ -260,7 +282,7 @@ def test_edit_project_rotate_fail(test_app, client, projects):
         assert resp.status == '400 BAD REQUEST'
 
 
-@pytest.mark.parametrize('projects', [('sample_0.mp4',)], indirect=True)
+@pytest.mark.parametrize('projects', [({'file': 'sample_0.mp4', 'duplicate': True},)], indirect=True)
 def test_edit_project_crop_success(test_app, client, projects):
     project = projects[0]
 
@@ -289,7 +311,7 @@ def test_edit_project_crop_success(test_app, client, projects):
         assert resp_data['metadata']['height'] == 480
 
 
-@pytest.mark.parametrize('projects', [('sample_0.mp4',)], indirect=True)
+@pytest.mark.parametrize('projects', [({'file': 'sample_0.mp4', 'duplicate': True},)], indirect=True)
 def test_edit_project_crop_fail(test_app, client, projects):
     project = projects[0]
 
@@ -365,7 +387,7 @@ def test_edit_project_crop_fail(test_app, client, projects):
         assert resp_data == {'message': {'crop': [{'height': ["crop's frame is outside a video's frame"]}]}}
 
 
-@pytest.mark.parametrize('projects', [('sample_0.mp4',)], indirect=True)
+@pytest.mark.parametrize('projects', [({'file': 'sample_0.mp4', 'duplicate': True},)], indirect=True)
 def test_edit_project_scale_success(test_app, client, projects):
     project = projects[0]
 
@@ -389,7 +411,7 @@ def test_edit_project_scale_success(test_app, client, projects):
         assert resp_data['metadata']['height'] == 360
 
 
-@pytest.mark.parametrize('projects', [('sample_0.mp4',)], indirect=True)
+@pytest.mark.parametrize('projects', [({'file': 'sample_0.mp4', 'duplicate': True},)], indirect=True)
 def test_edit_project_scale_fail(test_app, client, projects):
     project = projects[0]
 
@@ -463,7 +485,7 @@ def test_edit_project_scale_fail(test_app, client, projects):
         }
 
 
-@pytest.mark.parametrize('projects', [('sample_0.mp4',)], indirect=True)
+@pytest.mark.parametrize('projects', [({'file': 'sample_0.mp4', 'duplicate': True},)], indirect=True)
 def test_edit_project_scale_and_crop_success(test_app, client, projects):
     project = projects[0]
 
@@ -493,7 +515,7 @@ def test_edit_project_scale_and_crop_success(test_app, client, projects):
         assert resp_data['metadata']['height'] == 640
 
 
-@pytest.mark.parametrize('projects', [('sample_0.mp4',)], indirect=True)
+@pytest.mark.parametrize('projects', [({'file': 'sample_0.mp4', 'duplicate': True},)], indirect=True)
 def test_edit_project_remove_thumbnails(test_app, client, projects):
     project = projects[0]
 

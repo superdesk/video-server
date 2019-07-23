@@ -7,7 +7,7 @@ from flask import url_for
 from pymongo.errors import ServerSelectionTimeoutError
 
 
-@pytest.mark.parametrize('projects', [('sample_0.mp4',)], indirect=True)
+@pytest.mark.parametrize('projects', [({'file': 'sample_0.mp4', 'duplicate': False},)], indirect=True)
 def test_duplicate_project_success(test_app, client, projects):
     project = projects[0]
 
@@ -41,7 +41,7 @@ def test_duplicate_project_success(test_app, client, projects):
         assert 'size' in resp_data['metadata']
 
 
-@pytest.mark.parametrize('projects', [('sample_0.mp4',)], indirect=True)
+@pytest.mark.parametrize('projects', [({'file': 'sample_0.mp4', 'duplicate': False},)], indirect=True)
 @mock.patch('apps.projects.routes.app.fs.put', side_effect=Exception('Some error'))
 def test_duplicate_project_broken_fs_put(mock_fs_put, test_app, client, projects):
     project = projects[0]
@@ -56,7 +56,7 @@ def test_duplicate_project_broken_fs_put(mock_fs_put, test_app, client, projects
         assert list(test_app.mongo.db.projects.find()).__len__() == 1
 
 
-@pytest.mark.parametrize('projects', [('sample_0.mp4',)], indirect=True)
+@pytest.mark.parametrize('projects', [({'file': 'sample_0.mp4', 'duplicate': False},)], indirect=True)
 def test_duplicate_project_202_resp(test_app, client, projects):
     project = projects[0]
 
@@ -75,7 +75,7 @@ def test_duplicate_project_202_resp(test_app, client, projects):
         assert resp.status == '202 ACCEPTED'
 
 
-@pytest.mark.parametrize('projects', [('sample_0.mp4',)], indirect=True)
+@pytest.mark.parametrize('projects', [({'file': 'sample_0.mp4', 'duplicate': False},)], indirect=True)
 def test_duplicate_project_with_thumbnails(test_app, client, projects):
     project = projects[0]
 
@@ -106,7 +106,7 @@ def test_duplicate_project_with_thumbnails(test_app, client, projects):
             assert test_app.fs.get(thumbn_data['storage_id']).__class__ is bytes
 
 
-@pytest.mark.parametrize('projects', [('sample_0.mp4',)], indirect=True)
+@pytest.mark.parametrize('projects', [({'file': 'sample_0.mp4', 'duplicate': False},)], indirect=True)
 @mock.patch('pymongo.collection.Collection.find_one_and_update',
             side_effect=ServerSelectionTimeoutError('Timeout error'))
 def test_duplicate_project_cant_set_storage_id(mock_find_one_and_update, test_app, client, projects):

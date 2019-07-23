@@ -4,7 +4,7 @@ import pytest
 from flask import url_for
 
 
-@pytest.mark.parametrize('projects', [('sample_0.mp4',)], indirect=True)
+@pytest.mark.parametrize('projects', [({'file': 'sample_0.mp4', 'duplicate': False},)], indirect=True)
 def test_get_raw_video_full(test_app, client, projects):
     project = projects[0]
 
@@ -18,7 +18,7 @@ def test_get_raw_video_full(test_app, client, projects):
         assert resp.content_length > 2600000  # just to avoid OS specific tiny file size differences
 
 
-@pytest.mark.parametrize('projects', [('sample_0.mp4',)], indirect=True)
+@pytest.mark.parametrize('projects', [({'file': 'sample_0.mp4', 'duplicate': False},)], indirect=True)
 def test_get_raw_video_range(test_app, client, projects):
     project = projects[0]
 
@@ -35,7 +35,7 @@ def test_get_raw_video_range(test_app, client, projects):
         # TODO check resp.content_length
 
 
-@pytest.mark.parametrize('projects', [('sample_0.mp4',)], indirect=True)
+@pytest.mark.parametrize('projects', [({'file': 'sample_0.mp4', 'duplicate': False},)], indirect=True)
 def test_get_raw_video_202_resp(test_app, client, projects):
     project = projects[0]
 

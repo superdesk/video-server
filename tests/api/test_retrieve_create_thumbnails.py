@@ -6,7 +6,7 @@ import pytest
 from flask import url_for
 
 
-@pytest.mark.parametrize('projects', [('sample_0.mp4',)], indirect=True)
+@pytest.mark.parametrize('projects', [({'file': 'sample_0.mp4', 'duplicate': False},)], indirect=True)
 def test_capture_timeline_thumbnails_success(test_app, client, projects):
     project = projects[0]
     amount = 3
@@ -28,7 +28,7 @@ def test_capture_timeline_thumbnails_success(test_app, client, projects):
             assert test_app.fs.get(thumbnail_data['storage_id']).__class__ is bytes
 
 
-@pytest.mark.parametrize('projects', [('sample_0.mp4',)], indirect=True)
+@pytest.mark.parametrize('projects', [({'file': 'sample_0.mp4', 'duplicate': False},)], indirect=True)
 def test_capture_timeline_thumbnails_remove_old(test_app, client, projects):
     project = projects[0]
     amount = 3
@@ -57,7 +57,7 @@ def test_capture_timeline_thumbnails_remove_old(test_app, client, projects):
             assert test_app.fs.get(thumbnail_data['storage_id']).__class__ is bytes
 
 
-@pytest.mark.parametrize('projects', [('sample_0.mp4',)], indirect=True)
+@pytest.mark.parametrize('projects', [({'file': 'sample_0.mp4', 'duplicate': False},)], indirect=True)
 def test_capture_timeline_thumbnails_202_resp(test_app, client, projects):
     project = projects[0]
     amount = 3
@@ -83,7 +83,7 @@ def test_capture_timeline_thumbnails_202_resp(test_app, client, projects):
         assert resp.status == '202 ACCEPTED'
 
 
-@pytest.mark.parametrize('projects', [('sample_0.mp4',)], indirect=True)
+@pytest.mark.parametrize('projects', [({'file': 'sample_0.mp4', 'duplicate': False},)], indirect=True)
 def test_capture_preview_thumbnail_success(test_app, client, projects):
     project = projects[0]
     position = 4
@@ -103,7 +103,7 @@ def test_capture_preview_thumbnail_success(test_app, client, projects):
         assert test_app.fs.get(resp_data['storage_id']).__class__ is bytes
 
 
-@pytest.mark.parametrize('projects', [('sample_0.mp4',)], indirect=True)
+@pytest.mark.parametrize('projects', [({'file': 'sample_0.mp4', 'duplicate': False},)], indirect=True)
 def test_capture_preview_thumbnail_bad_position(test_app, client, projects):
     project = projects[0]
     position = 700
@@ -116,7 +116,7 @@ def test_capture_preview_thumbnail_bad_position(test_app, client, projects):
         assert resp.status == '400 BAD REQUEST'
 
 
-@pytest.mark.parametrize('projects', [('sample_0.mp4',)], indirect=True)
+@pytest.mark.parametrize('projects', [({'file': 'sample_0.mp4', 'duplicate': False},)], indirect=True)
 def test_capture_preview_thumbnail_202_resp(test_app, client, projects):
     project = projects[0]
     position = 700
@@ -137,7 +137,7 @@ def test_capture_preview_thumbnail_202_resp(test_app, client, projects):
         assert resp.status == '202 ACCEPTED'
 
 
-@pytest.mark.parametrize('projects', [('sample_0.mp4',)], indirect=True)
+@pytest.mark.parametrize('projects', [({'file': 'sample_0.mp4', 'duplicate': False},)], indirect=True)
 @pytest.mark.parametrize('filestreams', [('sample_0.jpg',)], indirect=True)
 def test_upload_custom_preview_thumbnail_success(test_app, client, projects, filestreams):
     project = projects[0]
@@ -157,7 +157,7 @@ def test_upload_custom_preview_thumbnail_success(test_app, client, projects, fil
         assert test_app.fs.get(resp_data['storage_id']).__class__ is bytes
 
 
-@pytest.mark.parametrize('projects', [('sample_0.mp4',)], indirect=True)
+@pytest.mark.parametrize('projects', [({'file': 'sample_0.mp4', 'duplicate': False},)], indirect=True)
 def test_upload_custom_preview_thumbnail_no_file(test_app, client, projects):
     project = projects[0]
 
@@ -171,7 +171,7 @@ def test_upload_custom_preview_thumbnail_no_file(test_app, client, projects):
         assert resp.status == '400 BAD REQUEST'
 
 
-@pytest.mark.parametrize('projects', [('sample_0.mp4',)], indirect=True)
+@pytest.mark.parametrize('projects', [({'file': 'sample_0.mp4', 'duplicate': False},)], indirect=True)
 @pytest.mark.parametrize('filestreams', [('sample_0.mp4',)], indirect=True)
 def test_upload_custom_preview_thumbnail_wrong_codec(test_app, client, projects, filestreams):
     project = projects[0]
@@ -191,7 +191,7 @@ def test_upload_custom_preview_thumbnail_wrong_codec(test_app, client, projects,
         assert resp_data == {'message': "Codec: 'h264' is not supported."}
 
 
-@pytest.mark.parametrize('projects', [('sample_0.mp4',)], indirect=True)
+@pytest.mark.parametrize('projects', [({'file': 'sample_0.mp4', 'duplicate': False},)], indirect=True)
 @pytest.mark.parametrize('filestreams', [('sample_0.jpg',)], indirect=True)
 def test_upload_custom_preview_thumbnail_202_resp(test_app, client, projects, filestreams):
     project = projects[0]
@@ -217,7 +217,7 @@ def test_upload_custom_preview_thumbnail_202_resp(test_app, client, projects, fi
         assert resp.status == '202 ACCEPTED'
 
 
-@pytest.mark.parametrize('projects', [('sample_0.mp4',)], indirect=True)
+@pytest.mark.parametrize('projects', [({'file': 'sample_0.mp4', 'duplicate': False},)], indirect=True)
 @pytest.mark.parametrize('filestreams', [('sample_0.jpg',)], indirect=True)
 def test_upload_custom_preview_remove_old_thumbnail(test_app, client, projects, filestreams):
     project = projects[0]

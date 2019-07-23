@@ -70,9 +70,9 @@ def filestreams(request):
 def projects(request, test_app, client):
     projects = []
 
-    for filename in request.param:
+    for param in request.param:
         test_path = os.path.dirname(os.path.abspath(__file__))
-        with open(f'{test_path}/storage/fixtures/{filename}', 'rb') as f:
+        with open(f'{test_path}/storage/fixtures/{param["file"]}', 'rb') as f:
             filestream = f.read()
         with test_app.test_request_context():
             # create a project
@@ -80,10 +80,17 @@ def projects(request, test_app, client):
             resp = client.post(
                 url,
                 data={
-                    'file': (BytesIO(filestream), filename)
+                    'file': (BytesIO(filestream), param["file"])
                 },
                 content_type='multipart/form-data'
             )
-            projects.append(json.loads(resp.data))
+            resp_data = json.loads(resp.data)
+            # duplicate
+            if param["duplicate"]:
+                url = url_for('projects.duplicate_project', project_id=resp_data['_id'])
+                resp = client.post(url)
+                resp_data = json.loads(resp.data)
+
+            projects.append(resp_data)
 
     return projects

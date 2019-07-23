@@ -4,7 +4,7 @@ import pytest
 from flask import url_for
 
 
-@pytest.mark.parametrize('projects', [('sample_0.mp4',)], indirect=True)
+@pytest.mark.parametrize('projects', [({'file': 'sample_0.mp4', 'duplicate': False},)], indirect=True)
 def test_get_raw_timeline_thumbnail_success(test_app, client, projects):
     project = projects[0]
 
@@ -23,7 +23,7 @@ def test_get_raw_timeline_thumbnail_success(test_app, client, projects):
         assert resp.mimetype == 'image/png'
 
 
-@pytest.mark.parametrize('projects', [('sample_0.mp4',)], indirect=True)
+@pytest.mark.parametrize('projects', [({'file': 'sample_0.mp4', 'duplicate': False},)], indirect=True)
 def test_get_raw_timeline_thumbnail_wrong_index(test_app, client, projects):
     project = projects[0]
 
@@ -41,7 +41,7 @@ def test_get_raw_timeline_thumbnail_wrong_index(test_app, client, projects):
         assert resp.status == '404 NOT FOUND'
 
 
-@pytest.mark.parametrize('projects', [('sample_0.mp4',)], indirect=True)
+@pytest.mark.parametrize('projects', [({'file': 'sample_0.mp4', 'duplicate': False},)], indirect=True)
 def test_get_raw_preview_thumbnail_success(test_app, client, projects):
     project = projects[0]
 
@@ -59,7 +59,7 @@ def test_get_raw_preview_thumbnail_success(test_app, client, projects):
         assert resp.mimetype == 'image/png'
 
 
-@pytest.mark.parametrize('projects', [('sample_0.mp4',)], indirect=True)
+@pytest.mark.parametrize('projects', [({'file': 'sample_0.mp4', 'duplicate': False},)], indirect=True)
 def test_get_raw_preview_thumbnail_404(test_app, client, projects):
     project = projects[0]
 
