@@ -57,12 +57,12 @@ def test_duplicate_project_broken_fs_put(mock_fs_put, test_app, client, projects
 
 
 @pytest.mark.parametrize('projects', [({'file': 'sample_0.mp4', 'duplicate': False},)], indirect=True)
-def test_duplicate_project_202_resp(test_app, client, projects):
+def test_duplicate_project_409_resp(test_app, client, projects):
     project = projects[0]
 
     # since we use CELERY_TASK_ALWAYS_EAGER, task will be executed immediately,
     # it means next request will return a finshed result,
-    # since we want to test 202 response, we must set processing flag in db directly
+    # since we want to test 409 response, we must set processing flag in db directly
     test_app.mongo.db.projects.find_one_and_update(
         {'_id': ObjectId(project['_id'])},
         {'$set': {'processing.video': True}}
@@ -72,7 +72,7 @@ def test_duplicate_project_202_resp(test_app, client, projects):
         url = url_for('projects.duplicate_project', project_id=project['_id'])
         resp = client.post(url)
 
-        assert resp.status == '202 ACCEPTED'
+        assert resp.status == '409 CONFLICT'
 
 
 @pytest.mark.parametrize('projects', [({'file': 'sample_0.mp4', 'duplicate': False},)], indirect=True)
@@ -85,14 +85,14 @@ def test_duplicate_project_with_thumbnails(test_app, client, projects):
             'projects.retrieve_or_create_thumbnails', project_id=project['_id']
         ) + '?type=preview&position=3'
         resp = client.get(url)
-        assert resp.status == '200 OK'
+        assert resp.status == '202 ACCEPTED'
         # capture timeline thumbnails
         amount = 3
         url = url_for(
             'projects.retrieve_or_create_thumbnails', project_id=project['_id']
         ) + f'?type=timeline&amount={amount}'
         resp = client.get(url)
-        assert resp.status == '200 OK'
+        assert resp.status == '202 ACCEPTED'
         # duplicate
         url = url_for('projects.duplicate_project', project_id=project['_id'])
         resp = client.post(url)

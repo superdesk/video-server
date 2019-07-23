@@ -78,13 +78,13 @@ def test_destroy_project_fails(test_app, client, projects):
 
 
 @pytest.mark.parametrize('projects', [({'file': 'sample_0.mp4', 'duplicate': False},)], indirect=True)
-def test_edit_project_202_response(test_app, client, projects):
+def test_edit_project_409_response(test_app, client, projects):
     project = projects[0]
 
     with test_app.test_request_context():
         # since we use CELERY_TASK_ALWAYS_EAGER, task will be executed immediately,
         # it means next request will return a finshed result,
-        # since we want to test 202 response, we must set processing flag in db directly
+        # since we want to test 409 response, we must set processing flag in db directly
         test_app.mongo.db.projects.find_one_and_update(
             {'_id': ObjectId(project['_id'])},
             {'$set': {'processing.video': True}}
@@ -104,7 +104,7 @@ def test_edit_project_202_response(test_app, client, projects):
             }),
             content_type='application/json'
         )
-        assert resp.status == '202 ACCEPTED'
+        assert resp.status == '409 CONFLICT'
 
 
 @pytest.mark.parametrize('projects', [({'file': 'sample_0.mp4', 'duplicate': True},)], indirect=True)
@@ -164,7 +164,7 @@ def test_edit_project_trim_success(test_app, client, projects):
             content_type='application/json'
         )
         resp_data = json.loads(resp.data)
-        assert resp.status == '200 OK'
+        assert resp.status == '202 ACCEPTED'
         assert resp_data == {'processing': True}
         # get details
         resp = client.get(url)
@@ -256,7 +256,7 @@ def test_edit_project_rotate_success(test_app, client, projects):
             content_type='application/json'
         )
         resp_data = json.loads(resp.data)
-        assert resp.status == '200 OK'
+        assert resp.status == '202 ACCEPTED'
         assert resp_data == {'processing': True}
         # get details
         resp = client.get(url)
@@ -302,7 +302,7 @@ def test_edit_project_crop_success(test_app, client, projects):
             content_type='application/json'
         )
         resp_data = json.loads(resp.data)
-        assert resp.status == '200 OK'
+        assert resp.status == '202 ACCEPTED'
         assert resp_data == {'processing': True}
         # get details
         resp = client.get(url)
@@ -402,7 +402,7 @@ def test_edit_project_scale_success(test_app, client, projects):
             content_type='application/json'
         )
         resp_data = json.loads(resp.data)
-        assert resp.status == '200 OK'
+        assert resp.status == '202 ACCEPTED'
         assert resp_data == {'processing': True}
         # get details
         resp = client.get(url)
@@ -506,7 +506,7 @@ def test_edit_project_scale_and_crop_success(test_app, client, projects):
             content_type='application/json'
         )
         resp_data = json.loads(resp.data)
-        assert resp.status == '200 OK'
+        assert resp.status == '202 ACCEPTED'
         assert resp_data == {'processing': True}
         # get details
         resp = client.get(url)
@@ -540,7 +540,7 @@ def test_edit_project_remove_thumbnails(test_app, client, projects):
             content_type='application/json'
         )
         resp_data = json.loads(resp.data)
-        assert resp.status == '200 OK'
+        assert resp.status == '202 ACCEPTED'
         assert resp_data == {'processing': True}
         # get details
         resp = client.get(url)

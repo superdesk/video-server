@@ -17,7 +17,7 @@ def test_capture_timeline_thumbnails_success(test_app, client, projects):
         ) + f'?type=timeline&amount={amount}'
         resp = client.get(url)
         resp_data = json.loads(resp.data)
-        assert resp.status == '200 OK'
+        assert resp.status == '202 ACCEPTED'
         assert resp_data == {'processing': True}
 
         resp = client.get(url)
@@ -46,7 +46,7 @@ def test_capture_timeline_thumbnails_remove_old(test_app, client, projects):
         ) + f'?type=timeline&amount={amount}'
         resp = client.get(url)
         resp_data = json.loads(resp.data)
-        assert resp.status == '200 OK'
+        assert resp.status == '202 ACCEPTED'
         assert resp_data == {'processing': True}
 
         resp = client.get(url)
@@ -58,7 +58,7 @@ def test_capture_timeline_thumbnails_remove_old(test_app, client, projects):
 
 
 @pytest.mark.parametrize('projects', [({'file': 'sample_0.mp4', 'duplicate': False},)], indirect=True)
-def test_capture_timeline_thumbnails_202_resp(test_app, client, projects):
+def test_capture_timeline_thumbnails_409_resp(test_app, client, projects):
     project = projects[0]
     amount = 3
 
@@ -68,19 +68,19 @@ def test_capture_timeline_thumbnails_202_resp(test_app, client, projects):
         ) + f'?type=timeline&amount={amount}'
         resp = client.get(url)
         resp_data = json.loads(resp.data)
-        assert resp.status == '200 OK'
+        assert resp.status == '202 ACCEPTED'
         assert resp_data == {'processing': True}
 
         # since we use CELERY_TASK_ALWAYS_EAGER, task will be executed immediately,
         # it means next request will return a finshed result,
-        # since we want to test 202 response, we must set processing flag in db directly
+        # since we want to test 409 response, we must set processing flag in db directly
         test_app.mongo.db.projects.find_one_and_update(
             {'_id': ObjectId(project['_id'])},
             {'$set': {'processing.thumbnails_timeline': True}}
         )
 
         resp = client.get(url)
-        assert resp.status == '202 ACCEPTED'
+        assert resp.status == '409 CONFLICT'
 
 
 @pytest.mark.parametrize('projects', [({'file': 'sample_0.mp4', 'duplicate': False},)], indirect=True)
@@ -94,7 +94,7 @@ def test_capture_preview_thumbnail_success(test_app, client, projects):
         ) + f'?type=preview&position={position}'
         resp = client.get(url)
         resp_data = json.loads(resp.data)
-        assert resp.status == '200 OK'
+        assert resp.status == '202 ACCEPTED'
         assert resp_data == {'processing': True}
 
         resp = client.get(url)
@@ -117,13 +117,13 @@ def test_capture_preview_thumbnail_bad_position(test_app, client, projects):
 
 
 @pytest.mark.parametrize('projects', [({'file': 'sample_0.mp4', 'duplicate': False},)], indirect=True)
-def test_capture_preview_thumbnail_202_resp(test_app, client, projects):
+def test_capture_preview_thumbnail_409_resp(test_app, client, projects):
     project = projects[0]
     position = 700
 
     # since we use CELERY_TASK_ALWAYS_EAGER, task will be executed immediately,
     # it means next request will return a finshed result,
-    # since we want to test 202 response, we must set processing flag in db directly
+    # since we want to test 409 response, we must set processing flag in db directly
     test_app.mongo.db.projects.find_one_and_update(
         {'_id': ObjectId(project['_id'])},
         {'$set': {'processing.thumbnail_preview': True}}
@@ -134,7 +134,7 @@ def test_capture_preview_thumbnail_202_resp(test_app, client, projects):
             'projects.retrieve_or_create_thumbnails', project_id=project['_id']
         ) + f'?type=preview&position={position}'
         resp = client.get(url)
-        assert resp.status == '202 ACCEPTED'
+        assert resp.status == '409 CONFLICT'
 
 
 @pytest.mark.parametrize('projects', [({'file': 'sample_0.mp4', 'duplicate': False},)], indirect=True)
@@ -193,13 +193,13 @@ def test_upload_custom_preview_thumbnail_wrong_codec(test_app, client, projects,
 
 @pytest.mark.parametrize('projects', [({'file': 'sample_0.mp4', 'duplicate': False},)], indirect=True)
 @pytest.mark.parametrize('filestreams', [('sample_0.jpg',)], indirect=True)
-def test_upload_custom_preview_thumbnail_202_resp(test_app, client, projects, filestreams):
+def test_upload_custom_preview_thumbnail_409_resp(test_app, client, projects, filestreams):
     project = projects[0]
     jpg_stream = filestreams[0]
 
     # since we use CELERY_TASK_ALWAYS_EAGER, task will be executed immediately,
     # it means next request will return a finshed result,
-    # since we want to test 202 response, we must set processing flag in db directly
+    # since we want to test 409 response, we must set processing flag in db directly
     test_app.mongo.db.projects.find_one_and_update(
         {'_id': ObjectId(project['_id'])},
         {'$set': {'processing.thumbnail_preview': True}}
@@ -214,7 +214,7 @@ def test_upload_custom_preview_thumbnail_202_resp(test_app, client, projects, fi
             },
             content_type='multipart/form-data'
         )
-        assert resp.status == '202 ACCEPTED'
+        assert resp.status == '409 CONFLICT'
 
 
 @pytest.mark.parametrize('projects', [({'file': 'sample_0.mp4', 'duplicate': False},)], indirect=True)
@@ -230,7 +230,7 @@ def test_upload_custom_preview_remove_old_thumbnail(test_app, client, projects, 
             'projects.retrieve_or_create_thumbnails', project_id=project['_id']
         ) + f'?type=preview&position={position}'
         resp = client.get(url)
-        assert resp.status == '200 OK'
+        assert resp.status == '202 ACCEPTED'
         # get storage_id of captured preview thumbnail
         resp = client.get(url)
         resp_data = json.loads(resp.data)

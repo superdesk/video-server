@@ -559,7 +559,7 @@ class RetrieveEditDestroyProject(MethodView):
                 type: integer
                 example: 800
         responses:
-          200:
+          202:
             description: Editing started
             schema:
               type: object
@@ -567,7 +567,7 @@ class RetrieveEditDestroyProject(MethodView):
                 processing:
                   type: boolean
                   example: True
-          202:
+          409:
             description: Previous editing was not finished yet
             schema:
               type: object
@@ -578,7 +578,7 @@ class RetrieveEditDestroyProject(MethodView):
         """
 
         if self._project['processing']['video']:
-            return json_response({'processing': True}, status=202)
+            return json_response({'processing': True}, status=409)
 
         if self._project['version'] == 1:
             raise BadRequest(f"Video with version 1 is not editable, use duplicated project instead.")
@@ -658,7 +658,7 @@ class RetrieveEditDestroyProject(MethodView):
             changes=document
         )
 
-        return json_response({"processing": True}, status=200)
+        return json_response({"processing": True}, status=202)
 
     def delete(self, project_id):
         """
@@ -789,7 +789,7 @@ class DuplicateProject(MethodView):
         """
 
         if any(self._project['processing'].values()):
-            return json_response({"processing": True}, status=202)
+            return json_response({"processing": True}, status=409)
 
         # deepcopy & save a child_project
         child_project = copy.deepcopy(self._project)
@@ -955,7 +955,7 @@ class RetrieveOrCreateThumbnails(MethodView):
           description: Position in the video where preview thumbnail should be captured.
                        Used only when `type` is `preview`.
         responses:
-          200:
+          202:
             description: Timeline/preview thumbnails information or status that thumbnails generation task was started.
         """
         document = validate_document(request.args.to_dict(), self.SCHEMA_THUMBNAILS)
@@ -1030,7 +1030,7 @@ class RetrieveOrCreateThumbnails(MethodView):
 
         # check if busy
         if self._project['processing']['thumbnail_preview']:
-            return json_response({'processing': True}, status=202)
+            return json_response({'processing': True}, status=409)
 
         # save to fs
         thumbnail_filename = "{filename}_preview-custom.{original_ext}".format(
@@ -1082,7 +1082,7 @@ class RetrieveOrCreateThumbnails(MethodView):
         """
         # resource is busy
         if self._project['processing']['thumbnails_timeline']:
-            return json_response({"processing": True}, status=202)
+            return json_response({"processing": True}, status=409)
         # no need to generate thumbnails
         elif amount == len(self._project['thumbnails']['timeline']):
             return json_response(self._project['thumbnails']['timeline'])
@@ -1098,7 +1098,7 @@ class RetrieveOrCreateThumbnails(MethodView):
                 json_util.dumps(self._project),
                 amount
             )
-            return json_response({"processing": True}, status=200)
+            return json_response({"processing": True}, status=202)
 
     def _get_preview_thumbnail(self, position):
         """
@@ -1110,7 +1110,7 @@ class RetrieveOrCreateThumbnails(MethodView):
         """
         # resource is busy
         if self._project['processing']['thumbnail_preview']:
-            return json_response({"processing": True}, status=202)
+            return json_response({"processing": True}, status=409)
         elif (self._project['thumbnails']['preview'] and
               self._project['thumbnails']['preview'].get('position') == position):
             return json_response(self._project['thumbnails']['preview'])
@@ -1131,7 +1131,7 @@ class RetrieveOrCreateThumbnails(MethodView):
                 json_util.dumps(self._project),
                 position
             )
-            return json_response({"processing": True}, status=200)
+            return json_response({"processing": True}, status=202)
 
 
 class GetRawVideo(MethodView):
@@ -1166,7 +1166,7 @@ class GetRawVideo(MethodView):
 
         # video is processing
         if self._project['processing']['video']:
-            return json_response({'processing': True}, status=202)
+            return json_response({'processing': True}, status=409)
 
         # get stream file for video
         video_range = request.headers.environ.get('HTTP_RANGE')
