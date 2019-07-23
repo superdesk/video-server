@@ -1198,32 +1198,11 @@ class GetRawVideo(MethodView):
         return res, 200
 
 
-class GetRawThumbnail(MethodView):
-    SCHEMA_THUMBNAILS = {
-        'type': {
-            'type': 'string',
-            'required': True,
-            'anyof': [
-                {
-                    'allowed': ['timeline'],
-                    'dependencies': ['index']
-                },
-                {
-                    'allowed': ['preview'],
-                    'excludes': 'index'
-                }
-            ],
-        },
-        'index': {
-            'type': 'integer',
-            'coerce': int,
-            'min': 0
-        }
-    }
+class GetRawPreviewThumbnail(MethodView):
 
     def get(self, project_id):
         """
-        Get thumbnail file
+        Get preview thumbnail file
         ---
         parameters:
         - in: path
@@ -1231,19 +1210,11 @@ class GetRawThumbnail(MethodView):
           type: string
           required: True
           description: Unique project id
-        - name: type
-          in: query
-          type: string
-          enum: [preview, timeline]
-        - in: query
-          name: index
-          type: integer
-          description: Index of timeline thumbnail to read. Used only when `type` is `timeline`.
         produces:
           - image/png
         responses:
           200:
-            description: thumbnail image
+            description: preview thumbnail image
             content:
               image/png:
                 schema:
@@ -1251,22 +1222,49 @@ class GetRawThumbnail(MethodView):
                   format: binary
         """
 
-        document = validate_document(request.args.to_dict(), self.SCHEMA_THUMBNAILS)
+        if not self._project['thumbnails']['preview']:
+            raise NotFound()
 
-        # preview
-        if document['type'] == 'preview':
-            if not self._project['thumbnails']['preview']:
-                raise NotFound()
-            thumbnail = self._project['thumbnails']['preview']
-            byte = app.fs.get(thumbnail['storage_id'])
-        # timeline
-        else:
-            try:
-                thumbnail = self._project['thumbnails']['timeline'][document['index']]
-            except IndexError:
-                raise NotFound()
-            byte = app.fs.get(thumbnail['storage_id'])
+        byte = app.fs.get(self._project['thumbnails']['preview']['storage_id'])
+        res = make_response(byte)
+        res.headers['Content-Type'] = self._project['thumbnails']['preview']['mimetype']
+        return res
 
+
+class GetRawTimelineThumbnail(MethodView):
+
+    def get(self, project_id, index):
+        """
+        Get timeline thumbnail file
+        ---
+        parameters:
+        - in: path
+          name: project_id
+          type: string
+          required: True
+          description: Unique project id
+        - in: path
+          name: index
+          type: integer
+          required: True
+          description: Index of timeline thumbnail to read.
+        produces:
+          - image/png
+        responses:
+          200:
+            description: timeline thumbnail image
+            content:
+              image/png:
+                schema:
+                  type: string
+                  format: binary
+        """
+
+        try:
+            thumbnail = self._project['thumbnails']['timeline'][index]
+        except IndexError:
+            raise NotFound()
+        byte = app.fs.get(thumbnail['storage_id'])
         res = make_response(byte)
         res.headers['Content-Type'] = thumbnail['mimetype']
         return res
@@ -1294,6 +1292,10 @@ bp.add_url_rule(
     view_func=GetRawVideo.as_view('get_raw_video')
 )
 bp.add_url_rule(
-    '/<project_id>/raw/thumbnail',
-    view_func=GetRawThumbnail.as_view('get_raw_thumbnail')
+    '/<project_id>/raw/thumbnails/preview',
+    view_func=GetRawPreviewThumbnail.as_view('get_raw_preview_thumbnail')
+)
+bp.add_url_rule(
+    '/<project_id>/raw/thumbnails/timeline/<int:index>',
+    view_func=GetRawTimelineThumbnail.as_view('get_raw_timeline_thumbnail')
 )
