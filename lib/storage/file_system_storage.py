@@ -41,7 +41,7 @@ class FileSystemStorage(MediaStorageInterface):
             with open(self._get_file_path(storage_id), 'rb') as rb:
                 media_file = rb.read()
         except Exception as e:
-            logger.error(f'FileSystemStorage:get: {e}')
+            logger.error(f'FileSystemStorage:get:{storage_id}: {e}')
             raise e
 
         return media_file
@@ -62,7 +62,7 @@ class FileSystemStorage(MediaStorageInterface):
                 rb.seek(start)
                 media_file = rb.read(length)
         except Exception as e:
-            logger.error(f'FileSystemStorage:get_range: {e}')
+            logger.error(f'FileSystemStorage:get_range:{storage_id}: {e}')
             raise e
 
         return media_file
@@ -121,7 +121,7 @@ class FileSystemStorage(MediaStorageInterface):
             with open(file_path, "wb") as f:
                 f.write(content)
         except Exception as e:
-            logger.error(f'FileSystemStorage:put: {e}')
+            logger.error(f'FileSystemStorage:put:{storage_id}: {e}')
             raise e
 
         logger.info(f"Saved file '{storage_id}' to fs storage")
@@ -148,10 +148,10 @@ class FileSystemStorage(MediaStorageInterface):
             with open(file_path, "wb") as f:
                 f.write(content)
         except Exception as e:
-            logger.error(f'FileSystemStorage:replace: {e}')
+            logger.error(f'FileSystemStorage:replace:{storage_id}: {e}')
             raise e
         else:
-            logger.info(f'Replaced file {storage_id} in fs storage')
+            logger.info(f'Replaced file "{storage_id}" in fs storage')
 
     def delete(self, storage_id):
         """
