@@ -68,8 +68,8 @@ MAX_RETRIES = int(env('MAX_RETRIES', 3))
 BROKER_CONNECTION_MAX_RETRIES = MAX_RETRIES
 
 #: Codec support
-CODEC_SUPPORT_VIDEO = json.loads(env('CODEC_SUPPORT_VIDEO', '["vp8", "vp9", "h264", "theora", "av1"]'))
-CODEC_SUPPORT_IMAGE = json.loads(env('CODEC_SUPPORT_IMAGE', '["bmp", "mjpeg", "png"]'))
+CODEC_SUPPORT_VIDEO = ('vp8', 'vp9', 'h264', 'theora', 'av1')
+CODEC_SUPPORT_IMAGE = ('bmp', 'mjpeg', 'png')
 CODEC_EXTENSION_MAP = {
     'bmp': 'bmp',
     'png': 'png',
