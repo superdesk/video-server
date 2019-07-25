@@ -505,8 +505,8 @@ class RetrieveEditDestroyProject(MethodView):
                         example: {}
         """
 
-        add_urls(self._project)
-        return json_response(self._project)
+        add_urls(self.project)
+        return json_response(self.project)
 
     def put(self, project_id):
         """
@@ -577,10 +577,10 @@ class RetrieveEditDestroyProject(MethodView):
                   example: True
         """
 
-        if self._project['processing']['video']:
+        if self.project['processing']['video']:
             return json_response({'processing': True}, status=409)
 
-        if self._project['version'] == 1:
+        if self.project['version'] == 1:
             raise BadRequest(f"Video with version 1 is not editable, use duplicated project instead.")
 
         request_json = request.get_json()
@@ -593,7 +593,7 @@ class RetrieveEditDestroyProject(MethodView):
             raise BadRequest(f"At least one of the edit rules is required. "
                              f"Available edit rules are: {', '.join(self.schema_edit.keys())}")
 
-        metadata = self._project['metadata']
+        metadata = self.project['metadata']
 
         # validate trim
         if 'trim' in document:
@@ -644,17 +644,17 @@ class RetrieveEditDestroyProject(MethodView):
                 ]})
 
         # set processing flag
-        self._project = app.mongo.db.projects.find_one_and_update(
-            {'_id': self._project['_id']},
+        self.project = app.mongo.db.projects.find_one_and_update(
+            {'_id': self.project['_id']},
             {'$set': {'processing.video': True}},
             return_document=ReturnDocument.AFTER
         )
-        logger.info(f"New project editing task was started. ID: {self._project['_id']}")
-        save_activity_log("EDIT", self._project['_id'], document)
+        logger.info(f"New project editing task was started. ID: {self.project['_id']}")
+        save_activity_log("EDIT", self.project['_id'], document)
 
         # run task
         edit_video.delay(
-            json_util.dumps(self._project),
+            json_util.dumps(self.project),
             changes=document
         )
 
@@ -676,10 +676,10 @@ class RetrieveEditDestroyProject(MethodView):
         """
 
         # remove project dir from storage
-        app.fs.delete_dir(self._project['storage_id'])
-        logger.info(f"Project was deleted. ID: {self._project['_id']}")
-        save_activity_log("DELETE", self._project['_id'])
-        app.mongo.db.projects.delete_one({'_id': self._project['_id']})
+        app.fs.delete_dir(self.project['storage_id'])
+        logger.info(f"Project was deleted. ID: {self.project['_id']}")
+        save_activity_log("DELETE", self.project['_id'])
+        app.mongo.db.projects.delete_one({'_id': self.project['_id']})
 
         return json_response(status=204)
 
@@ -788,14 +788,14 @@ class DuplicateProject(MethodView):
                         example: {}
         """
 
-        if any(self._project['processing'].values()):
+        if any(self.project['processing'].values()):
             return json_response({"processing": True}, status=409)
 
         # deepcopy & save a child_project
-        child_project = copy.deepcopy(self._project)
+        child_project = copy.deepcopy(self.project)
         del child_project['_id']
         del child_project['storage_id']
-        child_project['parent'] = self._project['_id']
+        child_project['parent'] = self.project['_id']
         child_project['create_time'] = datetime.utcnow()
         child_project['version'] += 1
         child_project['thumbnails'] = {
@@ -807,7 +807,7 @@ class DuplicateProject(MethodView):
         # put a video file stream into storage
         try:
             storage_id = app.fs.put(
-                content=app.fs.get(self._project['storage_id']),
+                content=app.fs.get(self.project['storage_id']),
                 filename=child_project['filename'],
                 project_id=child_project['_id'],
                 content_type=child_project['mime_type']
@@ -826,16 +826,16 @@ class DuplicateProject(MethodView):
             )
 
             # save preview thumbnail
-            if self._project['thumbnails']['preview']:
+            if self.project['thumbnails']['preview']:
                 storage_id = app.fs.put(
-                    content=app.fs.get(self._project['thumbnails']['preview']['storage_id']),
-                    filename=self._project['thumbnails']['preview']['filename'],
+                    content=app.fs.get(self.project['thumbnails']['preview']['storage_id']),
+                    filename=self.project['thumbnails']['preview']['filename'],
                     project_id=None,
                     asset_type='thumbnails',
                     storage_id=child_project['storage_id'],
-                    content_type=self._project['thumbnails']['preview']['mimetype']
+                    content_type=self.project['thumbnails']['preview']['mimetype']
                 )
-                child_project['thumbnails']['preview'] = self._project['thumbnails']['preview']
+                child_project['thumbnails']['preview'] = self.project['thumbnails']['preview']
                 child_project['thumbnails']['preview']['storage_id'] = storage_id
                 # set preview thumbnail in db
                 child_project = app.mongo.db.projects.find_one_and_update(
@@ -848,7 +848,7 @@ class DuplicateProject(MethodView):
 
             # save timeline thumbnails
             timeline_thumbnails = []
-            for thumbnail in self._project['thumbnails']['timeline']:
+            for thumbnail in self.project['thumbnails']['timeline']:
                 storage_id = app.fs.put(
                     content=app.fs.get(thumbnail['storage_id']),
                     filename=thumbnail['filename'],
@@ -881,8 +881,8 @@ class DuplicateProject(MethodView):
             app.mongo.db.projects.delete_one({'_id': child_project['_id']})
             raise InternalServerError(str(e))
 
-        logger.info(f"Project was duplicated. Parent ID: {self._project['_id']}. Child ID: {child_project['_id']}")
-        save_activity_log('DUPLICATE', self._project['_id'], child_project)
+        logger.info(f"Project was duplicated. Parent ID: {self.project['_id']}. Child ID: {child_project['_id']}")
+        save_activity_log('DUPLICATE', self.project['_id'], child_project)
         add_urls(child_project)
 
         return json_response(child_project, status=201)
@@ -959,7 +959,7 @@ class RetrieveOrCreateThumbnails(MethodView):
             description: Timeline/preview thumbnails information or status that thumbnails generation task was started.
         """
         document = validate_document(request.args.to_dict(), self.SCHEMA_THUMBNAILS)
-        add_urls(self._project)
+        add_urls(self.project)
 
         if document['type'] == 'timeline':
             return self._get_timeline_thumbnails(
@@ -1029,12 +1029,12 @@ class RetrieveOrCreateThumbnails(MethodView):
             raise BadRequest(f"Codec: '{metadata.get('codec_name')}' is not supported.")
 
         # check if busy
-        if self._project['processing']['thumbnail_preview']:
+        if self.project['processing']['thumbnail_preview']:
             return json_response({'processing': True}, status=409)
 
         # save to fs
         thumbnail_filename = "{filename}_preview-custom.{original_ext}".format(
-            filename=os.path.splitext(self._project['filename'])[0],
+            filename=os.path.splitext(self.project['filename'])[0],
             original_ext=request.files['file'].filename.rsplit('.', 1)[-1].lower()
         )
         mimetype = app.config.get('CODEC_MIMETYPE_MAP')[metadata.get('codec_name')]
@@ -1043,18 +1043,18 @@ class RetrieveOrCreateThumbnails(MethodView):
             filename=thumbnail_filename,
             project_id=None,
             asset_type='thumbnails',
-            storage_id=self._project['storage_id'],
+            storage_id=self.project['storage_id'],
             content_type=mimetype
         )
 
         # delete old file
-        if self._project['thumbnails']['preview'] \
-                and storage_id != self._project['thumbnails']['preview']['storage_id']:
-            app.fs.delete(self._project['thumbnails']['preview']['storage_id'])
+        if self.project['thumbnails']['preview'] \
+                and storage_id != self.project['thumbnails']['preview']['storage_id']:
+            app.fs.delete(self.project['thumbnails']['preview']['storage_id'])
 
         # save new thumbnail info
-        self._project = app.mongo.db.projects.find_one_and_update(
-            {'_id': self._project['_id']},
+        self.project = app.mongo.db.projects.find_one_and_update(
+            {'_id': self.project['_id']},
             {'$set': {
                 'thumbnails.preview': {
                     'filename': thumbnail_filename,
@@ -1068,9 +1068,9 @@ class RetrieveOrCreateThumbnails(MethodView):
             }},
             return_document=ReturnDocument.AFTER
         )
-        add_urls(self._project)
+        add_urls(self.project)
 
-        return json_response(self._project['thumbnails']['preview'])
+        return json_response(self.project['thumbnails']['preview'])
 
     def _get_timeline_thumbnails(self, amount):
         """
@@ -1081,21 +1081,21 @@ class RetrieveOrCreateThumbnails(MethodView):
         :rtype: flask.wrappers.Response
         """
         # resource is busy
-        if self._project['processing']['thumbnails_timeline']:
+        if self.project['processing']['thumbnails_timeline']:
             return json_response({"processing": True}, status=409)
         # no need to generate thumbnails
-        elif amount == len(self._project['thumbnails']['timeline']):
-            return json_response(self._project['thumbnails']['timeline'])
+        elif amount == len(self.project['thumbnails']['timeline']):
+            return json_response(self.project['thumbnails']['timeline'])
         else:
             # set processing flag
-            self._project = app.mongo.db.projects.find_one_and_update(
-                {'_id': self._project['_id']},
+            self.project = app.mongo.db.projects.find_one_and_update(
+                {'_id': self.project['_id']},
                 {'$set': {'processing.thumbnails_timeline': True}},
                 return_document=ReturnDocument.AFTER
             )
             # run task
             generate_timeline_thumbnails.delay(
-                json_util.dumps(self._project),
+                json_util.dumps(self.project),
                 amount
             )
             return json_response({"processing": True}, status=202)
@@ -1109,26 +1109,26 @@ class RetrieveOrCreateThumbnails(MethodView):
         :rtype: flask.wrappers.Response
         """
         # resource is busy
-        if self._project['processing']['thumbnail_preview']:
+        if self.project['processing']['thumbnail_preview']:
             return json_response({"processing": True}, status=409)
-        elif (self._project['thumbnails']['preview'] and
-              self._project['thumbnails']['preview'].get('position') == position):
-            return json_response(self._project['thumbnails']['preview'])
-        elif self._project['metadata']['duration'] < position:
+        elif (self.project['thumbnails']['preview'] and
+              self.project['thumbnails']['preview'].get('position') == position):
+            return json_response(self.project['thumbnails']['preview'])
+        elif self.project['metadata']['duration'] < position:
             raise BadRequest(
                 f"Requested position: '{position}' is more than video's duration: "
-                f"'{self._project['metadata']['duration']}'."
+                f"'{self.project['metadata']['duration']}'."
             )
         else:
             # set processing flag
-            self._project = app.mongo.db.projects.find_one_and_update(
-                {'_id': self._project['_id']},
+            self.project = app.mongo.db.projects.find_one_and_update(
+                {'_id': self.project['_id']},
                 {'$set': {'processing.thumbnail_preview': True}},
                 return_document=ReturnDocument.AFTER
             )
             # run task
             generate_preview_thumbnail.delay(
-                json_util.dumps(self._project),
+                json_util.dumps(self.project),
                 position
             )
             return json_response({"processing": True}, status=202)
@@ -1165,12 +1165,12 @@ class GetRawVideo(MethodView):
         """
 
         # video is processing
-        if self._project['processing']['video']:
+        if self.project['processing']['video']:
             return json_response({'processing': True}, status=409)
 
         # get stream file for video
         video_range = request.headers.environ.get('HTTP_RANGE')
-        length = self._project['metadata'].get('size')
+        length = self.project['metadata'].get('size')
         if video_range:
             start = int(re.split('[= | -]', video_range)[1])
             # TODO doublecheck streaming range
@@ -1180,19 +1180,19 @@ class GetRawVideo(MethodView):
                 'Content-Range': f'bytes {start}-{end}/{length}',
                 'Accept-Ranges': 'bytes',
                 'Content-Length': chunksize,
-                'Content-Type': self._project.get("mime_type"),
+                'Content-Type': self.project.get("mime_type"),
             }
             # get a stack of bytes push to client
-            stream = app.fs.get_range(self._project['storage_id'], start, chunksize)
+            stream = app.fs.get_range(self.project['storage_id'], start, chunksize)
             res = make_response(stream)
             res.headers = headers
             return res, 206
 
         headers = {
             'Content-Length': length,
-            'Content-Type': self._project.get("mime_type"),
+            'Content-Type': self.project.get("mime_type"),
         }
-        stream = app.fs.get(self._project.get('storage_id'))
+        stream = app.fs.get(self.project.get('storage_id'))
         res = make_response(stream)
         res.headers = headers
         return res, 200
@@ -1222,12 +1222,12 @@ class GetRawPreviewThumbnail(MethodView):
                   format: binary
         """
 
-        if not self._project['thumbnails']['preview']:
+        if not self.project['thumbnails']['preview']:
             raise NotFound()
 
-        byte = app.fs.get(self._project['thumbnails']['preview']['storage_id'])
+        byte = app.fs.get(self.project['thumbnails']['preview']['storage_id'])
         res = make_response(byte)
-        res.headers['Content-Type'] = self._project['thumbnails']['preview']['mimetype']
+        res.headers['Content-Type'] = self.project['thumbnails']['preview']['mimetype']
         return res
 
 
@@ -1261,7 +1261,7 @@ class GetRawTimelineThumbnail(MethodView):
         """
 
         try:
-            thumbnail = self._project['thumbnails']['timeline'][index]
+            thumbnail = self.project['thumbnails']['timeline'][index]
         except IndexError:
             raise NotFound()
         byte = app.fs.get(thumbnail['storage_id'])
