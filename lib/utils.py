@@ -1,7 +1,7 @@
 import json
 import uuid
 from datetime import datetime
-import tempfile
+from tempfile import mkstemp
 import logging
 
 import bson
@@ -151,22 +151,20 @@ def get_request_address(request_headers):
     return request_headers.get('HTTP_X_FORWARDED_FOR') or request_headers.get('REMOTE_ADDR')
 
 
-def create_temp_file(file_stream, file_name):
+def create_temp_file(file_stream, suffix=None):
     """
     Saves `file_stream` into /tmp directory
     :param file_stream: file to save
     :type file_stream: bytes
-    :param file_name: file name used to save `file_stream`
-    :type file_name: str
+    :param suffix: the file name will end with that suffix, otherwise there will be no suffix.
+    :type suffix: str
     :return: file path
     :rtype: str
     """
 
-    tmp_path = f"{tempfile.gettempdir()}/tmp_video_server_{file_name}"
-    try:
-        with open(tmp_path, "wb") as f:
-            f.write(file_stream)
-    except Exception as e:
-        logger.error(f'Can not save file stream to tmp directory: {e}')
+    fd, path = mkstemp(suffix=suffix)
 
-    return tmp_path
+    with open(fd, "wb") as f:
+        f.write(file_stream)
+
+    return path

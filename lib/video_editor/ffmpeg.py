@@ -4,7 +4,7 @@ import subprocess
 import logging
 
 from flask import current_app as app
-from lib.utils import create_file_name, create_temp_file
+from lib.utils import create_temp_file
 
 from .interface import VideoEditorInterface
 
@@ -36,8 +36,7 @@ class FFMPEGVideoEditor(VideoEditorInterface):
         :rtype: dict
         """
 
-        file_name = create_file_name(extension)
-        file_temp_path = create_temp_file(filestream, file_name)
+        file_temp_path = create_temp_file(filestream)
         try:
             metadata = self._get_meta(file_temp_path)
         finally:
@@ -63,7 +62,8 @@ class FFMPEGVideoEditor(VideoEditorInterface):
         :return:
         """
 
-        path_input = create_temp_file(stream_file, filename)
+        # file extension is required by ffmpeg
+        path_input = create_temp_file(stream_file, suffix=f".{filename.rsplit('.', 1)[-1]}")
         path_output = '{}_edit.{}'.format(*path_input.rsplit('.', 1))
         filter_string = ''
 
@@ -145,7 +145,7 @@ class FFMPEGVideoEditor(VideoEditorInterface):
         :rtype: bytes, dict
         """
 
-        path_video = create_temp_file(stream_file, filename)
+        path_video = create_temp_file(stream_file)
         try:
             # avoid the last frame, it is null
             if int(duration) <= int(position):
@@ -184,7 +184,7 @@ class FFMPEGVideoEditor(VideoEditorInterface):
         :return: bytes, generator
         """
 
-        path_video = create_temp_file(stream_file, filename)
+        path_video = create_temp_file(stream_file)
         try:
             # time period between two frames
             if thumbnails_amount == 1:
