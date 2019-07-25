@@ -2,6 +2,7 @@ import os
 import re
 import copy
 import logging
+import bson
 from datetime import datetime
 
 from bson import json_util
@@ -149,6 +150,7 @@ class ListUploadProject(MethodView):
 
         # add record to database
         project = {
+            '_id': bson.ObjectId(),
             'filename': create_file_name(ext=document['file'].filename.rsplit('.')[-1]),
             'storage_id': None,
             'metadata': metadata,
@@ -168,33 +170,23 @@ class ListUploadProject(MethodView):
                 'preview': None
             }
         }
-        app.mongo.db.projects.insert_one(project)
 
         # put file stream into storage
-        try:
-            storage_id = app.fs.put(
-                content=file_stream,
-                filename=project['filename'],
-                project_id=project['_id'],
-                content_type=document['file'].mimetype
-            )
-        except Exception as e:
-            # remove record from db
-            app.mongo.db.projects.delete_one({'_id': project['_id']})
-            raise InternalServerError(str(e))
-
+        storage_id = app.fs.put(
+            content=file_stream,
+            filename=project['filename'],
+            project_id=project['_id'],
+            content_type=document['file'].mimetype
+        )
         # set 'storage_id' for project
+        project['storage_id'] = storage_id
+
         try:
-            project = app.mongo.db.projects.find_one_and_update(
-                {'_id': project['_id']},
-                {'$set': {'storage_id': storage_id}},
-                return_document=ReturnDocument.AFTER
-            )
+            # save project
+            app.mongo.db.projects.insert_one(project)
         except ServerSelectionTimeoutError as e:
             # delete project dir
             app.fs.delete_dir(storage_id)
-            # remove record from db
-            app.mongo.db.projects.delete_one({'_id': project['_id']})
             raise InternalServerError(str(e))
 
         logger.info(f"New project was created. ID: {project['_id']}")
