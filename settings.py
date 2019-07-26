@@ -1,4 +1,3 @@
-import json
 import os
 from distutils.util import strtobool as _strtobool
 
@@ -89,11 +88,6 @@ FS_MEDIA_STORAGE_PATH = env('FS_MEDIA_STORAGE_PATH', DEFAULT_PATH)
 
 #: media tool
 DEFAULT_MEDIA_TOOL = env('DEFAULT_MEDIA_TOOL', 'ffmpeg')
-
-#: urls
-VIDEO_SERVER_URL = env('VIDEO_SERVER_URL', 'http://localhost:5050/projects')
-VIDEO_URL_SUFFIX = env('VIDEO_URL_SUFFIX', 'raw/video')
-THUMBNAIL_URL_SUFFIX = env('THUMBNAIL_URL_SUFFIX', 'raw/thumbnail')
 
 #: pagination, items per page
 ITEMS_PER_PAGE = int(env('ITEMS_PER_PAGE', 25))

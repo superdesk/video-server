@@ -27,7 +27,7 @@ def test_retrieve_project_success(test_app, client, projects):
         assert resp_data['parent'] is None
         assert resp_data['processing'] == {'video': False, 'thumbnail_preview': False, 'thumbnails_timeline': False}
         assert resp_data['thumbnails'] == {'timeline': [], 'preview': None}
-        assert resp_data['url'] == f'http://localhost:5050/projects/{resp_data["_id"]}/raw/video'
+        assert resp_data['url'] == url_for('projects.get_raw_video', project_id=resp_data["_id"], _external=True)
         assert resp_data['metadata']['codec_name'] == 'h264'
         assert resp_data['metadata']['codec_long_name'] == 'H.264 / AVC / MPEG-4 AVC / MPEG-4 part 10'
         assert resp_data['metadata']['width'] == 1280

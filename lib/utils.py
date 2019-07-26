@@ -7,6 +7,7 @@ import logging
 import bson
 from flask import Response
 from flask import current_app as app
+from flask import url_for
 from werkzeug.exceptions import BadRequest
 
 from lib.validator import Validator
@@ -75,33 +76,28 @@ def add_urls(doc):
     :type doc: dict or list
     """
 
-    def _get_url_for_media(project_id, media_type):
-        """
-        Build and return url for a project's media
-        :param project_id: id of project
-        :type project_id: bson.objectid.ObjectId
-        :return: url for project's media
-        :rtype: str
-        """
-
-        if media_type == 'video':
-            suffix = app.config.get('VIDEO_URL_SUFFIX')
-        elif media_type == 'thumbnail':
-            suffix = app.config.get('THUMBNAIL_URL_SUFFIX')
-        else:
-            raise KeyError('Invalid media_type')
-
-        return '/'.join(x.strip('/') for x in (app.config.get('VIDEO_SERVER_URL'), str(project_id), suffix))
-
     def _handle_doc(doc):
         if '_id' in doc:
-            doc['url'] = _get_url_for_media(doc['_id'], 'video')
+            doc['url'] = url_for(
+                'projects.get_raw_video',
+                project_id=doc['_id'],
+                _external=True
+            )
 
             for index, thumb in enumerate(doc['thumbnails']['timeline']):
-                thumb['url'] = _get_url_for_media(doc.get('_id'), 'thumbnail') + f'?type=timeline&index={index}'
+                thumb['url'] = url_for(
+                    'projects.get_raw_timeline_thumbnail',
+                    project_id=doc['_id'],
+                    index=index,
+                    _external=True
+                )
 
             if doc['thumbnails']['preview']:
-                doc['thumbnails']['preview']['url'] = _get_url_for_media(doc.get('_id'), 'thumbnail') + '?type=preview'
+                doc['thumbnails']['preview']['url'] = url_for(
+                    'projects.get_raw_preview_thumbnail',
+                    project_id=doc['_id'],
+                    _external=True
+                )
 
     if type(doc) is dict:
         _handle_doc(doc)
