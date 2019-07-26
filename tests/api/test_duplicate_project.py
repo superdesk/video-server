@@ -52,7 +52,7 @@ def test_duplicate_project_broken_fs_put(mock_fs_put, test_app, client, projects
         resp_data = json.loads(resp.data)
 
         assert resp.status == '500 INTERNAL SERVER ERROR'
-        assert resp_data == {'message': 'Some error'}
+        assert resp_data == {'error': 'Some error'}
         assert list(test_app.mongo.db.projects.find()).__len__() == 1
 
 
@@ -119,5 +119,5 @@ def test_duplicate_project_cant_set_storage_id(mock_find_one_and_update, test_ap
         resp_data = json.loads(resp.data)
 
         assert resp.status == '500 INTERNAL SERVER ERROR'
-        assert resp_data == {'message': 'Timeout error'}
+        assert resp_data == {'error': 'Timeout error'}
         assert len(list(test_app.mongo.db.projects.find())) == len(projects)

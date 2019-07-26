@@ -55,7 +55,7 @@ def test_upload_project_wrong_codec(test_app, client, filestreams):
 
         resp_data = json.loads(resp.data)
         assert resp.status == '400 BAD REQUEST'
-        assert resp_data['message'] == "Codec: 'mjpeg' is not supported."
+        assert resp_data['file'] == ["Codec: 'mjpeg' is not supported."]
 
 
 @pytest.mark.parametrize('filestreams', [('sample_0.mp4',)], indirect=True)
@@ -74,7 +74,7 @@ def test_upload_project_bad_request(test_app, client, filestreams):
         )
         resp_data = json.loads(resp.data)
         assert resp.status == '400 BAD REQUEST'
-        assert resp_data['message'] == {'file': ['required field']}
+        assert resp_data == {'file': ['required field']}
 
 
 @pytest.mark.parametrize('filestreams', [('sample_0.mp4',)], indirect=True)
@@ -93,7 +93,7 @@ def test_upload_project_wrong_contenttype(test_app, client, filestreams):
         )
         resp_data = json.loads(resp.data)
         assert resp.status == '400 BAD REQUEST'
-        assert resp_data['message'] == {'file': ['required field']}
+        assert resp_data == {'file': ['required field']}
 
 
 @pytest.mark.parametrize('filestreams', [('sample_0.mp4',)], indirect=True)
@@ -114,7 +114,7 @@ def test_upload_project_cant_set_storage_id(mock_insert_one, test_app, client, f
         )
         resp_data = json.loads(resp.data)
         assert resp.status == '500 INTERNAL SERVER ERROR'
-        assert resp_data == {'message': 'Timeout error'}
+        assert resp_data == {'error': 'Timeout error'}
         assert list(test_app.mongo.db.projects.find()) == []
 
 

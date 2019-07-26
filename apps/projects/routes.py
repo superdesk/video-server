@@ -146,7 +146,7 @@ class ListUploadProject(MethodView):
         file_stream = document['file'].stream.read()
         metadata = get_video_editor().get_meta(file_stream)
         if metadata.get('codec_name') not in app.config.get('CODEC_SUPPORT_VIDEO'):
-            raise BadRequest(f"Codec: '{metadata.get('codec_name')}' is not supported.")
+            raise BadRequest({'file': [f"Codec: '{metadata.get('codec_name')}' is not supported."]})
 
         # add record to database
         project = {
@@ -573,7 +573,7 @@ class RetrieveEditDestroyProject(MethodView):
             return json_response({'processing': True}, status=409)
 
         if self.project['version'] == 1:
-            raise BadRequest(f"Video with version 1 is not editable, use duplicated project instead.")
+            raise BadRequest({"project_id": [f"Video with version 1 is not editable, use duplicated project instead."]})
 
         request_json = request.get_json()
         document = validate_document(
@@ -582,8 +582,10 @@ class RetrieveEditDestroyProject(MethodView):
         )
 
         if not document:
-            raise BadRequest(f"At least one of the edit rules is required. "
-                             f"Available edit rules are: {', '.join(self.schema_edit.keys())}")
+            raise BadRequest({
+                'edit': [f"At least one of the edit rules is required. "
+                         f"Available edit rules are: {', '.join(self.schema_edit.keys())}"]
+            })
 
         metadata = self.project['metadata']
 
@@ -1018,7 +1020,7 @@ class RetrieveOrCreateThumbnails(MethodView):
         file_stream = document['file'].stream.read()
         metadata = get_video_editor().get_meta(file_stream)
         if metadata.get('codec_name') not in app.config.get('CODEC_SUPPORT_IMAGE'):
-            raise BadRequest(f"Codec: '{metadata.get('codec_name')}' is not supported.")
+            raise BadRequest({'file': [f"Codec: '{metadata.get('codec_name')}' is not supported."]})
 
         # check if busy
         if self.project['processing']['thumbnail_preview']:
@@ -1107,10 +1109,10 @@ class RetrieveOrCreateThumbnails(MethodView):
               self.project['thumbnails']['preview'].get('position') == position):
             return json_response(self.project['thumbnails']['preview'])
         elif self.project['metadata']['duration'] < position:
-            raise BadRequest(
-                f"Requested position: '{position}' is more than video's duration: "
-                f"'{self.project['metadata']['duration']}'."
-            )
+            raise BadRequest({
+                'position': [f"Requested position: '{position}' is more than video's duration: "
+                             f"'{self.project['metadata']['duration']}'."]
+            })
         else:
             # set processing flag
             self.project = app.mongo.db.projects.find_one_and_update(

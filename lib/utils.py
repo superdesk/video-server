@@ -110,6 +110,7 @@ def add_urls(doc):
         for _doc in docs:
             _handle_doc(_doc)
 
+
 def save_activity_log(action, project_id, payload=None):
     """
     Inserts an activity record into `activity` collection

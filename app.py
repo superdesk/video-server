@@ -81,8 +81,11 @@ def get_app(config=None):
 
     def make_json_error(ex):
         message = ex.description if hasattr(ex, 'description') else ex
-        response = jsonify(message=message)
 
+        if type(message) is not dict:
+            message = {'error': message}
+
+        response = jsonify(message)
         response.status_code = (ex.code
                                 if isinstance(ex, HTTPException)
                                 else 500)

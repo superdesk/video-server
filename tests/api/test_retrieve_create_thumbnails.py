@@ -188,7 +188,7 @@ def test_upload_custom_preview_thumbnail_wrong_codec(test_app, client, projects,
         )
         resp_data = json.loads(resp.data)
         assert resp.status == '400 BAD REQUEST'
-        assert resp_data == {'message': "Codec: 'h264' is not supported."}
+        assert resp_data == {'file': ["Codec: 'h264' is not supported."]}
 
 
 @pytest.mark.parametrize('projects', [({'file': 'sample_0.mp4', 'duplicate': False},)], indirect=True)
