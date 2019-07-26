@@ -5,7 +5,7 @@ from tempfile import mkstemp
 import logging
 
 import bson
-from flask import Response
+from flask import Response, make_response
 from flask import current_app as app
 from flask import url_for
 from werkzeug.exceptions import BadRequest
@@ -165,3 +165,34 @@ def create_temp_file(file_stream, suffix=None):
         f.write(file_stream)
 
     return path
+
+
+def storage2response(storage_id, headers=None, status=200, start=None, length=None):
+    """
+    Fetch binary using `storage_id` and return http response.
+    
+    :param storage_id: Unique storage id
+    :type storage_id: str
+    :param headers: header for response 
+    :type headers: dict
+    :param status: http status code
+    :type status: int
+    :param start: start file's position to read
+    :type start: int
+    :param length: the number of bytes to be read from the file
+    :type length: int
+    :return: response
+    :rtype: flask.wrappers.Response
+    """
+
+    if not headers:
+        headers = {}
+
+    if start is not None:
+        bytes = app.fs.get_range(storage_id, start, length)
+    else:
+        bytes = app.fs.get(storage_id)
+
+    resp = make_response(bytes)
+    resp.headers = headers
+    return resp, status

@@ -5,7 +5,6 @@ import logging
 import bson
 from datetime import datetime
 
-from bson import json_util
 from flask import request, make_response
 from flask import current_app as app
 from pymongo import ReturnDocument
@@ -14,7 +13,7 @@ from werkzeug.exceptions import BadRequest, InternalServerError, NotFound
 
 from lib.utils import (
     create_file_name, json_response, add_urls, validate_document,
-    get_request_address, save_activity_log, paginate
+    get_request_address, save_activity_log, paginate, storage2response
 )
 from lib.video_editor import get_video_editor
 from lib.views import MethodView
@@ -1170,26 +1169,27 @@ class GetRawVideo(MethodView):
             # TODO doublecheck streaming range
             end = length - 1
             chunksize = end - start + 1
-            headers = {
-                'Content-Range': f'bytes {start}-{end}/{length}',
-                'Accept-Ranges': 'bytes',
-                'Content-Length': chunksize,
+
+            return storage2response(
+                storage_id=self.project['storage_id'],
+                headers={
+                    'Content-Range': f'bytes {start}-{end}/{length}',
+                    'Accept-Ranges': 'bytes',
+                    'Content-Length': chunksize,
+                    'Content-Type': self.project.get("mime_type"),
+                },
+                status=206,
+                start=start,
+                length=chunksize
+            )
+
+        return storage2response(
+            storage_id=self.project.get('storage_id'),
+            headers={
+                'Content-Length': length,
                 'Content-Type': self.project.get("mime_type"),
             }
-            # get a stack of bytes push to client
-            stream = app.fs.get_range(self.project['storage_id'], start, chunksize)
-            res = make_response(stream)
-            res.headers = headers
-            return res, 206
-
-        headers = {
-            'Content-Length': length,
-            'Content-Type': self.project.get("mime_type"),
-        }
-        stream = app.fs.get(self.project.get('storage_id'))
-        res = make_response(stream)
-        res.headers = headers
-        return res, 200
+        )
 
 
 class GetRawPreviewThumbnail(MethodView):
@@ -1219,10 +1219,10 @@ class GetRawPreviewThumbnail(MethodView):
         if not self.project['thumbnails']['preview']:
             raise NotFound()
 
-        byte = app.fs.get(self.project['thumbnails']['preview']['storage_id'])
-        res = make_response(byte)
-        res.headers['Content-Type'] = self.project['thumbnails']['preview']['mimetype']
-        return res
+        return storage2response(
+            storage_id=self.project['thumbnails']['preview']['storage_id'],
+            headers={'Content-Type': self.project['thumbnails']['preview']['mimetype']}
+        )
 
 
 class GetRawTimelineThumbnail(MethodView):
@@ -1258,10 +1258,11 @@ class GetRawTimelineThumbnail(MethodView):
             thumbnail = self.project['thumbnails']['timeline'][index]
         except IndexError:
             raise NotFound()
-        byte = app.fs.get(thumbnail['storage_id'])
-        res = make_response(byte)
-        res.headers['Content-Type'] = thumbnail['mimetype']
-        return res
+
+        return storage2response(
+            storage_id=thumbnail['storage_id'],
+            headers={'Content-Type': thumbnail['mimetype']}
+        )
 
 
 # register all urls
