@@ -648,7 +648,7 @@ class RetrieveEditDestroyProject(MethodView):
 
         # run task
         edit_video.delay(
-            json_util.dumps(self.project),
+            self.project,
             changes=document
         )
 
@@ -1089,7 +1089,7 @@ class RetrieveOrCreateThumbnails(MethodView):
             )
             # run task
             generate_timeline_thumbnails.delay(
-                json_util.dumps(self.project),
+                self.project,
                 amount
             )
             return json_response({"processing": True}, status=202)
@@ -1122,7 +1122,7 @@ class RetrieveOrCreateThumbnails(MethodView):
             )
             # run task
             generate_preview_thumbnail.delay(
-                json_util.dumps(self.project),
+                self.project,
                 position
             )
             return json_response({"processing": True}, status=202)

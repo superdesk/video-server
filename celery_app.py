@@ -1,10 +1,23 @@
 from celery import Celery
 from werkzeug.exceptions import InternalServerError
+from kombu.serialization import register
+from bson import json_util
 
 from lib.logging import logger
 
 celery = Celery(__name__)
 TaskBase = celery.Task
+
+
+def encoder(obj):
+    return json_util.dumps(obj)
+
+
+def decoder(s):
+    return json_util.loads(s)
+
+
+register('bson', encoder=encoder, decoder=decoder, content_type='application/json')
 
 
 def init_celery(app):

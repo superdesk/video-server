@@ -13,14 +13,13 @@ logger = logging.getLogger(__name__)
 
 
 @celery.task(bind=True, default_retry_delay=10)
-def edit_video(self, project_json, changes):
+def edit_video(self, project, changes):
     """
     Task use tool for edit video and record the data and update status after finished,
-    :param project_json: project json
+    :param project: project doc
     :param changes: changes apply to the video
     """
 
-    project = json_util.loads(project_json)
     video_editor = get_video_editor()
 
     try:
@@ -73,8 +72,7 @@ def edit_video(self, project_json, changes):
 
 
 @celery.task(bind=True, default_retry_delay=10)
-def generate_timeline_thumbnails(self, project_json, amount):
-    project = json_util.loads(project_json)
+def generate_timeline_thumbnails(self, project, amount):
     timeline_thumbnails = []
     video_editor = get_video_editor()
 
@@ -148,8 +146,7 @@ def generate_timeline_thumbnails(self, project_json, amount):
 
 
 @celery.task(bind=True, default_retry_delay=10)
-def generate_preview_thumbnail(self, project_json, position):
-    project = json_util.loads(project_json)
+def generate_preview_thumbnail(self, project, position):
     video_editor = get_video_editor()
     preview_thumbnail = None
 
