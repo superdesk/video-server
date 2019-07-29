@@ -1,6 +1,6 @@
 # -*- coding: utf-8; -*-
 #
-# This file is part of Superdesk.
+# This file is part of Superdesk Video Server.
 #
 # Copyright 2015 Sourcefabric z.u. and contributors.
 #
@@ -25,7 +25,8 @@ def configure_logging(file_path):
     """
     Configure logging.
 
-    :param str file_path:
+    :param file_path: file path to log config file
+    :type file_path: str
     """
     if not file_path:
         return

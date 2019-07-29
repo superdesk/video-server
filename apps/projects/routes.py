@@ -1,62 +1,27 @@
-import base64
-import logging
 import os
 import re
+import copy
+import logging
+import bson
 from datetime import datetime
 
-from bson import json_util
 from flask import request, make_response
 from flask import current_app as app
-from flask.views import MethodView
 from pymongo import ReturnDocument
 from pymongo.errors import ServerSelectionTimeoutError
 from werkzeug.exceptions import BadRequest, InternalServerError, NotFound
 
-from lib.utils import create_file_name, format_id, json_response, get_url_for_media
-from lib.validator import Validator
+from lib.utils import (
+    create_file_name, json_response, add_urls, validate_document,
+    get_request_address, save_activity_log, paginate, storage2response
+)
 from lib.video_editor import get_video_editor
+from lib.views import MethodView
 
+from .tasks import edit_video, generate_timeline_thumbnails, generate_preview_thumbnail
 from . import bp
-from .tasks import task_edit_video, task_get_list_thumbnails
 
 logger = logging.getLogger(__name__)
-
-
-def check_user_agent():
-    user_agent = request.headers.environ.get('HTTP_USER_AGENT')
-
-    client_name = user_agent.split('/')[0]
-    if client_name.lower() not in app.config.get('AGENT_ALLOW'):
-        raise BadRequest("client is not allow to edit")
-
-
-def check_request_schema_validity(request_schema, schema, **kwargs):
-    validator = Validator(schema, **kwargs)
-    if not validator.validate(request_schema):
-        raise BadRequest(validator.errors)
-    return validator.document
-
-
-def get_request_address(request_headers):
-    return request_headers.get('HTTP_X_FORWARDED_FOR') or request_headers.get('REMOTE_ADDR')
-
-
-def find_one_or_404(project_id):
-    # Flask-PyMongo find_one_or_404 method uses abort so can't pass custom 404 error message
-    doc = app.mongo.db.projects.find_one({'_id': format_id(project_id)})
-    if not doc:
-        raise NotFound(f"Project with id {project_id} was not found.")
-    return doc
-
-
-def save_activity_log(action, project_id, storage_id, payload=None):
-    app.mongo.db.activity.insert_one({
-        "action": action,
-        "project_id": project_id,
-        "storage_id": storage_id,
-        "payload": payload,
-        "create_date": datetime.utcnow()
-    })
 
 
 class ListUploadProject(MethodView):
@@ -69,7 +34,7 @@ class ListUploadProject(MethodView):
 
     def post(self):
         """
-        Create new project record in DB and save file into file storage
+        Upload video file and create new project for it
         ---
         consumes:
           - multipart/form-data
@@ -77,183 +42,199 @@ class ListUploadProject(MethodView):
         - in: formData
           name: file
           type: file
-          description: file object to upload
+          description: video file to upload
         responses:
           201:
-            description: CREATED
+            description: Created project details
             schema:
-              type: object
-              properties:
-                filename:
-                  type: string
-                  example: fa5079a38e0a4197864aa2ccb07f3bea.mp4
-                url:
-                  type: string
-                  example: https://example.com/url_raw/fa5079a38e0a4197864aa2ccb07f3bea4
-                storage_id:
-                  type: string
-                  example: 2019/5/1/fa5079a38e0a4197864aa2ccb07f3bea.mp4
-                metadata:
-                  type: object
-                  properties:
-                    codec_name:
-                      type: string
-                      example: h264
-                    codec_long_name:
-                      type: string
-                      example: H.264 / AVC / MPEG-4 AVC / MPEG-4 part 10
-                    width:
-                      type: int
-                      example: 640
-                    height:
-                      type: int
-                      example: 360
-                    duration:
-                      type: float
-                      example: 300.014000
-                    bit_rate:
-                      type: int
-                      example: 287654
-                    nb_frames:
-                      type: int
-                      example: 7654
-                    r_frame_rate:
-                      type: string
-                      example: 24/1
-                    format_name:
-                      type: string
-                      example: mov,mp4,m4a,3gp,3g2,mj2
-                    size:
-                      type: int
-                      example: 14567890
-                mime_type:
-                  type: string
-                  example: video/mp4
-                create_time:
-                  type: string
-                  example: 2019-05-01T09:00:00+00:00
-                original_filename:
-                  type: string
-                  example: video.mp4
-                request_address:
-                  type: string
-                  example: 127.0.0.1
-                version:
-                  type: integer
-                  example: 1
-                parent:
-                  type: object
-                  example: {}
-                processing:
-                  type: boolean
-                  example: False
-                thumbnails:
-                  type: object
-                  example: {}
-                _id:
-                  type: string
-                  example: 5cbd5acfe24f6045607e51aa
+                type: object
+                properties:
+                  _id:
+                    type: string
+                    example: 5cbd5acfe24f6045607e51aa
+                  filename:
+                    type: string
+                    example: fa5079a38e0a4197864aa2ccb07f3bea.mp4
+                  storage_id:
+                    type: string
+                    example: 2019/7/2/5cbd5acfe24f6045607e51aa/9c8e970807104c848afceea44fa07d1a.mp4
+                  metadata:
+                    type: object
+                    properties:
+                      codec_name:
+                        type: string
+                        example: h264
+                      codec_long_name:
+                        type: string
+                        example: H.264 / AVC / MPEG-4 AVC / MPEG-4 part 10
+                      width:
+                        type: int
+                        example: 640
+                      height:
+                        type: int
+                        example: 360
+                      duration:
+                        type: float
+                        example: 300.014000
+                      bit_rate:
+                        type: int
+                        example: 287654
+                      nb_frames:
+                        type: int
+                        example: 7654
+                      r_frame_rate:
+                        type: string
+                        example: 24/1
+                      format_name:
+                        type: string
+                        example: mov,mp4,m4a,3gp,3g2,mj2
+                      size:
+                        type: int
+                        example: 14567890
+                  url:
+                    type: string
+                    example: http://localhost:5050/projects/5cbd5acfe24f6045607e51aa/raw/video
+                  mime_type:
+                    type: string
+                    example: video/mp4
+                  create_time:
+                    type: string
+                    example: 2019-07-02T15:02:32+00:00
+                  original_filename:
+                    type: string
+                    example: video.mp4
+                  request_address:
+                    type: string
+                    example: 127.0.0.1
+                  version:
+                    type: integer
+                    example: 1
+                  parent:
+                    type: string
+                    example: 5d2c8078fe985e7587b50de7
+                  processing:
+                    type: object
+                    properties:
+                      video:
+                        type: boolean
+                        example: False
+                      thumbnail_preview:
+                        type: boolean
+                        example: False
+                      thumbnails_timeline:
+                        type: boolean
+                        example: False
+                  thumbnails:
+                    type: object
+                    properties:
+                      timeline:
+                        type: array
+                        example: []
+                      preview:
+                        type: object
+                        example: {}
         """
 
         # validate request
         if 'file' not in request.files:
             # to avoid TypeError: cannot serialize '_io.BufferedRandom' error
             raise BadRequest({"file": ["required field"]})
-
-        check_user_agent()
-        schema = check_request_schema_validity(request.files, self.SCHEMA_UPLOAD)
+        document = validate_document(request.files, self.SCHEMA_UPLOAD)
 
         # validate codec
-        video_editor = get_video_editor()
-        file = schema['file']
-        file_stream = file.stream.read()
-        metadata = video_editor.get_meta(file_stream)
-        codec_name = metadata.get('codec_name')
-        if codec_name not in app.config.get('CODEC_SUPPORT'):
-            raise BadRequest("Codec: {} is not supported.".format(codec_name))
-        # generate file name
-        file_name = create_file_name(ext=file.filename.split('.')[1])
-        try:
-            # add record to database
-            doc = {
-                'filename': file_name,
-                'storage_id': None,
-                'metadata': metadata,
-                'create_time': datetime.utcnow(),
-                'mime_type': file.mimetype,
-                'version': 1,
-                'processing': False,
-                'parent': None,
-                'thumbnails': {},
-                'request_address': get_request_address(request.headers.environ),
-                'original_filename': file.filename,
-                'preview_thumbnail': None,
-                'url': None
+        file_stream = document['file'].stream.read()
+        metadata = get_video_editor().get_meta(file_stream)
+        if metadata.get('codec_name') not in app.config.get('CODEC_SUPPORT_VIDEO'):
+            raise BadRequest({'file': [f"Codec: '{metadata.get('codec_name')}' is not supported."]})
+
+        # add record to database
+        project = {
+            '_id': bson.ObjectId(),
+            'filename': create_file_name(ext=document['file'].filename.rsplit('.')[-1]),
+            'storage_id': None,
+            'metadata': metadata,
+            'create_time': datetime.utcnow(),
+            'mime_type': document['file'].mimetype,
+            'request_address': get_request_address(request.headers.environ),
+            'original_filename': document['file'].filename,
+            'version': 1,
+            'parent': None,
+            'processing': {
+                'video': False,
+                'thumbnail_preview': False,
+                'thumbnails_timeline': False
+            },
+            'thumbnails': {
+                'timeline': [],
+                'preview': None
             }
-            app.mongo.db.projects.insert_one(doc)
+        }
 
-            # put file stream into storage
-            storage_id = app.fs.put(file_stream, file_name, doc['_id'], content_type=file.mimetype)
-            if not storage_id:
-                raise InternalServerError('Something went wrong when putting file into storage.')
+        # put file stream into storage
+        storage_id = app.fs.put(
+            content=file_stream,
+            filename=project['filename'],
+            project_id=project['_id'],
+            content_type=document['file'].mimetype
+        )
+        # set 'storage_id' for project
+        project['storage_id'] = storage_id
 
-            # update url for preview video
-            doc = app.mongo.db.projects.find_one_and_update(
-                {'_id': doc['_id']},
-                {'$set': {
-                    'storage_id': storage_id,
-                    'url': get_url_for_media(doc.get('_id'), 'video'),
-                }},
-                return_document=ReturnDocument.AFTER
-            )
-            save_activity_log("UPLOAD", doc['_id'], doc['storage_id'], {"file": doc.get('filename')})
-            return json_response(doc, status=201)
-        except ServerSelectionTimeoutError:
-            app.fs.delete(file_name)
-            raise InternalServerError('Could not connect to database')
-        except Exception as ex:
-            app.fs.delete(file_name)
-            logger.exception(ex)
-            raise InternalServerError(str(ex))
+        try:
+            # save project
+            app.mongo.db.projects.insert_one(project)
+        except ServerSelectionTimeoutError as e:
+            # delete project dir
+            app.fs.delete_dir(storage_id)
+            raise InternalServerError(str(e))
+
+        logger.info(f"New project was created. ID: {project['_id']}")
+        save_activity_log('UPLOAD', project['_id'], project)
+        add_urls(project)
+
+        return json_response(project, status=201)
 
     def get(self):
         """
-        Get list of projects in DB
+        List of projects
         ---
         parameters:
-        - name: offset
+        - name: page
           in: query
           type: integer
           description: Page number
         responses:
           200:
-            description: OK
+            description: list of projects
             schema:
               type: object
               properties:
-                offset:
-                  type: integer
-                  example: 1
-                size:
-                  type: integer
-                  example: 14
-                max_size:
-                  type: integer
-                  example: 50
-                items:
+                _meta:
+                  type: object
+                  properties:
+                    page:
+                      type: integer
+                      example: 1
+                    max_results:
+                      type: integer
+                      example: 25
+                    total:
+                      type: integer
+                      example: 230
+                _items:
                   type: array
                   items:
                     type: object
                     properties:
+                      _id:
+                        type: string
+                        example: 5cbd5acfe24f6045607e51aa
                       filename:
                         type: string
                         example: fa5079a38e0a4197864aa2ccb07f3bea.mp4
-                      url:
-                        type: string
-                        example: https://example.com/url_raw/fa5079a38e0a4197864aa2ccb07f3bea
                       storage_id:
                         type: string
-                        example: 2019/5/fa5079a38e0a4197864aa2ccb07f3bea.mp4
+                        example: 2019/7/2/5cbd5acfe24f6045607e51aa/9c8e970807104c848afceea44fa07d1a.mp4
                       metadata:
                         type: object
                         properties:
@@ -287,12 +268,15 @@ class ListUploadProject(MethodView):
                           size:
                             type: int
                             example: 14567890
+                      url:
+                        type: string
+                        example: http://localhost:5050/projects/5cbd5acfe24f6045607e51aa/raw/video
                       mime_type:
                         type: string
                         example: video/mp4
                       create_time:
                         type: string
-                        example: 2019-05-01T09:00:00+00:00
+                        example: 2019-07-02T15:02:32+00:00
                       original_filename:
                         type: string
                         example: video.mp4
@@ -303,73 +287,112 @@ class ListUploadProject(MethodView):
                         type: integer
                         example: 1
                       parent:
-                        type: object
-                        example: {}
+                        type: string
+                        example: 5d2c8078fe985e7587b50de7
                       processing:
-                        type: boolean
-                        example: False
+                        type: object
+                        properties:
+                          video:
+                            type: boolean
+                            example: False
+                          thumbnail_preview:
+                            type: boolean
+                            example: False
+                          thumbnails_timeline:
+                            type: boolean
+                            example: False
                       thumbnails:
                         type: object
-                        example: {}
-                      _id:
-                        type: string
-                        example: 5cbd5acfe24f6045607e51aa
+                        properties:
+                          timeline:
+                            type: array
+                            example: []
+                          preview:
+                            type: object
+                            example: {}
         """
-        offset = request.args.get('offset', 0, type=int)
-        size = app.config.get('ITEMS_PER_PAGE', 25)
-        # get all projects
-        docs = list(app.mongo.db.projects.find().skip(offset).limit(size))
 
-        res = {
-            'items': docs,
-            'offset': offset,
-            'max_results': size,
-            'total': app.mongo.db.projects.count()
-        }
-        return json_response(res)
+        page = request.args.get('page', 1, type=int)
+        projects = list(paginate(
+            cursor=app.mongo.db.projects.find(),
+            page=page
+        ))
+        add_urls(projects)
+
+        return json_response(
+            {
+                '_items': projects,
+                '_meta': {
+                    'page': page,
+                    'max_results': app.config.get('ITEMS_PER_PAGE'),
+                    'total': app.mongo.db.projects.count()
+                }
+            }
+        )
 
 
 class RetrieveEditDestroyProject(MethodView):
-    SCHEMA_EDIT = {
-        'capture': {
-            'type': 'dict',
-            'required': False,
-            'empty': True,
-        },
-        'cut': {
-            'type': 'dict',
-            'required': False,
-            'empty': True,
-            'schema': {
-                'start': {'type': 'float', 'required': True},
-                'end': {'type': 'float', 'required': True},
+
+    @property
+    def schema_edit(self):
+        return {
+            'trim': {
+                'type': 'dict',
+                'required': False,
+                'schema': {
+                    'start': {
+                        'type': 'float',
+                        'min': 0,
+                        'required': True
+                    },
+                    'end': {
+                        'type': 'float',
+                        'min': 1,
+                        'required': True
+                    },
+                }
             },
-        },
-        'rotate': {
-            'type': 'dict',
-            'required': False,
-            'empty': True,
-            'schema': {
-                'degree': {'type': 'integer', 'required': True}
+            'rotate': {
+                'type': 'integer',
+                'required': False,
+                'allowed': [-270, -180, -90, 90, 180, 270]
             },
-        },
-        'quality': {
-            'type': 'dict',
-            'required': False,
-            'empty': True,
-        },
-        'crop': {
-            'type': 'dict',
-            'required': False,
-            'empty': True,
-            'schema': {
-                'width': {'type': 'float', 'required': True},
-                'height': {'type': 'float', 'required': True},
-                'x': {'type': 'float', 'required': True},
-                'y': {'type': 'float', 'required': True}
+            'scale': {
+                'type': 'integer',
+                'min': app.config.get('MIN_VIDEO_WIDTH'),
+                'max': app.config.get('MAX_VIDEO_WIDTH'),
+                'required': False
+            },
+            'crop': {
+                'type': 'dict',
+                'required': False,
+                'empty': True,
+                'schema': {
+                    'width': {
+                        'type': 'integer',
+                        'min': app.config.get('MIN_VIDEO_WIDTH'),
+                        'max': app.config.get('MAX_VIDEO_WIDTH'),
+                        'required': True
+                    },
+                    'height': {
+                        'type': 'integer',
+                        'min': app.config.get('MIN_VIDEO_HEIGHT'),
+                        'max': app.config.get('MAX_VIDEO_HEIGHT'),
+                        'required': True
+                    },
+                    'x': {
+                        'type': 'integer',
+                        'required': True,
+                        'min': 0
+                    },
+                    'y': {
+                        'type': 'integer',
+                        'required': True,
+                        'min': 0
+                    }
+                }
             }
         }
-    }
 
     def get(self, project_id):
         """
@@ -383,87 +406,102 @@ class RetrieveEditDestroyProject(MethodView):
               description: Unique project id
         responses:
           200:
-            description: OK
+            description: Project details
             schema:
-              type: object
-              properties:
-                filename:
-                  type: string
-                  example: fa5079a38e0a4197864aa2ccb07f3bea.mp4
-                url:
-                  type: string
-                  example: https://example.com/url_raw/fa5079a38e0a4197864aa2ccb07f3bea
-                storage_id:
-                  type: string
-                  example: 2019/5/fa5079a38e0a4197864aa2ccb07f3bea.mp4
-                metadata:
-                  type: object
-                  properties:
-                    codec_name:
-                      type: string
-                      example: h264
-                    codec_long_name:
-                      type: string
-                      example: H.264 / AVC / MPEG-4 AVC / MPEG-4 part 10
-                    width:
-                      type: integer
-                      example: 640
-                    height:
-                      type: integer
-                      example: 360
-                    duration:
-                      type: float
-                      example: 300.014000
-                    bit_rate:
-                      type: int
-                      example: 287654
-                    nb_frames:
-                      type: int
-                      example: 7654
-                    r_frame_rate:
-                      type: string
-                      example: 24/1
-                    format_name:
-                      type: string
-                      example: mov,mp4,m4a,3gp,3g2,mj2
-                    size:
-                      type: int
-                      example: 14567890
-                mime_type:
-                  type: string
-                  example: video/mp4
-                create_time:
-                  type: string
-                  example: 2019-05-01T09:00:00+00:00
-                original_filename:
-                  type: string
-                  example: video.mp4
-                request_address:
-                  type: string
-                  example: 127.0.0.1
-                version:
-                  type: integer
-                  example: 1
-                parent:
-                  type: object
-                  example: {}
-                processing:
-                  type: boolean
-                  example: False
-                thumbnails:
-                  type: object
-                  example: {}
-                _id:
-                  type: string
-                  example: 5cbd5acfe24f6045607e51aa
+                type: object
+                properties:
+                  _id:
+                    type: string
+                    example: 5cbd5acfe24f6045607e51aa
+                  filename:
+                    type: string
+                    example: fa5079a38e0a4197864aa2ccb07f3bea.mp4
+                  storage_id:
+                    type: string
+                    example: 2019/7/2/5cbd5acfe24f6045607e51aa/9c8e970807104c848afceea44fa07d1a.mp4
+                  metadata:
+                    type: object
+                    properties:
+                      codec_name:
+                        type: string
+                        example: h264
+                      codec_long_name:
+                        type: string
+                        example: H.264 / AVC / MPEG-4 AVC / MPEG-4 part 10
+                      width:
+                        type: int
+                        example: 640
+                      height:
+                        type: int
+                        example: 360
+                      duration:
+                        type: float
+                        example: 300.014000
+                      bit_rate:
+                        type: int
+                        example: 287654
+                      nb_frames:
+                        type: int
+                        example: 7654
+                      r_frame_rate:
+                        type: string
+                        example: 24/1
+                      format_name:
+                        type: string
+                        example: mov,mp4,m4a,3gp,3g2,mj2
+                      size:
+                        type: int
+                        example: 14567890
+                  url:
+                    type: string
+                    example: http://localhost:5050/projects/5cbd5acfe24f6045607e51aa/raw/video
+                  mime_type:
+                    type: string
+                    example: video/mp4
+                  create_time:
+                    type: string
+                    example: 2019-07-02T15:02:32+00:00
+                  original_filename:
+                    type: string
+                    example: video.mp4
+                  request_address:
+                    type: string
+                    example: 127.0.0.1
+                  version:
+                    type: integer
+                    example: 1
+                  parent:
+                    type: string
+                    example: 5d2c8078fe985e7587b50de7
+                  processing:
+                    type: object
+                    properties:
+                      video:
+                        type: boolean
+                        example: False
+                      thumbnail_preview:
+                        type: boolean
+                        example: False
+                      thumbnails_timeline:
+                        type: boolean
+                        example: False
+                  thumbnails:
+                    type: object
+                    properties:
+                      timeline:
+                        type: array
+                        example: []
+                      preview:
+                        type: object
+                        example: {}
         """
 
-        doc = find_one_or_404(project_id)
-        return json_response(doc)
+        add_urls(self.project)
+        return json_response(self.project)
 
     def put(self, project_id):
         """
-        Edit video. This method does not create a new project.
+        Edit project's video
         ---
         consumes:
         - application/json
@@ -475,12 +513,12 @@ class RetrieveEditDestroyProject(MethodView):
           description: Unique project id
         - in: body
           name: action
-          description: Actions want to apply to the video
+          description: Changes to apply for the video
           required: True
           schema:
             type: object
             properties:
-              cut:
+              trim:
                 type: object
                 properties:
                   start:
@@ -505,242 +543,119 @@ class RetrieveEditDestroyProject(MethodView):
                     type: integer
                     example: 10
               rotate:
-                type: object
-                properties:
-                  degree:
-                    type: integer
-                    example: 90
+                type: integer
+                enum: [-270, -180, -90, 90, 180, 270]
+                example: 90
+              scale:
+                type: integer
+                example: 800
         responses:
-          200:
-            description: OK
+          202:
+            description: Editing started
             schema:
               type: object
               properties:
-                filename:
-                  type: string
-                  example: fa5079a38e0a4197864aa2ccb07f3bea.mp4
-                url:
-                  type: string
-                  example: https://example.com/url_raw/fa5079a38e0a4197864aa2ccb07f3bea
-                storage_id:
-                  type: string
-                  example: 2019/5/fa5079a38e0a4197864aa2ccb07f3bea.mp4
-                metadata:
-                  type: object
-                  properties:
-                    codec_name:
-                      type: string
-                      example: h264
-                    codec_long_name:
-                      type: string
-                      example: H.264 / AVC / MPEG-4 AVC / MPEG-4 part 10
-                    width:
-                      type: integer
-                      example: 640
-                    height:
-                      type: integer
-                      example: 360
-                    duration:
-                      type: float
-                      example: 300.014000
-                    bit_rate:
-                      type: int
-                      example: 287654
-                    nb_frames:
-                      type: int
-                      example: 7654
-                    r_frame_rate:
-                      type: string
-                      example: 24/1
-                    format_name:
-                      type: string
-                      example: mov,mp4,m4a,3gp,3g2,mj2
-                    size:
-                      type: int
-                      example: 14567890
-                mime_type:
-                  type: string
-                  example: video/mp4
-                create_time:
-                  type: string
-                  example: 2019-05-01T09:00:00+00:00
-                original_filename:
-                  type: string
-                  example: video.mp4
-                request_address:
-                  type: string
-                  example: 127.0.0.1
-                version:
-                  type: integer
-                  example: 1
-                parent:
-                  type: object
-                  example: {}
                 processing:
                   type: boolean
-                  example: False
-                thumbnails:
-                  type: object
-                  example: {}
-                _id:
-                  type: string
-                  example: 5cbd5acfe24f6045607e51aa
+                  example: True
+          409:
+            description: Previous editing was not finished yet
+            schema:
+              type: object
+              properties:
+                processing:
+                  type: boolean
+                  example: True
         """
-        check_user_agent()
-        schema = check_request_schema_validity(request.get_json(), self.SCHEMA_EDIT)
 
-        doc = find_one_or_404(project_id)
-        if doc.get('processing') is True:
-            return json_response({'processing': doc['processing']}, status=202)
-        if not doc.get('version') >= 2:
-            raise BadRequest("Only PUT action for edited video version 2")
+        if self.project['processing']['video']:
+            return json_response({'processing': True}, status=409)
 
-        # Update processing is True when begin edit video
-        doc = app.mongo.db.projects.find_one_and_update(
-            {'_id': doc['_id']},
-            {'$set': {
-                'processing': True,
-            }},
+        if self.project['version'] == 1:
+            raise BadRequest({"project_id": [f"Video with version 1 is not editable, use duplicated project instead."]})
+
+        request_json = request.get_json()
+        document = validate_document(
+            request_json if request_json else {},
+            self.schema_edit
+        )
+
+        if not document:
+            raise BadRequest({
+                'edit': [f"At least one of the edit rules is required. "
+                         f"Available edit rules are: {', '.join(self.schema_edit.keys())}"]
+            })
+
+        metadata = self.project['metadata']
+
+        # validate trim
+        if 'trim' in document:
+            if document['trim']['start'] >= document['trim']['end']:
+                raise BadRequest({"trim": [{"start": ["must be less than 'end' value"]}]})
+            elif (document['trim']['end'] - document['trim']['start'] < app.config.get('MIN_TRIM_DURATION')) \
+                    or (metadata['duration'] - document['trim']['start'] < app.config.get('MIN_TRIM_DURATION')):
+                raise BadRequest({"trim": [
+                    {"start": [f"trimmed video must be at least {app.config.get('MIN_TRIM_DURATION')} seconds"]}
+                ]})
+            elif document['trim']['end'] > metadata['duration']:
+                raise BadRequest({"trim": [
+                    {"end": [f"outside of initial video's length"]}
+                ]})
+            elif document['trim']['start'] == 0 and document['trim']['end'] == metadata['duration']:
+                raise BadRequest({"trim": [
+                    {"end": ["trim is duplicating an entire video"]}
+                ]})
+        # validate crop
+        if 'crop' in document:
+            if metadata['width'] - document['crop']['x'] < app.config.get('MIN_VIDEO_WIDTH'):
+                raise BadRequest({"crop": [{"x": ["less than minimum allowed crop width"]}]})
+            elif metadata['height'] - document['crop']['y'] < app.config.get('MIN_VIDEO_HEIGHT'):
+                raise BadRequest({"crop": [{"y": ["less than minimum allowed crop height"]}]})
+            elif document['crop']['x'] + document['crop']['width'] > metadata['width']:
+                raise BadRequest({"crop": [{"width": ["crop's frame is outside a video's frame"]}]})
+            elif document['crop']['y'] + document['crop']['height'] > metadata['height']:
+                raise BadRequest({"crop": [{"height": ["crop's frame is outside a video's frame"]}]})
+        # validate scale
+        if 'scale' in document:
+            width = metadata['width']
+            if 'crop' in document:
+                width = document['crop']['width']
+            if document['scale'] == width:
+                raise BadRequest({"trim": [
+                    {"scale": ["video or crop option already has exactly the same width"]}
+                ]})
+            elif not app.config.get('ALLOW_INTERPOLATION') and document['scale'] > width:
+                raise BadRequest({"trim": [
+                    {"scale": ["interpolation of pixels is not allowed"]}
+                ]})
+            elif app.config.get('ALLOW_INTERPOLATION') \
+                    and document['scale'] > width \
+                    and width >= app.config.get('INTERPOLATION_LIMIT'):
+                raise BadRequest({"trim": [
+                    {"scale": [f"interpolation is permitted only for videos which have width less than "
+                               f"{app.config.get('INTERPOLATION_LIMIT')}px"]}
+                ]})
+
+        # set processing flag
+        self.project = app.mongo.db.projects.find_one_and_update(
+            {'_id': self.project['_id']},
+            {'$set': {'processing.video': True}},
             return_document=ReturnDocument.AFTER
         )
-        save_activity_log("PUT PROJECT", doc['_id'], doc['storage_id'], schema)
-        task_edit_video.delay(json_util.dumps(doc), schema, action='put')
-        return json_response(doc)
+        logger.info(f"New project editing task was started. ID: {self.project['_id']}")
+        save_activity_log("EDIT", self.project['_id'], document)
 
-    def post(self, project_id):
-        """
-        Edit video. This method creates a new project.
-        ---
-        consumes:
-        - application/json
-        parameters:
-        - in: path
-          name: project_id
-          type: string
-          required: True
-          description: Unique project id
-        - in: body
-          name: action
-          description: Actions want to apply to the video
-          required: True
-          schema:
-            type: object
-            properties:
-              cut:
-                type: object
-                properties:
-                  start:
-                    type: integer
-                    example: 5
-                  end:
-                    type: integer
-                    example: 10
-              crop:
-                type: object
-                properties:
-                  width:
-                    type: integer
-                    example: 480
-                  height:
-                    type: integer
-                    example: 360
-                  x:
-                    type: integer
-                    example: 10
-                  y:
-                    type: integer
-                    example: 10
-              rotate:
-                type: object
-                properties:
-                  degree:
-                    type: integer
-                    example: 90
-        responses:
-          200:
-            description: OK
-            schema:
-              type: object
-              properties:
-                filename:
-                  type: string
-                  example: fa5079a38e0a4197864aa2ccb07f3bea_v2.mp4
-                url:
-                  type: string
-                  example: https://example.com/url_raw/fa5079a38e0a4197864aa2ccb07f3bea
-                storage_id:
-                  type: string
-                  example: 2019/5/fa5079a38e0a4197864aa2ccb07f3bea.mp4
-                metadata:
-                  type: object
-                  example: {}
-                mime_type:
-                  type: string
-                  example: video/mp4
-                create_time:
-                  type: string
-                  example: 2019-05-01T09:00:00+00:00
-                original_filename:
-                  type: string
-                  example: video.mp4
-                request_address:
-                  type: string
-                  example: 127.0.0.1
-                version:
-                  type: integer
-                  example: 2
-                parent:
-                  type: object
-                  parameters:
-                    _id:
-                      type: object
-                      parameters:
-                        $oid:
-                          type: string
-                          example: 5ccbc4104dfd9b8fa153d60e
-                processing:
-                  type: boolean
-                  example: False
-                thumbnails:
-                  type: object
-                  example: {}
-                _id:
-                  type: string
-                  example: 5cbd5acfe24f6045607e51aa
-        """
-        check_user_agent()
-        schema = check_request_schema_validity(request.get_json(), self.SCHEMA_EDIT)
+        # run task
+        edit_video.delay(
+            self.project,
+            changes=document
+        )
 
-        doc = find_one_or_404(project_id)
-
-        filename, ext = os.path.splitext(doc['filename'])
-        if doc.get('version') >= 2:
-            raise BadRequest("Only POST action for original video version 1")
-        version = doc.get('version', 1) + 1
-        new_file_name = f'{filename}_v{version}{ext}'
-        new_doc = {
-            'filename': new_file_name,
-            'storage_id': doc.get('storage_id'),
-            'metadata': None,
-            'request_address': get_request_address(request.headers.environ),
-            'version': version,
-            'processing': True,
-            'mime_type': doc.get('mime_type'),
-            'parent': {
-                '_id': doc.get('_id'),
-            },
-            'thumbnails': {},
-            'preview_thumbnail': doc.get('preview_thumbnail')
-        }
-        app.mongo.db.projects.insert_one(new_doc)
-        new_doc['predict_url'] = get_url_for_media(new_doc.get('_id'), 'video')
-        task_edit_video.delay(json_util.dumps(new_doc), schema)
-        save_activity_log("POST PROJECT", doc['_id'], doc['storage_id'], schema)
-        return json_response(new_doc)
+        return json_response({"processing": True}, status=202)
 
     def delete(self, project_id):
         """
-        Delete project from db and video from filestorage.
+        Delete project from db and related files from a storage.
         ---
         parameters:
         - name: project_id
@@ -752,22 +667,218 @@ class RetrieveEditDestroyProject(MethodView):
           204:
             description: NO CONTENT
         """
-        doc = find_one_or_404(project_id)
 
-        # remove file from storage
-        if app.fs.delete(doc['storage_id']):
-            # Delete thumbnails
-            for thumbnail in next(iter(doc['thumbnails'].values()), []):
-                app.fs.delete(thumbnail['storage_id'])
-            preview_thumbnail = doc['preview_thumbnail']
-            if preview_thumbnail:
-                app.fs.delete(preview_thumbnail['storage_id'])
+        # remove project dir from storage
+        app.fs.delete_dir(self.project['storage_id'])
+        logger.info(f"Project was deleted. ID: {self.project['_id']}")
+        save_activity_log("DELETE", self.project['_id'])
+        app.mongo.db.projects.delete_one({'_id': self.project['_id']})
 
-            save_activity_log("DELETE PROJECT", doc['_id'], doc['storage_id'], None)
-            app.mongo.db.projects.delete_one({'_id': format_id(project_id)})
-            return json_response(status=204)
-        else:
-            raise InternalServerError()
+        return json_response(status=204)
+
+
+class DuplicateProject(MethodView):
+
+    def post(self, project_id):
+        """
+        Duplicate project
+        ---
+        parameters:
+            - name: project_id
+              in: path
+              type: string
+              required: true
+              description: Unique project id
+        responses:
+          201:
+            description: Project was duplicated
+            schema:
+                type: object
+                properties:
+                  _id:
+                    type: string
+                    example: 5cbd5acfe24f6045607e51aa
+                  filename:
+                    type: string
+                    example: fa5079a38e0a4197864aa2ccb07f3bea.mp4
+                  storage_id:
+                    type: string
+                    example: 2019/7/2/5cbd5acfe24f6045607e51aa/9c8e970807104c848afceea44fa07d1a.mp4
+                  metadata:
+                    type: object
+                    properties:
+                      codec_name:
+                        type: string
+                        example: h264
+                      codec_long_name:
+                        type: string
+                        example: H.264 / AVC / MPEG-4 AVC / MPEG-4 part 10
+                      width:
+                        type: int
+                        example: 640
+                      height:
+                        type: int
+                        example: 360
+                      duration:
+                        type: float
+                        example: 300.014000
+                      bit_rate:
+                        type: int
+                        example: 287654
+                      nb_frames:
+                        type: int
+                        example: 7654
+                      r_frame_rate:
+                        type: string
+                        example: 24/1
+                      format_name:
+                        type: string
+                        example: mov,mp4,m4a,3gp,3g2,mj2
+                      size:
+                        type: int
+                        example: 14567890
+                  url:
+                    type: string
+                    example: http://localhost:5050/projects/5cbd5acfe24f6045607e51aa/raw/video
+                  mime_type:
+                    type: string
+                    example: video/mp4
+                  create_time:
+                    type: string
+                    example: 2019-07-02T15:02:32+00:00
+                  original_filename:
+                    type: string
+                    example: video.mp4
+                  request_address:
+                    type: string
+                    example: 127.0.0.1
+                  version:
+                    type: integer
+                    example: 1
+                  parent:
+                    type: string
+                    example: 5d2c8078fe985e7587b50de7
+                  processing:
+                    type: object
+                    properties:
+                      video:
+                        type: boolean
+                        example: False
+                      thumbnail_preview:
+                        type: boolean
+                        example: False
+                      thumbnails_timeline:
+                        type: boolean
+                        example: False
+                  thumbnails:
+                    type: object
+                    properties:
+                      timeline:
+                        type: array
+                        example: []
+                      preview:
+                        type: object
+                        example: {}
+        """
+
+        if any(self.project['processing'].values()):
+            return json_response({"processing": True}, status=409)
+
+        # deepcopy & save a child_project
+        child_project = copy.deepcopy(self.project)
+        del child_project['_id']
+        del child_project['storage_id']
+        child_project['parent'] = self.project['_id']
+        child_project['create_time'] = datetime.utcnow()
+        child_project['version'] += 1
+        child_project['thumbnails'] = {
+            'timeline': [],
+            'preview': None
+        }
+        app.mongo.db.projects.insert_one(child_project)
+
+        # put a video file stream into storage
+        try:
+            storage_id = app.fs.put(
+                content=app.fs.get(self.project['storage_id']),
+                filename=child_project['filename'],
+                project_id=child_project['_id'],
+                content_type=child_project['mime_type']
+            )
+        except Exception as e:
+            # remove record from db
+            app.mongo.db.projects.delete_one({'_id': child_project['_id']})
+            raise InternalServerError(str(e))
+
+        try:
+            # set 'storage_id' for child_project
+            child_project = app.mongo.db.projects.find_one_and_update(
+                {'_id': child_project['_id']},
+                {'$set': {'storage_id': storage_id}},
+                return_document=ReturnDocument.AFTER
+            )
+
+            # save preview thumbnail
+            if self.project['thumbnails']['preview']:
+                storage_id = app.fs.put(
+                    content=app.fs.get(self.project['thumbnails']['preview']['storage_id']),
+                    filename=self.project['thumbnails']['preview']['filename'],
+                    project_id=None,
+                    asset_type='thumbnails',
+                    storage_id=child_project['storage_id'],
+                    content_type=self.project['thumbnails']['preview']['mimetype']
+                )
+                child_project['thumbnails']['preview'] = self.project['thumbnails']['preview']
+                child_project['thumbnails']['preview']['storage_id'] = storage_id
+                # set preview thumbnail in db
+                child_project = app.mongo.db.projects.find_one_and_update(
+                    {'_id': child_project['_id']},
+                    {"$set": {
+                        'thumbnails.preview': child_project['thumbnails']['preview']
+                    }},
+                    return_document=ReturnDocument.AFTER
+                )
+
+            # save timeline thumbnails
+            timeline_thumbnails = []
+            for thumbnail in self.project['thumbnails']['timeline']:
+                storage_id = app.fs.put(
+                    content=app.fs.get(thumbnail['storage_id']),
+                    filename=thumbnail['filename'],
+                    project_id=None,
+                    asset_type='thumbnails',
+                    storage_id=child_project['storage_id'],
+                    content_type=thumbnail['mimetype']
+                )
+                timeline_thumbnails.append({
+                    'filename': thumbnail['filename'],
+                    'storage_id': storage_id,
+                    'mimetype': thumbnail['mimetype'],
+                    'width': thumbnail['width'],
+                    'height': thumbnail['height'],
+                    'size': thumbnail['size']
+                })
+            if timeline_thumbnails:
+                child_project = app.mongo.db.projects.find_one_and_update(
+                    {'_id': child_project['_id']},
+                    {"$set": {
+                        'thumbnails.timeline': timeline_thumbnails
+                    }},
+                    return_document=ReturnDocument.AFTER
+                )
+
+        except Exception as e:
+            # delete child_project dir
+            app.fs.delete_dir(storage_id)
+            # remove record from db
+            app.mongo.db.projects.delete_one({'_id': child_project['_id']})
+            raise InternalServerError(str(e))
+
+        logger.info(f"Project was duplicated. Parent ID: {self.project['_id']}. Child ID: {child_project['_id']}")
+        save_activity_log('DUPLICATE', self.project['_id'], child_project)
+        add_urls(child_project)
+
+        return json_response(child_project, status=201)
 
 
 class RetrieveOrCreateThumbnails(MethodView):
@@ -779,15 +890,16 @@ class RetrieveOrCreateThumbnails(MethodView):
                 {
                     'allowed': ['timeline'],
                     'dependencies': ['amount'],
-                    'excludes': 'time',
+                    'excludes': 'position',
                 },
-                {  # make amount optional
+                {
+                    # make `amount` optional
                     'allowed': ['timeline'],
-                    'excludes': 'time',
+                    'excludes': 'position',
                 },
                 {
                     'allowed': ['preview'],
-                    'dependencies': ['time'],
+                    'dependencies': ['position'],
                     'excludes': 'amount',
                 }
             ],
@@ -797,125 +909,74 @@ class RetrieveOrCreateThumbnails(MethodView):
             'coerce': int,
             'min': 1,
         },
-        'time': {
+        'position': {
             'type': 'float',
             'coerce': float,
         },
     }
 
     SCHEMA_UPLOAD = {
-        'data': {
-            'type': 'string',
-            'required': True,
-            'empty': False,
+        'file': {
+            'type': 'filestorage',
+            'required': True
         }
     }
 
     def get(self, project_id):
         """
-        Get or capture video thumbnails.
-        Generate new thumbnails if it is empty or `amount` argument different from current total thumbnails.
-        Or capture thumbnail at `time`.
+        Get or create thumbnail for preview or thumbnails for timeline.
+        If `type` is `timeline` - return a list of thumbnails for timeline or start task to generate thumbnails.
+        If `type` is `preview` - return a preview thumbnail or start task to generate it.
         ---
-        consumes:
-        - application/json
         parameters:
         - in: path
           name: project_id
           type: string
           required: True
           description: Unique project id
+        - name: type
+          in: query
+          type: string
+          enum: [preview, timeline]
         - name: amount
           in: query
           type: integer
-          description: number thumbnails to create
-        - name: time
+          description: Amount of thumbnails to generate for a timeline. Used only when `type` is `timeline`.
+        - name: position
           in: query
           type: float
-          description: time to capture preview thumbnail
+          description: Position in the video where preview thumbnail should be captured.
+                       Used only when `type` is `preview`.
         responses:
-          200:
-            description: OK
-            schema:
-              type: object
-              properties:
-                processing:
-                  type: boolean
-                  example: True
-                thumbnails:
-                  type: object
-                  example: {}
+          202:
+            description: Timeline/preview thumbnails information or status that thumbnails generation task was started.
         """
-        doc = find_one_or_404(project_id)
-        check_user_agent()
-        schema = check_request_schema_validity(request.args.to_dict(), self.SCHEMA_THUMBNAILS)
+        document = validate_document(request.args.to_dict(), self.SCHEMA_THUMBNAILS)
+        add_urls(self.project)
 
-        if schema['type'] == 'timeline':
-            return self._get_timeline_thumbnail(
-                doc,
-                schema.get('amount', app.config.get('DEFAULT_TOTAL_TIMELINE_THUMBNAILS'))
+        if document['type'] == 'timeline':
+            return self._get_timeline_thumbnails(
+                amount=document.get('amount', app.config.get('DEFAULT_TOTAL_TIMELINE_THUMBNAILS'))
             )
-        else:
-            return self._capture_thumbnail(doc, schema['time'])
 
-    def _get_timeline_thumbnail(self, doc, amount):
-        # Only get thumbnails when list thumbnail have not created yet (empty) and video is not processed any task
-        data = doc.get('thumbnails')
-        if (not data or not data.get(str(amount))) \
-                and doc.get('processing') is False:
-
-            # Delete all old thumbnails
-
-            for thumbnail in next(iter(doc['thumbnails'].values()), []):
-                app.fs.delete(thumbnail['storage_id'])
-
-            # Update processing is True when begin edit video
-            doc = app.mongo.db.projects.find_one_and_update(
-                {'_id': doc['_id']},
-                {'$set': {
-                    'processing': True,
-                    'thumbnails': {}
-                }},
-                return_document=ReturnDocument.AFTER
-            )
-            # Run get list thumbnails of timeline for video in celery
-            task_get_list_thumbnails.delay(json_util.dumps(doc), amount)
-        return json_response({
-            "processing": doc.get('processing'),
-            "thumbnails": doc['thumbnails'],
-        })
-
-    def _capture_thumbnail(self, doc, time):
-        video_editor = get_video_editor()
-        video_stream = app.fs.get(doc['storage_id'])
-
-        thumbnail_stream, thumbnail_metadata = video_editor.capture_thumbnail(
-            video_stream, doc['filename'], doc['metadata'], time
-        )
-        return self._save_thumbnail(doc, thumbnail_stream, thumbnail_metadata)
+        return self._get_preview_thumbnail(document['position'])
 
     def post(self, project_id):
         """
-        Update video preview thumbnails
+        Upload custom preview thumbnail.
         ---
         consumes:
-        - application/json
+         - multipart/form-data
         parameters:
         - in: path
           name: project_id
           type: string
           required: True
           description: Unique project id
-        - in: body
-          name: body
-          description: Thumbnail data
+        - in: formData
+          name: file
+          description: image file
           required: True
-          schema:
-            type: object
-            properties:
-              data:
-                type: string
-                description: base64 image data want to upload
         responses:
           200:
             description: OK
@@ -924,146 +985,153 @@ class RetrieveOrCreateThumbnails(MethodView):
               properties:
                 filename:
                   type: string
-                  example: fa5079a38e0a4197864aa2ccb07f3bea.mp4
+                  example: 059ec59cd21543d2a014687619a85ca7_preview-custom.jpeg
                 url:
                   type: string
-                  example: https://example.com/url_raw/fa5079a38e0a4197864aa2ccb07f3bea
+                  example: http://localhost:5050/projects/5d2ee69cfe985e50884006f9/raw/thumbnail?type=preview
                 storage_id:
                   type: string
-                  example: 2019/5/fa5079a38e0a4197864aa2ccb07f3bea.mp4
-                metadata:
-                  type: object
-                  properties:
-                    codec_name:
-                      type: string
-                      example: h264
-                    codec_long_name:
-                      type: string
-                      example: H.264 / AVC / MPEG-4 AVC / MPEG-4 part 10
-                    width:
-                      type: string
-                      example: 640
-                    height:
-                      type: string
-                      example: 360
-                    duration:
-                      type: float
-                      example: 300.014000
-                    bit_rate:
-                      type: int
-                      example: 287654
-                    nb_frames:
-                      type: int
-                      example: 7654
-                    r_frame_rate:
-                      type: string
-                      example: 24/1
-                    format_name:
-                      type: string
-                      example: mov,mp4,m4a,3gp,3g2,mj2
-                    size:
-                      type: int
-                      example: 14567890
+                  example: 2019/7/17/5d2ee69cfe985e50884006f9/thumbnails/059ec59cd21543d2a014687619_preview-custom.jpeg
                 mime_type:
                   type: string
                   example: video/mp4
-                create_time:
-                  type: string
-                  example: 2019-05-01T09:00:00+00:00
-                original_filename:
-                  type: string
-                  example: video.mp4
-                request_address:
-                  type: string
-                  example: 127.0.0.1
-                version:
+                width:
                   type: integer
-                  example: 1
-                parent:
-                  type: object
-                  example: {}
-                processing:
-                  type: boolean
-                  example: False
-                thumbnails:
-                  type: object
-                  example: {}
-                _id:
+                  example: 640
+                height:
+                  type: integer
+                  example: 360
+                size:
+                  type: integer
+                  example: 300000
+                positoin:
                   type: string
-                  example: 5cbd5acfe24f6045607e51aa
-                preview_thumbnail:
-                  type: object
-                  properties:
-                    filename:
-                      type: string
-                      example: fa5079a38e0a4197864aa2ccb07f3bea_thumbnail.png
-                    storage_id:
-                      type: string
-                      example: 2019/5/fa5079a38e0a4197864aa2ccb07f3bea_thumbnail.png
-                    mimetype:
-                      type: string
-                      example: "image/png"
-                    width:
-                      type: integer
-                      example: 640
-                    height:
-                      type: integer
-                      example: 360
-                    size:
-                      type: int
-                      example: 300000
+                  example: custom
         """
-        doc = find_one_or_404(project_id)
 
-        check_user_agent()
-        schema = check_request_schema_validity(request.get_json(), self.SCHEMA_UPLOAD)
+        # validate request
+        if 'file' not in request.files:
+            # to avoid TypeError: cannot serialize '_io.BufferedRandom' error
+            raise BadRequest({"file": ["required field"]})
+        document = validate_document(request.files, self.SCHEMA_UPLOAD)
 
-        if doc.get('processing') is True:
-            return json_response({'processing': doc['processing']}, status=202)
+        # validate codec
+        file_stream = document['file'].stream.read()
+        metadata = get_video_editor().get_meta(file_stream)
+        if metadata.get('codec_name') not in app.config.get('CODEC_SUPPORT_IMAGE'):
+            raise BadRequest({'file': [f"Codec: '{metadata.get('codec_name')}' is not supported."]})
 
-        base64_string = schema['data']
-        try:
-            if ',' not in base64_string:
-                base64_thumbnail = base64_string
-            else:
-                base64_format, base64_thumbnail = base64_string.split(',', 1)
-            thumbnail_stream = base64.b64decode(base64_thumbnail)
-        except base64.binascii.Error as err:
-            raise BadRequest(str(err))
+        # check if busy
+        if self.project['processing']['thumbnail_preview']:
+            return json_response({'processing': True}, status=409)
 
-        video_editor = get_video_editor()
-        thumbnail_metadata = video_editor.get_meta(thumbnail_stream, 'png')
-        return self._save_thumbnail(doc, thumbnail_stream, thumbnail_metadata)
-
-    def _save_thumbnail(self, doc, stream, metadata):
-        filename, ext = os.path.splitext(doc['filename'])
-        thumbnail_filename = f"{filename}_thumbnail.png"
-        storage_id = app.fs.put(
-            stream, thumbnail_filename, None,
-            asset_type='thumbnails', storage_id=doc['storage_id'], content_type='image/png'
+        # save to fs
+        thumbnail_filename = "{filename}_preview-custom.{original_ext}".format(
+            filename=os.path.splitext(self.project['filename'])[0],
+            original_ext=request.files['file'].filename.rsplit('.', 1)[-1].lower()
         )
-        doc = app.mongo.db.projects.find_one_and_update(
-            {'_id': doc['_id']},
+        mimetype = app.config.get('CODEC_MIMETYPE_MAP')[metadata.get('codec_name')]
+        storage_id = app.fs.put(
+            content=file_stream,
+            filename=thumbnail_filename,
+            project_id=None,
+            asset_type='thumbnails',
+            storage_id=self.project['storage_id'],
+            content_type=mimetype
+        )
+
+        # delete old file
+        if self.project['thumbnails']['preview'] \
+                and storage_id != self.project['thumbnails']['preview']['storage_id']:
+            app.fs.delete(self.project['thumbnails']['preview']['storage_id'])
+
+        # save new thumbnail info
+        self.project = app.mongo.db.projects.find_one_and_update(
+            {'_id': self.project['_id']},
             {'$set': {
-                'preview_thumbnail': {
+                'thumbnails.preview': {
                     'filename': thumbnail_filename,
-                    'url': get_url_for_media(doc.get('_id'), 'thumbnail'),
                     'storage_id': storage_id,
-                    'mimetype': 'image/png',
+                    'mimetype': mimetype,
                     'width': metadata.get('width'),
                     'height': metadata.get('height'),
                     'size': metadata.get('size'),
+                    'position': 'custom'
                 }
             }},
             return_document=ReturnDocument.AFTER
         )
-        return json_response(doc)
+        add_urls(self.project)
+
+        return json_response(self.project['thumbnails']['preview'])
+
+    def _get_timeline_thumbnails(self, amount):
+        """
+        Get list or create thumbnails for timeline
+        :param amount: amount of thumbnails
+        :type amount: int
+        :return: json response
+        :rtype: flask.wrappers.Response
+        """
+        # resource is busy
+        if self.project['processing']['thumbnails_timeline']:
+            return json_response({"processing": True}, status=409)
+        # no need to generate thumbnails
+        elif amount == len(self.project['thumbnails']['timeline']):
+            return json_response(self.project['thumbnails']['timeline'])
+        else:
+            # set processing flag
+            self.project = app.mongo.db.projects.find_one_and_update(
+                {'_id': self.project['_id']},
+                {'$set': {'processing.thumbnails_timeline': True}},
+                return_document=ReturnDocument.AFTER
+            )
+            # run task
+            generate_timeline_thumbnails.delay(
+                self.project,
+                amount
+            )
+            return json_response({"processing": True}, status=202)
+
+    def _get_preview_thumbnail(self, position):
+        """
+        Get or create thumbnail for preview
+        :param position: video position to capture a frame
+        :type position: int
+        :return: json response
+        :rtype: flask.wrappers.Response
+        """
+        # resource is busy
+        if self.project['processing']['thumbnail_preview']:
+            return json_response({"processing": True}, status=409)
+        elif (self.project['thumbnails']['preview'] and
+              self.project['thumbnails']['preview'].get('position') == position):
+            return json_response(self.project['thumbnails']['preview'])
+        elif self.project['metadata']['duration'] < position:
+            raise BadRequest({
+                'position': [f"Requested position: '{position}' is more than video's duration: "
+                             f"'{self.project['metadata']['duration']}'."]
+            })
+        else:
+            # set processing flag
+            self.project = app.mongo.db.projects.find_one_and_update(
+                {'_id': self.project['_id']},
+                {'$set': {'processing.thumbnail_preview': True}},
+                return_document=ReturnDocument.AFTER
+            )
+            # run task
+            generate_preview_thumbnail.delay(
+                self.project,
+                position
+            )
+            return json_response({"processing": True}, status=202)
 
 
 class GetRawVideo(MethodView):
     def get(self, project_id):
         """
-        Get video
+        Get video stream.
+        If `HTTP_RANGE` header is specified - return chunked video stream, else full file.
         ---
         parameters:
         - in: path
@@ -1074,59 +1142,61 @@ class GetRawVideo(MethodView):
           - video/mp4
         responses:
           200:
-            description: OK
-            schema:
-              type: file
+            description: Video stream
+            content:
+              video/mp4:
+                schema:
+                  type: string
+                  format: binary
+          206:
+            description: Chunked stream
+            content:
+              video/mp4:
+                schema:
+                  type: string
+                  format: binary
         """
-        project_id, _ = os.path.splitext(project_id)
-        doc = app.mongo.db.projects.find_one_or_404({'_id': format_id(project_id)})
-        # video is processing
-        if not doc['metadata']:
-            return json_response({'processing': doc['processing']}, status=202)
 
-        # get strem file for video
+        # video is processing
+        if self.project['processing']['video']:
+            return json_response({'processing': True}, status=409)
+
+        # get stream file for video
         video_range = request.headers.environ.get('HTTP_RANGE')
-        length = doc['metadata'].get('size')
+        length = self.project['metadata'].get('size')
         if video_range:
             start = int(re.split('[= | -]', video_range)[1])
+            # TODO doublecheck streaming range
             end = length - 1
             chunksize = end - start + 1
-            headers = {
-                'Content-Range': f'bytes {start}-{end}/{length}',
-                'Accept-Ranges': 'bytes',
-                'Content-Length': chunksize,
-                'Content-Type': doc.get("mime_type"),
+
+            return storage2response(
+                storage_id=self.project['storage_id'],
+                headers={
+                    'Content-Range': f'bytes {start}-{end}/{length}',
+                    'Accept-Ranges': 'bytes',
+                    'Content-Length': chunksize,
+                    'Content-Type': self.project.get("mime_type"),
+                },
+                status=206,
+                start=start,
+                length=chunksize
+            )
+
+        return storage2response(
+            storage_id=self.project.get('storage_id'),
+            headers={
+                'Content-Length': length,
+                'Content-Type': self.project.get("mime_type"),
             }
-            # get a stack of bytes push to client
-            stream = app.fs.get_range(doc['storage_id'], start, chunksize)
-            res = make_response(stream)
-            res.headers = headers
-            return res, 206
-
-        headers = {
-            'Content-Length': length,
-            'Content-Type': 'video/mp4',
-        }
-        stream = app.fs.get(doc.get('storage_id'))
-        res = make_response(stream)
-        res.headers = headers
-        return res, 200
+        )
 
 
-class GetRawThumbnail(MethodView):
-    SCHEME_THUMBNAIL = {
-        'index': {
-            'type': 'integer',
-            'required': False,
-            'empty': True,
-            'coerce': int,
-            'min': 0,
-        },	
-    }
+class GetRawPreviewThumbnail(MethodView):
 
     def get(self, project_id):
         """
-        Get thumbnail
+        Get preview thumbnail file
         ---
         parameters:
         - in: path
@@ -1134,44 +1204,93 @@ class GetRawThumbnail(MethodView):
           type: string
           required: True
           description: Unique project id
-        - name: index
-          in: query
-          type:
-          - integer
-          - string
-          description: index of thumbnail to get, leave empty to get preview thumbnail
         produces:
           - image/png
         responses:
           200:
-            description: OK
-            schema:
-              type: file
+            description: preview thumbnail image
+            content:
+              image/png:
+                schema:
+                  type: string
+                  format: binary
         """
-        doc = app.mongo.db.projects.find_one_or_404({'_id': format_id(project_id)})
 
-        if not request.args:
-            preview_thumbnail = doc.get('preview_thumbnail')
-            if not preview_thumbnail:
-                raise NotFound()
-            byte = app.fs.get(preview_thumbnail.get('storage_id'))
-        else:
-            schema = check_request_schema_validity(request.args.to_dict(), self.SCHEME_THUMBNAIL, allow_unknown=True)
-            index = schema['index']
-            thumbnails = next(iter(doc['thumbnails'].values()), [])
-            if len(thumbnails) < index + 1:
-                raise NotFound()
-            byte = app.fs.get(thumbnails[index]['storage_id'])
+        if not self.project['thumbnails']['preview']:
+            raise NotFound()
 
-        res = make_response(byte)
-        res.headers['Content-Type'] = 'image/png'
-        return res
+        return storage2response(
+            storage_id=self.project['thumbnails']['preview']['storage_id'],
+            headers={'Content-Type': self.project['thumbnails']['preview']['mimetype']}
+        )
+
+
+class GetRawTimelineThumbnail(MethodView):
+
+    def get(self, project_id, index):
+        """
+        Get timeline thumbnail file
+        ---
+        parameters:
+        - in: path
+          name: project_id
+          type: string
+          required: True
+          description: Unique project id
+        - in: path
+          name: index
+          type: integer
+          required: True
+          description: Index of timeline thumbnail to read.
+        produces:
+          - image/png
+        responses:
+          200:
+            description: timeline thumbnail image
+            content:
+              image/png:
+                schema:
+                  type: string
+                  format: binary
+        """
+
+        try:
+            thumbnail = self.project['thumbnails']['timeline'][index]
+        except IndexError:
+            raise NotFound()
+
+        return storage2response(
+            storage_id=thumbnail['storage_id'],
+            headers={'Content-Type': thumbnail['mimetype']}
+        )
 
 
 # register all urls
-bp.add_url_rule('/', view_func=ListUploadProject.as_view('upload_project'))
-bp.add_url_rule('/<project_id>', view_func=RetrieveEditDestroyProject.as_view('retrieve_edit_destroy_project'))
-bp.add_url_rule('/<project_id>/thumbnails',
-                view_func=RetrieveOrCreateThumbnails.as_view('retrieve_or_create_thumbnails'))
-bp.add_url_rule('/<project_id>/url_raw/video', view_func=GetRawVideo.as_view('get_raw_video'))
-bp.add_url_rule('/<project_id>/url_raw/thumbnail', view_func=GetRawThumbnail.as_view('get_raw_thumbnail'))
+bp.add_url_rule(
+    '/',
+    view_func=ListUploadProject.as_view('list_upload_project')
+)
+bp.add_url_rule(
+    '/<project_id>',
+    view_func=RetrieveEditDestroyProject.as_view('retrieve_edit_destroy_project')
+)
+bp.add_url_rule(
+    '/<project_id>/duplicate',
+    view_func=DuplicateProject.as_view('duplicate_project')
+)
+bp.add_url_rule(
+    '/<project_id>/thumbnails',
+    view_func=RetrieveOrCreateThumbnails.as_view('retrieve_or_create_thumbnails')
+)
+bp.add_url_rule(
+    '/<project_id>/raw/video',
+    view_func=GetRawVideo.as_view('get_raw_video')
+)
+bp.add_url_rule(
+    '/<project_id>/raw/thumbnails/preview',
+    view_func=GetRawPreviewThumbnail.as_view('get_raw_preview_thumbnail')
+)
+bp.add_url_rule(
+    '/<project_id>/raw/thumbnails/timeline/<int:index>',
+    view_func=GetRawTimelineThumbnail.as_view('get_raw_timeline_thumbnail')
+)

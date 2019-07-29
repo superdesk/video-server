@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8; -*-
 #
-# This file is part of Superdesk.
+# This file is part of Superdesk Video Server.
 #
 # Copyright 2013, 2014, 2015 Sourcefabric z.u. and contributors.
 #
@@ -10,7 +10,6 @@
 # at https://www.sourcefabric.org/superdesk/license
 
 import importlib
-import logging.config
 import os
 
 from flask import Flask, jsonify
@@ -18,11 +17,11 @@ from flask_pymongo import PyMongo
 from werkzeug.exceptions import HTTPException, default_exceptions
 
 import settings
-from lib.celery_app import init_celery
 from lib.logging import configure_logging
 from lib.storage import get_media_storage
 
-logger = logging.getLogger(__name__)
+from celery_app import init_celery
+
 
 if os.environ.get('NEW_RELIC_LICENSE_KEY'):
     try:
@@ -82,8 +81,11 @@ def get_app(config=None):
 
     def make_json_error(ex):
         message = ex.description if hasattr(ex, 'description') else ex
-        response = jsonify(message=message)
 
+        if type(message) is not dict:
+            message = {'error': message}
+
+        response = jsonify(message)
         response.status_code = (ex.code
                                 if isinstance(ex, HTTPException)
                                 else 500)

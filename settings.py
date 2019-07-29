@@ -1,4 +1,3 @@
-import json
 import os
 from distutils.util import strtobool as _strtobool
 
@@ -62,14 +61,25 @@ RABBIT_MQ_URL = env('RABBIT_MQ_URL', 'pyamqp://guest@localhost//')
 #: celery broker
 BROKER_URL = env('CELERY_BROKER_URL', RABBIT_MQ_URL)
 CELERY_BROKER_URL = BROKER_URL
+CELERY_TASK_ALWAYS_EAGER = strtobool(env('CELERY_TASK_ALWAYS_EAGER', 'False'))
+CELERY_TASK_SERIALIZER = 'bson'
 #: number retry when task fail
-NUMBER_RETRY = int(env('NUMBER_RETRY', 3))
-BROKER_CONNECTION_MAX_RETRIES = NUMBER_RETRY
+MAX_RETRIES = int(env('MAX_RETRIES', 3))
+BROKER_CONNECTION_MAX_RETRIES = MAX_RETRIES
 
-#: allow agent
-AGENT_ALLOW = json.loads(env('AGENT_ALLOW', '["superdesk", "python-requests" ,"postmanruntime", "mozilla"]'))
 #: Codec support
-CODEC_SUPPORT = json.loads(env('CODEC_SUPPORT', '["vp8", "vp9", "h264", "theora", "av1"]'))
+CODEC_SUPPORT_VIDEO = ('vp8', 'vp9', 'h264', 'theora', 'av1')
+CODEC_SUPPORT_IMAGE = ('bmp', 'mjpeg', 'png')
+CODEC_EXTENSION_MAP = {
+    'bmp': 'bmp',
+    'png': 'png',
+    'mjpeg': 'jpeg'
+}
+CODEC_MIMETYPE_MAP = {
+    'bmp': 'image/bmp',
+    'png': 'image/png',
+    'mjpeg': 'image/jpeg'
+}
 
 #: media storage
 MEDIA_STORAGE = env('MEDIA_STORAGE', 'filesystem')
@@ -79,13 +89,28 @@ FS_MEDIA_STORAGE_PATH = env('FS_MEDIA_STORAGE_PATH', DEFAULT_PATH)
 #: media tool
 DEFAULT_MEDIA_TOOL = env('DEFAULT_MEDIA_TOOL', 'ffmpeg')
 
-VIDEO_SERVER_URL = env('VIDEO_SERVER_URL', 'http://localhost:5050/projects')
-VIDEO_URL_SUFFIX = env('VIDEO_URL_SUFFIX', 'url_raw/video')
-THUMBNAIL_URL_SUFFIX = env('THUMBNAIL_URL_SUFFIX', 'url_raw/thumbnail')
-
 #: pagination, items per page
 ITEMS_PER_PAGE = int(env('ITEMS_PER_PAGE', 25))
 DEFAULT_TOTAL_TIMELINE_THUMBNAILS = int(env('DEFAULT_TOTAL_TIMELINE_THUMBNAILS', 40))
 
 #: set PORT for video server
-VIDEO_SERVER_PORT = env('ITEMS_PER_PAGE', 5050)
+VIDEO_SERVER_PORT = env('VIDEO_SERVER_PORT', 5050)
+
+#: video edit constraints
+ALLOW_INTERPOLATION = strtobool(env('ALLOW_INTERPOLATION', 'True'))
+INTERPOLATION_LIMIT = env('INTERPOLATION_LIMIT', 1280)
+MIN_TRIM_DURATION = env('MIN_TRIM_DURATION', 2)
+MIN_VIDEO_WIDTH = env('MIN_VIDEO_WIDTH', 320)
+MAX_VIDEO_WIDTH = env('MAX_VIDEO_WIDTH', 3840)
+MIN_VIDEO_HEIGHT = env('MIN_VIDEO_HEIGHT', 180)
+MAX_VIDEO_HEIGHT = env('MAX_VIDEO_HEIGHT', 2160)
+
+#: ffmpeg command line defaults
+# the default is the number of available CPUs (0)
+FFMPEG_THREADS = env('FFMPEG_THREADS', '0')
+# The default is medium.
+# The preset determines how fast the encoding process will be – at the expense of compression efficiency.
+# Put differently, if you choose ultrafast, the encoding process is going to run fast,
+# but the file size will be larger when compared to medium. The visual quality will be the same.
+# Valid presets are ultrafast, superfast, veryfast, faster, fast, medium, slow, slower, veryslow and placebo.
+FFMPEG_PRESET = env('FFMPEG_PRESET', 'medium')

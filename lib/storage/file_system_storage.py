@@ -1,5 +1,6 @@
-import logging
 import os
+import shutil
+import logging
 from datetime import datetime
 
 from flask import current_app as app
@@ -10,114 +11,174 @@ logger = logging.getLogger(__name__)
 
 
 class FileSystemStorage(MediaStorageInterface):
+    """
+    File system storage.
+    Use file system to store files.
+    """
+
+    @staticmethod
+    def _get_file_path(storage_id):
+        """
+        Build and return full file path based on `storage_id`.
+        :param storage_id: unique starage id
+        :type storage_id: str
+        :return: file path
+        :rtype: str
+        """
+
+        return os.path.join(app.config.get('FS_MEDIA_STORAGE_PATH'), storage_id)
 
     def get(self, storage_id):
         """
-        Get stream file
-        :param storage_id: full file path
-        :return:
+        Read and return a file based on `storage_id`
+        :param storage_id: unique starage id
+        :type storage_id: str
+        :return: file
+        :rtype: bytes
         """
+
         try:
-            file_path = os.path.join(app.config.get('FS_MEDIA_STORAGE_PATH'), storage_id)
-            media_file = (open(file_path, 'rb')).read()
-        except Exception as ex:
-            logger.error('Cannot get data file %s ex: %s' % (storage_id, ex))
-            media_file = None
+            with open(self._get_file_path(storage_id), 'rb') as rb:
+                media_file = rb.read()
+        except Exception as e:
+            logger.error(f'FileSystemStorage:get:{storage_id}: {e}')
+            raise e
+
         return media_file
 
     def get_range(self, storage_id, start, length):
         """
-        Get a range of stream file
-        :param storage_id: storage_id of file
-        :param start: start index stream
-        :param length: end index stream
-        :return:
+        Read and return a file's chunks based on `storage_id`
+        :param storage_id: unique starage id
+        :type storage_id: str
+        :param start: start file's position to read
+        :param length: the number of bytes to be read from the file
+        :return: file
+        :rtype: bytes
         """
+
         try:
-            file_path = os.path.join(app.config.get('FS_MEDIA_STORAGE_PATH'), storage_id)
-            file = (open(file_path, 'rb'))
-            file.seek(start)
-            media_file = file.read(length)
-        except Exception as ex:
-            logger.error('Cannot get data file %s ex: %s' % (storage_id, ex))
-            media_file = None
+            with open(self._get_file_path(storage_id), 'rb') as rb:
+                rb.seek(start)
+                media_file = rb.read(length)
+        except Exception as e:
+            logger.error(f'FileSystemStorage:get_range:{storage_id}: {e}')
+            raise e
+
         return media_file
 
     def put(self, content, filename, project_id=None, asset_type='project', storage_id=None, content_type=None):
         """
-        Put a file into storage.
-        Auto create the path, if asset_type is project: <year>/<month>/<day>/<project-id>/<filename>
-                        and if asset_type is not project: <year>/<month>/<day>/<project-id>/<asset_type>/<filename>
-                        asset_type isnot project, that mean it is sub item contain in project.
-        :param content: stream of file, binary type
-        :param filename: name of file to save to storage
-        :param project_id: project id
-        :param asset_type: the folder to store asset under project_id if asset_type is not project
-        :param storage_id: storage_id of video
+        Save file into a fs storage.
+
+        Use <year>/<month>/<day>/<project-id>/<filename> path if `asset_type` is 'project', `project_id` is required.
+        Use <year>/<month>/<day>/<project-id>/<asset_type>/<filename> if `asset_type` is not 'project', `storage_id`
+        is required.
+
+        Example:
+         - video file: 2019/6/11/5cff82a6fe985e1e3bddb326/3ada91761c6048bdb3dd42a2463d5df8.mp4
+         - thumbnail:  2019/6/11/5cff82a6fe985e1e3bddb326/thumbnails/3ada91761c6048bdb3dd42a2463d5df8_timeline_00.png
+
+        :param content: file to save
+        :type content: bytes
+        :param filename: name which will be used when store a file
+        :type filename: str
+        :param project_id: unique project id
+        :type project_id: bson.objectid.ObjectId
+        :param asset_type: asset type
+        :type asset_type: str
+        :param storage_id: unique starage id of file
+        :type storage_id: str
         :param content_type: content type of file
-        :return: storage_id
+        :type content_type: str
+        :return: storage id of just saved file
+        :rtype: str
         """
+
+        if asset_type == 'project':
+            if not project_id:
+                raise ValueError("Argument 'project_id' is required when 'asset_type' is 'project'")
+            # generate storage_id for project
+            utcnow = datetime.utcnow()
+            storage_id = f'{utcnow.year}/{utcnow.month}/{utcnow.day}/{project_id}/{filename}'
+        else:
+            if not storage_id:
+                raise ValueError("Argument 'storage_id' is required when 'asset_type' is not 'project'")
+            # generate storage_id
+            storage_id = f'{os.path.dirname(storage_id)}/{asset_type}/{filename}'
+
+        file_path = self._get_file_path(storage_id)
+        # check if file exists
+        if os.path.exists(file_path):
+            raise Exception(f'File {file_path} already exists, use "replace" method instead.')
+
+        # check if dir exists, if not create it
+        file_dir = os.path.dirname(file_path)
+        if not os.path.exists(file_dir):
+            os.makedirs(file_dir)
+        # write stream to file
         try:
-            if asset_type == 'project':
-                # generate storage_id for video
-                if not project_id:
-                    raise KeyError("asset_type is project, the project_id must be not empty")
-                utcnow = datetime.utcnow()
-                storage_id = f'{utcnow.year}/{utcnow.month}/{utcnow.day}/{project_id}/{filename}'
-            else:
-                if not storage_id:
-                    raise KeyError("asset_type is not project, must have the storage_id of asset's project")
-                storage_id = f'{os.path.dirname(storage_id)}/{asset_type}/{filename}'
-            file_path = os.path.join(app.config.get('FS_MEDIA_STORAGE_PATH'), storage_id)
-            # check if dir exists, if not create it
-            file_dir = os.path.dirname(file_path)
-            if not os.path.exists(file_dir):
-                os.makedirs(file_dir)
-            # write stream to file
             with open(file_path, "wb") as f:
                 f.write(content)
-            logger.info('Put media file %s to storage' % storage_id)
-            return storage_id
-        except Exception as ex:
-            logger.error('Cannot put file %s ex: %s' % (storage_id, ex))
-            return None
+        except Exception as e:
+            logger.error(f'FileSystemStorage:put:{storage_id}: {e}')
+            raise e
+
+        logger.info(f"Saved file '{storage_id}' to fs storage")
+        return storage_id
 
     def replace(self, content, storage_id, content_type=None):
         """
-        replace a file in storage
-        :param content: stream file
-        :param storage_id: storage_id of file
+        Replace a file in the storage
+        :param content: file to replace with
+        :type content: bytes
+        :param storage_id: starage id of file for replacement
+        :type storage_id: str
         :param content_type: content type of file
-        :return:
+        :type content_type: str
         """
+
+        file_path = self._get_file_path(storage_id)
+        # check if dir exists, if not create it
+        file_dir = os.path.dirname(file_path)
+        if not os.path.exists(file_dir):
+            os.makedirs(file_dir)
+        # write stream to file
         try:
-            # generate storage_id
-            file_path = os.path.join(app.config.get('FS_MEDIA_STORAGE_PATH'), storage_id)
-            # check if dir exists, if not create it
-            file_dir = os.path.dirname(file_path)
-            if not os.path.exists(file_dir):
-                os.makedirs(file_dir)
-            # write stream to file
             with open(file_path, "wb") as f:
                 f.write(content)
-            logger.info('Replace media file %s in storage' % storage_id)
-            return storage_id
-        except Exception as ex:
-            logger.error('Cannot replace file %s ex: %s' % (storage_id, ex))
-            return None
+        except Exception as e:
+            logger.error(f'FileSystemStorage:replace:{storage_id}: {e}')
+            raise e
+        else:
+            logger.info(f'Replaced file "{storage_id}" in fs storage')
 
     def delete(self, storage_id):
         """
-        Delete a file in storage
-        :param storage_id: storage_id of file
-        :return:
+        Delete a file from the storage
+        :param storage_id: starage id of file to remove
+        :type storage_id: str
         """
-        try:
-            file_path = os.path.join(app.config.get('FS_MEDIA_STORAGE_PATH'), storage_id)
-            if os.path.exists(file_path):
-                os.remove(file_path)
-            logger.info('Deleted media file %s from storage' % storage_id)
-            return True
-        except Exception as ex:
-            logger.error('Cannot delete file %s ex: %s' % (storage_id, ex))
-            return False
+
+        file_path = self._get_file_path(storage_id)
+
+        if os.path.exists(file_path):
+            os.remove(file_path)
+            logger.info(f"Removed '{file_path}' from fs storage")
+        else:
+            logger.warning(f"File '{file_path}' was not found in fs storage.")
+
+    def delete_dir(self, storage_id):
+        """
+        Delete an entire folder where `storage_id` is located
+        :param storage_id: unique storage
+        :type storage_id: str
+        """
+
+        dir_path = os.path.dirname(self._get_file_path(storage_id))
+
+        if os.path.isdir(dir_path):
+            shutil.rmtree(dir_path)
+            logger.info(f"Removed '{dir_path}' from fs storage")
+        else:
+            logger.warning(f"Directory '{dir_path}' was not found in fs storage.")

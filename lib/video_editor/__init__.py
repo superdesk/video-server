@@ -1,14 +1,23 @@
+from flask import current_app as app
+
 from .ffmpeg import FFMPEGVideoEditor
 from .moviepy import MoviePyVideoEditor
-from flask import current_app as app
 
 
 def get_video_editor(name=None):
-    # Set default tool for video editor
+    """
+    Instantinates and returns selected video editor
+    :param name: name of video editor. Options: 'ffmpeg'
+    :type name: str
+    :return: instance of video editor
+    """
+
     if not name:
         name = app.config.get("DEFAULT_MEDIA_TOOL")
+
     if name == 'ffmpeg':
         return FFMPEGVideoEditor()
-    if name == 'moviepy':
+    elif name == 'moviepy':
         return MoviePyVideoEditor()
-    return None
+
+    raise Exception(f"Video editor backend with '{name}' does not exist.")
