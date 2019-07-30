@@ -146,7 +146,7 @@ def generate_timeline_thumbnails(self, project, amount):
 
 
 @celery.task(bind=True, default_retry_delay=10)
-def generate_preview_thumbnail(self, project, position):
+def generate_preview_thumbnail(self, project, position, crop, rotate):
     video_editor = get_video_editor()
     preview_thumbnail = None
 
@@ -155,7 +155,9 @@ def generate_preview_thumbnail(self, project, position):
             stream_file=app.fs.get(project['storage_id']),
             filename=project['filename'],
             duration=project['metadata']['duration'],
-            position=position
+            position=position,
+            crop=crop,
+            rotate=rotate,
         )
         ext = app.config.get('CODEC_EXTENSION_MAP')[meta.get('codec_name')]
         filename = f"{project['filename'].rsplit('.', 1)[0]}_preview-{position}.{ext}"

@@ -130,7 +130,7 @@ class FFMPEGVideoEditor(VideoEditorInterface):
                 os.remove(path_input)
         return content, metadata_edit_file
 
-    def capture_thumbnail(self, stream_file, filename, duration, position):
+    def capture_thumbnail(self, stream_file, filename, duration, position, crop={}, rotate=0):
         """
         Use ffmpeg tool to capture video frame at a position.
         :param stream_file: video file
@@ -141,6 +141,10 @@ class FFMPEGVideoEditor(VideoEditorInterface):
         :type duration: int
         :param position: video position to capture a frame
         :type position: int
+        :param crop: crop editing rules
+        :type crop: dict
+        :param rotate: rotate degree
+        :type rotate: int
         :return: file stream, metadata
         :rtype: bytes, dict
         """
@@ -152,9 +156,21 @@ class FFMPEGVideoEditor(VideoEditorInterface):
                 position = duration - 0.1
             # create output file path
             output_file = f"{path_video}_preview_thumbnail.png"
+            cmd = ["-accurate_seek", "-i", path_video, "-ss", str(position), "-vframes", "1"]
+
+            vfilter = ''
+            if crop:
+                vfilter = f'-vf crop={crop["width"]}:{crop["height"]}:{crop["x"]}:{crop["y"]}'
+            if rotate:
+                vfilter += ',' if vfilter else '-vf '
+                transpose = f'transpose=1' if rotate > 0 else f'transpose=2'
+                vfilter += ','.join([transpose] * (rotate // 90))
+                print(vfilter)
+            if vfilter:
+                cmd.extend(vfilter.split(' '))
+
             # run ffmpeg command
-            subprocess.run(["ffmpeg", "-v", "error", "-y", "-accurate_seek", "-i", path_video,
-                            "-ss", str(position), "-vframes", "1", output_file])
+            subprocess.run(["ffmpeg", "-v", "error", "-y", *cmd, output_file])
             try:
                 # get metadata
                 thumbnail_metadata = self._get_meta(output_file)

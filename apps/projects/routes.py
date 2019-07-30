@@ -3,6 +3,7 @@ import re
 import copy
 import logging
 import bson
+from ast import literal_eval
 from datetime import datetime
 
 from flask import request, make_response
@@ -913,6 +914,38 @@ class RetrieveOrCreateThumbnails(MethodView):
             'type': 'float',
             'coerce': float,
         },
+        'crop': {
+            'type': 'dict',
+            'coerce': literal_eval,  # crop args are a string represent of a dict
+            'required': False,
+            'empty': True,
+            'schema': {
+                'width': {
+                    'type': 'integer',
+                    'required': True
+                },
+                'height': {
+                    'type': 'integer',
+                    'required': True
+                },
+                'x': {
+                    'type': 'integer',
+                    'required': True,
+                    'min': 0
+                },
+                'y': {
+                    'type': 'integer',
+                    'required': True,
+                    'min': 0
+                }
+            }
+        },
+        'rotate': {
+            'type': 'integer',
+            'required': False,
+            'coerce': int,
+            'allowed': [-270, -180, -90, 90, 180, 270]
+        }
     }
 
     SCHEMA_UPLOAD = {
@@ -959,7 +992,7 @@ class RetrieveOrCreateThumbnails(MethodView):
                 amount=document.get('amount', app.config.get('DEFAULT_TOTAL_TIMELINE_THUMBNAILS'))
             )
 
-        return self._get_preview_thumbnail(document['position'])
+        return self._get_preview_thumbnail(document['position'], document.get('crop'), document.get('rotate', 0))
 
     def post(self, project_id):
         """
@@ -1093,11 +1126,15 @@ class RetrieveOrCreateThumbnails(MethodView):
             )
             return json_response({"processing": True}, status=202)
 
-    def _get_preview_thumbnail(self, position):
+    def _get_preview_thumbnail(self, position, crop, rotate):
         """
         Get or create thumbnail for preview
         :param position: video position to capture a frame
         :type position: int
+        :param crop: crop editing rules
+        :type crop: dict
+        :param rotate: rotate degree
+        :type rotate: int
         :return: json response
         :rtype: flask.wrappers.Response
         """
@@ -1112,6 +1149,15 @@ class RetrieveOrCreateThumbnails(MethodView):
                 'position': [f"Requested position: '{position}' is more than video's duration: "
                              f"'{self.project['metadata']['duration']}'."]
             })
+        elif crop:
+            if self.project['metadata']['width'] - crop['x'] < app.config.get('MIN_VIDEO_WIDTH'):
+                raise BadRequest({"crop": [{"x": ["less than minimum allowed crop width"]}]})
+            elif self.project['metadata']['height'] - crop['y'] < app.config.get('MIN_VIDEO_HEIGHT'):
+                raise BadRequest({"crop": [{"y": ["less than minimum allowed crop height"]}]})
+            elif crop and crop['x'] + crop['width'] > self.project['metadata']['width']:
+                raise BadRequest({"crop": [{"width": ["crop's frame is outside a video's frame"]}]})
+            elif crop and crop['y'] + crop['height'] > self.project['metadata']['height']:
+                raise BadRequest({"crop": [{"height": ["crop's frame is outside a video's frame"]}]})
         else:
             # set processing flag
             self.project = app.mongo.db.projects.find_one_and_update(
@@ -1122,7 +1168,9 @@ class RetrieveOrCreateThumbnails(MethodView):
             # run task
             generate_preview_thumbnail.delay(
                 self.project,
-                position
+                position,
+                crop,
+                rotate,
             )
             return json_response({"processing": True}, status=202)
 
