@@ -10,7 +10,7 @@ from flask import request, make_response
 from flask import current_app as app
 from pymongo import ReturnDocument
 from pymongo.errors import ServerSelectionTimeoutError
-from werkzeug.exceptions import BadRequest, InternalServerError, NotFound
+from werkzeug.exceptions import BadRequest, InternalServerError, NotFound, Conflict
 
 from lib.utils import (
     create_file_name, json_response, add_urls, validate_document,
@@ -570,7 +570,7 @@ class RetrieveEditDestroyProject(MethodView):
         """
 
         if self.project['processing']['video']:
-            return json_response({'processing': True}, status=409)
+            raise Conflict({"processing": ["Task edit video is still processing"]})
 
         if self.project['version'] == 1:
             raise BadRequest({"project_id": [f"Video with version 1 is not editable, use duplicated project instead."]})
@@ -783,7 +783,7 @@ class DuplicateProject(MethodView):
         """
 
         if any(self.project['processing'].values()):
-            return json_response({"processing": True}, status=409)
+            raise Conflict({"processing": ["Some tasks is still processing"]})
 
         # deepcopy & save a child_project
         child_project = copy.deepcopy(self.project)
@@ -1056,7 +1056,7 @@ class RetrieveOrCreateThumbnails(MethodView):
 
         # check if busy
         if self.project['processing']['thumbnail_preview']:
-            return json_response({'processing': True}, status=409)
+            raise Conflict({"processing": ["Task get preview thumbnails is still processing"]})
 
         # save to fs
         thumbnail_filename = "{filename}_preview-custom.{original_ext}".format(
@@ -1108,7 +1108,7 @@ class RetrieveOrCreateThumbnails(MethodView):
         """
         # resource is busy
         if self.project['processing']['thumbnails_timeline']:
-            return json_response({"processing": True}, status=409)
+            raise Conflict({"processing": ["Task get timeline thumbnails video is still processing"]})
         # no need to generate thumbnails
         elif amount == len(self.project['thumbnails']['timeline']):
             return json_response(self.project['thumbnails']['timeline'])
@@ -1140,7 +1140,7 @@ class RetrieveOrCreateThumbnails(MethodView):
         """
         # resource is busy
         if self.project['processing']['thumbnail_preview']:
-            return json_response({"processing": True}, status=409)
+            raise Conflict({"processing": ["Task get preview thumbnails video is still processing"]})
         elif (self.project['thumbnails']['preview'] and
               self.project['thumbnails']['preview'].get('position') == position):
             return json_response(self.project['thumbnails']['preview'])
@@ -1207,7 +1207,7 @@ class GetRawVideo(MethodView):
 
         # video is processing
         if self.project['processing']['video']:
-            return json_response({'processing': True}, status=409)
+            raise Conflict({"processing": ["Task edit video is still processing"]})
 
         # get stream file for video
         video_range = request.headers.environ.get('HTTP_RANGE')
