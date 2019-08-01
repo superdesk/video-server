@@ -1211,6 +1211,17 @@ class RetrieveOrCreateThumbnails(MethodView):
         :return: json response
         :rtype: flask.wrappers.Response
         """
+        # validate crop param
+        if crop:
+            if self.project['metadata']['width'] - crop['x'] < app.config.get('MIN_VIDEO_WIDTH'):
+                raise BadRequest({"crop": [{"x": ["less than minimum allowed crop width"]}]})
+            elif self.project['metadata']['height'] - crop['y'] < app.config.get('MIN_VIDEO_HEIGHT'):
+                raise BadRequest({"crop": [{"y": ["less than minimum allowed crop height"]}]})
+            elif crop['x'] + crop['width'] > self.project['metadata']['width']:
+                raise BadRequest({"crop": [{"width": ["crop's frame is outside a video's frame"]}]})
+            elif crop['y'] + crop['height'] > self.project['metadata']['height']:
+                raise BadRequest({"crop": [{"height": ["crop's frame is outside a video's frame"]}]})
+
         # resource is busy
         if self.project['processing']['thumbnail_preview']:
             raise Conflict({"processing": ["Task get preview thumbnails video is still processing"]})
@@ -1222,15 +1233,6 @@ class RetrieveOrCreateThumbnails(MethodView):
                 'position': [f"Requested position: '{position}' is more than video's duration: "
                              f"'{self.project['metadata']['duration']}'."]
             })
-        elif crop:
-            if self.project['metadata']['width'] - crop['x'] < app.config.get('MIN_VIDEO_WIDTH'):
-                raise BadRequest({"crop": [{"x": ["less than minimum allowed crop width"]}]})
-            elif self.project['metadata']['height'] - crop['y'] < app.config.get('MIN_VIDEO_HEIGHT'):
-                raise BadRequest({"crop": [{"y": ["less than minimum allowed crop height"]}]})
-            elif crop and crop['x'] + crop['width'] > self.project['metadata']['width']:
-                raise BadRequest({"crop": [{"width": ["crop's frame is outside a video's frame"]}]})
-            elif crop and crop['y'] + crop['height'] > self.project['metadata']['height']:
-                raise BadRequest({"crop": [{"height": ["crop's frame is outside a video's frame"]}]})
         else:
             # set processing flag
             self.project = app.mongo.db.projects.find_one_and_update(
