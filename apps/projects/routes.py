@@ -565,8 +565,9 @@ class RetrieveEditDestroyProject(MethodView):
               type: object
               properties:
                 processing:
-                  type: boolean
-                  example: True
+                  type: array
+                  example:
+                    - Task edit video is still processing
         """
 
         if self.project['processing']['video']:
@@ -780,6 +781,15 @@ class DuplicateProject(MethodView):
                       preview:
                         type: object
                         example: {}
+          409:
+            description: A running task has not completed
+            schema:
+              type: object
+              properties:
+                processing:
+                  type: array
+                  example:
+                    - Some tasks is still processing
         """
 
         if any(self.project['processing'].values()):
@@ -891,12 +901,12 @@ class RetrieveOrCreateThumbnails(MethodView):
                 {
                     'allowed': ['timeline'],
                     'dependencies': ['amount'],
-                    'excludes': 'position',
+                    'excludes': ['position', 'crop', 'rotate'],
                 },
                 {
                     # make `amount` optional
                     'allowed': ['timeline'],
-                    'excludes': 'position',
+                    'excludes': ['position', 'crop', 'rotate'],
                 },
                 {
                     'allowed': ['preview'],
@@ -980,9 +990,63 @@ class RetrieveOrCreateThumbnails(MethodView):
           type: float
           description: Position in the video where preview thumbnail should be captured.
                        Used only when `type` is `preview`.
+        - name: crop
+          in: query
+          type: json
+          description: Crop rules apply to preview thumbnail. Used only when `type` is `preview`.
+          default: "{'width': 720, 'height': 360, 'x': 0, 'y':0}"
+        - name: rotate
+          in: query
+          type: integer
+          description: Number of degrees rotate preview thumbnail. Used only when `type` is `preview`.
+          enum: [-270, -180, -90, 90, 180, 270]
         responses:
+          200:
+            description: Timeline/preview thumbnails information
+            schema:
+              type: object
+              properties:
+                filename:
+                  type: string
+                  example: c2deb6fb933d4df186ad2539914ff374_preview-4.0.png
+                storage_id:
+                  type: string
+                  example: 2019/7/17/5cbd5acfe24f6045607e51aa/thumbnails/c2deb6fb933d4df186ad2539914ff374_preview-4.0.png  # noqa
+                mimetype:
+                  type: string
+                  example: image/png
+                width:
+                  type: integer
+                  example: 360
+                height:
+                  type: integer
+                  example: 720
+                size:
+                  type: integer
+                  example: 654321
+                position:
+                  type: integer
+                  example: 10
+                url:
+                  type: string
+                  example: http://localhost:5050/projects/5cbd5acfe24f6045607e51aa/raw/thumbnails/preview
           202:
-            description: Timeline/preview thumbnails information or status that thumbnails generation task was started.
+            description: Timeline/preview thumbnails status that thumbnails generation task was started.
+            schema:
+              type: object
+              properties:
+                processing:
+                  type: boolean
+                  example: True
+          409:
+            description: Timeline/preview task is still processing
+            schema:
+              type: object
+              properties:
+                processing:
+                  type: array
+                  example:
+                    - Task get preview thumbnails is still processing
         """
         document = validate_document(request.args.to_dict(), self.SCHEMA_THUMBNAILS)
         add_urls(self.project)
@@ -1040,6 +1104,15 @@ class RetrieveOrCreateThumbnails(MethodView):
                 positoin:
                   type: string
                   example: custom
+          409:
+            description: There is a running preview thumbnails task
+            schema:
+              type: object
+              properties:
+                processing:
+                  type: array
+                  example:
+                    - Task get preview thumbnails is still processing
         """
 
         # validate request
@@ -1203,6 +1276,15 @@ class GetRawVideo(MethodView):
                 schema:
                   type: string
                   format: binary
+          409:
+            description: Timeline/preview task is still processing
+            schema:
+              type: object
+              properties:
+                processing:
+                  type: array
+                  example:
+                    - Task edit video is still processing
         """
 
         # video is processing
