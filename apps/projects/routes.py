@@ -1137,6 +1137,10 @@ class RetrieveOrCreateThumbnails(MethodView):
             original_ext=request.files['file'].filename.rsplit('.', 1)[-1].lower()
         )
         mimetype = app.config.get('CODEC_MIMETYPE_MAP')[metadata.get('codec_name')]
+        if self.project['thumbnails']['preview']:
+            # delete old file
+            app.fs.delete(self.project['thumbnails']['preview']['storage_id'])
+
         storage_id = app.fs.put(
             content=file_stream,
             filename=thumbnail_filename,
@@ -1145,11 +1149,6 @@ class RetrieveOrCreateThumbnails(MethodView):
             storage_id=self.project['storage_id'],
             content_type=mimetype
         )
-
-        # delete old file
-        if self.project['thumbnails']['preview'] \
-                and storage_id != self.project['thumbnails']['preview']['storage_id']:
-            app.fs.delete(self.project['thumbnails']['preview']['storage_id'])
 
         # save new thumbnail info
         self.project = app.mongo.db.projects.find_one_and_update(
