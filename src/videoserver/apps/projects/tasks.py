@@ -1,13 +1,12 @@
 import logging
 
-from bson import json_util, ObjectId
+from bson import ObjectId
 from flask import current_app as app
 from pymongo import ReturnDocument
-
 from celery.exceptions import MaxRetriesExceededError
-from lib.video_editor import get_video_editor
 
-from celery_app import celery
+from videoserver.lib.video_editor import get_video_editor
+from videoserver.celery_app import celery
 
 logger = logging.getLogger(__name__)
 

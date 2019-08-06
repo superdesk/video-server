@@ -10,7 +10,7 @@ from flask import current_app as app
 from flask import url_for
 from werkzeug.exceptions import BadRequest
 
-from lib.validator import Validator
+from .validator import Validator
 
 logger = logging.getLogger(__name__)
 

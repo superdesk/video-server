@@ -5,19 +5,16 @@ import logging
 import bson
 from datetime import datetime
 
-from flask import request, make_response
+from flask import request
 from flask import current_app as app
 from pymongo import ReturnDocument
 from pymongo.errors import ServerSelectionTimeoutError
 from werkzeug.exceptions import BadRequest, InternalServerError, NotFound
 
-from lib.utils import (
-    create_file_name, json_response, add_urls, validate_document,
-    get_request_address, save_activity_log, paginate, storage2response
-)
-from lib.video_editor import get_video_editor
-from lib.views import MethodView
-
+from videoserver.lib.utils import (create_file_name, json_response, add_urls, validate_document,
+                                   get_request_address, save_activity_log, paginate, storage2response)
+from videoserver.lib.video_editor import get_video_editor
+from videoserver.lib.views import MethodView
 from .tasks import edit_video, generate_timeline_thumbnails, generate_preview_thumbnail
 from . import bp
 

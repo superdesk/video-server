@@ -16,11 +16,10 @@ from flask import Flask, jsonify
 from flask_pymongo import PyMongo
 from werkzeug.exceptions import HTTPException, default_exceptions
 
-import settings
-from lib.logging import configure_logging
-from lib.storage import get_media_storage
-
-from celery_app import init_celery
+from . import settings
+from .lib.logging import configure_logging
+from .lib.storage import get_media_storage
+from .celery_app import init_celery
 
 
 if os.environ.get('NEW_RELIC_LICENSE_KEY'):
@@ -66,7 +65,7 @@ def get_app(config=None):
             app_module.init_app(app)
 
     for module_name in app.config.get('CORE_APPS', []):
-        install_app(module_name)
+        install_app(f'videoserver.{module_name}')
     #: logging
     configure_logging(app.config['LOG_CONFIG_FILE'])
 
@@ -76,6 +75,7 @@ def get_app(config=None):
         app.mongo = PyMongo(app)
 
     app.init_db = init_db
+    app.init_db()
 
     init_celery(app)
 
@@ -103,5 +103,4 @@ if __name__ == '__main__':
     host = '0.0.0.0'
     port = int(os.environ.get('PORT', '5050'))
     app = get_app()
-    app.init_db()
     app.run(host=host, port=port)

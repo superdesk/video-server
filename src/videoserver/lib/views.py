@@ -1,7 +1,7 @@
 import bson
 from flask import current_app as app
 from flask.views import MethodView as FlaskMethodView
-from werkzeug.exceptions import NotFound, BadRequest
+from werkzeug.exceptions import NotFound
 
 
 class MethodView(FlaskMethodView):
