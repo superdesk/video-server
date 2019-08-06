@@ -932,11 +932,13 @@ class RetrieveOrCreateThumbnails(MethodView):
             'schema': {
                 'width': {
                     'type': 'integer',
-                    'required': True
+                    'required': True,
+                    'min': 2,
                 },
                 'height': {
                     'type': 'integer',
-                    'required': True
+                    'required': True,
+                    'min': 2,
                 },
                 'x': {
                     'type': 'integer',
