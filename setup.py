@@ -1,6 +1,30 @@
 from setuptools import setup
 from setuptools import find_packages
 
+requirements = (
+    'flask>=1.0.2',
+    'flask-swagger==0.2.14',
+    'Flask-PyMongo==2.2.0',
+    'celery>=4.3',
+    'kombu>=4.5.0',
+    'pytz>=2015.4',
+    'pymongo>=3.7.2',
+    'cerberus==1.2',
+    'PyYAML==5.1'
+)
+
+dev_requirements = (
+    'flake8',
+    'flake8-docstrings',
+    'pep8',
+    'pyflakes',
+    'pydocstyle',
+    'pytest==4.4.1',
+    'pytest-cov==2.7.1',
+    'pytest-pythonpath==0.7.3',
+    'tox==3.13.2',
+    'tox-pyenv==1.1.0'
+)
 
 setup(
     name='videoserver',
@@ -24,20 +48,10 @@ setup(
     author='Oleg Pshenichniy, Petr Jašek, Loi Tran, Thanh Nguyen',
     author_email='oleg.pshenichniy@sourcefabric.org',
     license='GPLv3',
-    install_requires=(
-        'flask>=1.0.2',
-        'flask-swagger==0.2.14',
-        'Flask-PyMongo==2.2.0',
-        'celery>=4.3',
-        'kombu>=4.5.0',
-        'pytz>=2015.4',
-        'pymongo>=3.7.2',
-        'cerberus==1.2',
-        'PyYAML==5.1',
-        'pytest==4.4.1',
-        'pytest-cov==2.7.1',
-        'pytest-pythonpath==0.7.3'
-    ),
+    install_requires=requirements,
+    extras_require={
+        'dev': dev_requirements
+    },
     packages=find_packages('src'),
     package_dir={'': 'src'},
     include_package_data=True,
