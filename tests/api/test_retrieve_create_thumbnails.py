@@ -117,6 +117,68 @@ def test_capture_preview_thumbnail_bad_position(test_app, client, projects):
 
 
 @pytest.mark.parametrize('projects', [({'file': 'sample_0.mp4', 'duplicate': False},)], indirect=True)
+def test_capture_preview_thumbnail_crop_success(test_app, client, projects):
+    project = projects[0]
+    position = 4
+    crop = {'width': 640, 'height': 480, 'x': 0, 'y': 0}
+
+    with test_app.test_request_context():
+        url = url_for(
+            'projects.retrieve_or_create_thumbnails', project_id=project['_id']
+        ) + f'?type=preview&position={position}&crop={crop}'
+        resp = client.get(url)
+        assert resp.status == '202 ACCEPTED'
+
+        # get details
+        resp = client.get(url)
+        resp_data = json.loads(resp.data)
+        assert resp_data['width'] == 640
+        assert resp_data['height'] == 480
+
+
+@pytest.mark.parametrize('projects', [({'file': 'sample_0.mp4', 'duplicate': False},)], indirect=True)
+def test_capture_preview_thumbnail_crop_fail(test_app, client, projects):
+    project = projects[0]
+    position = 4
+
+    with test_app.test_request_context():
+        crop = {'width': 640,'height': 480, 'x': 1000, 'y': 0}
+        url = url_for(
+            'projects.retrieve_or_create_thumbnails', project_id=project['_id']
+        ) + f'?type=preview&position={position}&crop={crop}'
+        resp = client.get(url)
+        resp_data = json.loads(resp.data)
+        assert resp.status == '400 BAD REQUEST'
+        assert resp_data == {'crop': [{'x': ['less than minimum allowed crop width']}]}
+
+        crop = {'width': 640,'height': 480, 'x': 0, 'y': 1000}
+        url = url_for(
+            'projects.retrieve_or_create_thumbnails', project_id=project['_id']
+        ) + f'?type=preview&position={position}&crop={crop}'
+        resp = client.get(url)
+        resp_data = json.loads(resp.data)
+        assert resp.status == '400 BAD REQUEST'
+        assert resp_data == {'crop': [{'y': ['less than minimum allowed crop height']}]}
+
+        crop = {'width': 10000,'height': 480, 'x': 0, 'y': 0}
+        url = url_for(
+            'projects.retrieve_or_create_thumbnails', project_id=project['_id']
+        ) + f'?type=preview&position={position}&crop={crop}'
+        resp = client.get(url)
+        resp_data = json.loads(resp.data)
+        assert resp.status == '400 BAD REQUEST'
+        assert resp_data == {'crop': [{'width': ["crop's frame is outside a video's frame"]}]}
+
+        crop = {'width': 640,'height': 10000, 'x': 0, 'y': 0}
+        url = url_for(
+            'projects.retrieve_or_create_thumbnails', project_id=project['_id']
+        ) + f'?type=preview&position={position}&crop={crop}'
+        resp = client.get(url)
+        resp_data = json.loads(resp.data)
+        assert resp.status == '400 BAD REQUEST'
+        assert resp_data == {'crop': [{'height': ["crop's frame is outside a video's frame"]}]}
+
+@pytest.mark.parametrize('projects', [({'file': 'sample_0.mp4', 'duplicate': False},)], indirect=True)
 def test_capture_preview_thumbnail_409_resp(test_app, client, projects):
     project = projects[0]
     position = 700
