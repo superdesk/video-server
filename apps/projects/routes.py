@@ -1,26 +1,26 @@
-import os
-import re
 import copy
 import logging
-import bson
+import os
+import re
 from ast import literal_eval
 from datetime import datetime
 
-from flask import request, make_response
+import bson
 from flask import current_app as app
+from flask import request
 from pymongo import ReturnDocument
 from pymongo.errors import ServerSelectionTimeoutError
-from werkzeug.exceptions import BadRequest, InternalServerError, NotFound, Conflict
+from werkzeug.exceptions import BadRequest, Conflict, InternalServerError, NotFound
 
 from lib.utils import (
-    create_file_name, json_response, add_urls, validate_document,
-    get_request_address, save_activity_log, paginate, storage2response
+    add_urls, create_file_name, get_request_address, json_response, paginate, save_activity_log,
+    storage2response, validate_document
 )
 from lib.video_editor import get_video_editor
 from lib.views import MethodView
 
-from .tasks import edit_video, generate_timeline_thumbnails, generate_preview_thumbnail
 from . import bp
+from .tasks import edit_video, generate_preview_thumbnail, generate_timeline_thumbnails
 
 logger = logging.getLogger(__name__)
 
@@ -1230,9 +1230,6 @@ class RetrieveOrCreateThumbnails(MethodView):
         # resource is busy
         if self.project['processing']['thumbnail_preview']:
             raise Conflict({"processing": ["Task get preview thumbnails video is still processing"]})
-        elif (self.project['thumbnails']['preview'] and
-              self.project['thumbnails']['preview'].get('position') == position):
-            return json_response(self.project['thumbnails']['preview'])
         elif self.project['metadata']['duration'] < position:
             raise BadRequest({
                 'position': [f"Requested position: '{position}' is more than video's duration: "
