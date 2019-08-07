@@ -42,7 +42,7 @@ def test_duplicate_project_success(test_app, client, projects):
 
 
 @pytest.mark.parametrize('projects', [({'file': 'sample_0.mp4', 'duplicate': False},)], indirect=True)
-@mock.patch('apps.projects.routes.app.fs.put', side_effect=Exception('Some error'))
+@mock.patch('videoserver.apps.projects.routes.app.fs.put', side_effect=Exception('Some error'))
 def test_duplicate_project_broken_fs_put(mock_fs_put, test_app, client, projects):
     project = projects[0]
 

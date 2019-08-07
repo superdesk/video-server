@@ -1,7 +1,7 @@
 import os
 
 import pytest
-from lib.storage.file_system_storage import FileSystemStorage
+from videoserver.lib.storage.file_system_storage import FileSystemStorage
 
 
 @pytest.mark.parametrize('filestreams', [('sample_0.mp4', 'sample_0.jpg', 'sample_1.jpg')], indirect=True)

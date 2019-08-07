@@ -12,12 +12,12 @@ from pymongo import ReturnDocument
 from pymongo.errors import ServerSelectionTimeoutError
 from werkzeug.exceptions import BadRequest, Conflict, InternalServerError, NotFound
 
-from lib.utils import (
-    add_urls, create_file_name, get_request_address, json_response, paginate, save_activity_log,
-    storage2response, validate_document
+from videoserver.lib.video_editor import get_video_editor
+from videoserver.lib.views import MethodView
+from videoserver.lib.utils import (
+    add_urls, create_file_name, get_request_address, json_response,
+    paginate, save_activity_log, storage2response, validate_document
 )
-from lib.video_editor import get_video_editor
-from lib.views import MethodView
 
 from . import bp
 from .tasks import edit_video, generate_preview_thumbnail, generate_timeline_thumbnails
