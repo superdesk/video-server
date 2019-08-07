@@ -893,79 +893,81 @@ class DuplicateProject(MethodView):
 
 
 class RetrieveOrCreateThumbnails(MethodView):
-    SCHEMA_THUMBNAILS = {
-        'type': {
-            'type': 'string',
-            'required': True,
-            'anyof': [
-                {
-                    'allowed': ['timeline'],
-                    'dependencies': ['amount'],
-                    'excludes': ['position', 'crop', 'rotate'],
-                },
-                {
-                    # make `amount` optional
-                    'allowed': ['timeline'],
-                    'excludes': ['position', 'crop', 'rotate'],
-                },
-                {
-                    'allowed': ['preview'],
-                    'dependencies': ['position'],
-                    'excludes': 'amount',
-                }
-            ],
-        },
-        'amount': {
-            'type': 'integer',
-            'coerce': int,
-            'min': 1,
-        },
-        'position': {
-            'type': 'float',
-            'coerce': float,
-        },
-        'crop': {
-            'type': 'dict',
-            'coerce': literal_eval,  # crop args are a string represent of a dict
-            'required': False,
-            'empty': True,
-            'schema': {
-                'width': {
-                    'type': 'integer',
-                    'required': True,
-                    'min': 2,
-                },
-                'height': {
-                    'type': 'integer',
-                    'required': True,
-                    'min': 2,
-                },
-                'x': {
-                    'type': 'integer',
-                    'required': True,
-                    'min': 0
-                },
-                'y': {
-                    'type': 'integer',
-                    'required': True,
-                    'min': 0
-                }
-            }
-        },
-        'rotate': {
-            'type': 'integer',
-            'required': False,
-            'coerce': int,
-            'allowed': [-270, -180, -90, 90, 180, 270]
-        }
-    }
-
     SCHEMA_UPLOAD = {
         'file': {
             'type': 'filestorage',
             'required': True
         }
     }
+
+    @property
+    def schema_thumbnails(self):
+        return {
+            'type': {
+                'type': 'string',
+                'required': True,
+                'anyof': [
+                    {
+                        'allowed': ['timeline'],
+                        'dependencies': ['amount'],
+                        'excludes': ['position', 'crop', 'rotate'],
+                    },
+                    {
+                        # make `amount` optional
+                        'allowed': ['timeline'],
+                        'excludes': ['position', 'crop', 'rotate'],
+                    },
+                    {
+                        'allowed': ['preview'],
+                        'dependencies': ['position'],
+                        'excludes': 'amount',
+                    }
+                ],
+            },
+            'amount': {
+                'type': 'integer',
+                'coerce': int,
+                'min': 1,
+            },
+            'position': {
+                'type': 'float',
+                'coerce': float,
+            },
+            'crop': {
+                'type': 'dict',
+                'coerce': literal_eval,  # crop args are a string represent of a dict
+                'required': False,
+                'empty': True,
+                'schema': {
+                    'width': {
+                        'type': 'integer',
+                        'required': True,
+                        'min': app.config.get('MIN_VIDEO_WIDTH'),
+                    },
+                    'height': {
+                        'type': 'integer',
+                        'required': True,
+                        'min': app.config.get('MIN_VIDEO_HEIGHT'),
+                    },
+                    'x': {
+                        'type': 'integer',
+                        'required': True,
+                        'min': 0
+                    },
+                    'y': {
+                        'type': 'integer',
+                        'required': True,
+                        'min': 0
+                    }
+                }
+            },
+            'rotate': {
+                'type': 'integer',
+                'required': False,
+                'coerce': int,
+                'allowed': [-270, -180, -90, 90, 180, 270]
+            }
+        }
 
     def get(self, project_id):
         """
@@ -1050,7 +1052,7 @@ class RetrieveOrCreateThumbnails(MethodView):
                   example:
                     - Task get preview thumbnails is still processing
         """
-        document = validate_document(request.args.to_dict(), self.SCHEMA_THUMBNAILS)
+        document = validate_document(request.args.to_dict(), self.schema_thumbnails)
         add_urls(self.project)
 
         if document['type'] == 'timeline':
