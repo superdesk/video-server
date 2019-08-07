@@ -1183,7 +1183,9 @@ class RetrieveOrCreateThumbnails(MethodView):
         :rtype: flask.wrappers.Response
         """
         # resource is busy
-        if self.project['processing']['thumbnails_timeline']:
+        # request get timeline thumbnails while editing video may lead to conflict with timeline task
+        # triggered by edit video right after it finished
+        if self.project['processing']['video'] or self.project['processing']['thumbnails_timeline']:
             raise Conflict({"processing": ["Task get timeline thumbnails video is still processing"]})
         # no need to generate thumbnails
         elif amount == len(self.project['thumbnails']['timeline']):
