@@ -164,19 +164,19 @@ class FFMPEGVideoEditor(VideoEditorInterface):
                 transpose = f'transpose=1' if rotate > 0 else f'transpose=2'
                 vfilter += ','.join([transpose] * (rotate // 90))
 
-            # run ffmpeg command
-            self._run_ffmpeg(
-                path_input=path_video,
-                path_output=output_file,
-                preoptions=('-y', '-accurate_seek'),
-                options=(
-                    '-ss', str(position),
-                    '-vframes', '1',
-                    *shlex.split(vfilter),
-                ),
-                override=False,
-            )
             try:
+                # run ffmpeg command
+                self._run_ffmpeg(
+                    path_input=path_video,
+                    path_output=output_file,
+                    preoptions=('-y', '-accurate_seek'),
+                    options=(
+                        '-ss', str(position),
+                        '-vframes', '1',
+                        *shlex.split(vfilter),
+                    ),
+                    override=False,
+                )
                 # get metadata
                 thumbnail_metadata = self._get_meta(output_file)
                 thumbnail_metadata['mimetype'] = 'image/png'
@@ -185,8 +185,9 @@ class FFMPEGVideoEditor(VideoEditorInterface):
                     content = f.read()
                 return content, thumbnail_metadata
             finally:
-                # delete temp thumbnail file
-                os.remove(output_file)
+                if os.path.exists(output_file):
+                    # delete temp thumbnail file
+                    os.remove(output_file)
         finally:
             os.remove(path_video)
 
@@ -251,15 +252,18 @@ class FFMPEGVideoEditor(VideoEditorInterface):
         :return: file path to edited file
         :rtype: str
         """
-        # run ffmpeg with provided options
-        subprocess.run(["ffmpeg", "-loglevel", "error", *preoptions, "-i", path_input, *options, path_output])
-        if not override:
-            return path_output
-        # replace tmp origin
-        subprocess.run(["cp", "-r", path_output, path_input])
-        # delete old tmp input file
-        os.remove(path_output)
-        return path_input
+        try:
+            # run ffmpeg with provided options
+            subprocess.run(["ffmpeg", "-loglevel", "error", *preoptions, "-i", path_input, *options, path_output])
+            if not override:
+                return path_output
+            # replace tmp origin
+            subprocess.run(["cp", "-r", path_output, path_input])
+            return path_input
+        finally:
+            if override:
+                # delete old tmp input file
+                os.remove(path_output)
 
     def _get_meta(self, file_path):
         """
