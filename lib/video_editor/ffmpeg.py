@@ -68,20 +68,13 @@ class FFMPEGVideoEditor(VideoEditorInterface):
         path_input = create_temp_file(stream_file, suffix=f".{filename.rsplit('.', 1)[-1]}")
         path_output = '{}_edit.{}'.format(*path_input.rsplit('.', 1))
         filter_string = ''
-
         try:
-            # trim
-            if trim:
-                self._run_ffmpeg(
-                    path_input=path_input,
-                    path_output=path_output,
-                    options=(
-                        '-ss', str(trim['start']),
-                        '-t', str(trim['end'] - trim['start']),
-                        '-qscale', '0',
-                        '-threads', str(app.config.get('FFMPEG_THREADS'))
-                    )
-                )
+            # get option for trim
+            trim_option = (
+                '-ss', str(trim['start']),
+                '-t', str(trim['end'] - trim['start']),
+                '-qscale', '0',
+            ) if trim else tuple()
             # crop
             # https://ffmpeg.org/ffmpeg-filters.html#crop
             if crop:
@@ -114,13 +107,17 @@ class FFMPEGVideoEditor(VideoEditorInterface):
                     rotate_string = 'transpose=2,transpose=2,transpose=2'
                 filter_string += ',' if filter_string != '' else ''
                 filter_string += rotate_string
-            # run ffmpeg -filter:v to apply all filters
-            if filter_string:
+            # get option for filter
+            filter_option = ('-filter:v', filter_string) if filter_string else tuple()
+            # run ffmpeg
+            if filter_option or trim_option:
+                # combine trim and filter to run one time
                 self._run_ffmpeg(
                     path_input=path_input,
                     path_output=path_output,
                     options=(
-                        '-filter:v', filter_string,
+                        *trim_option,
+                        *filter_option,
                         '-threads', str(app.config.get('FFMPEG_THREADS')),
                         '-preset', app.config.get('FFMPEG_PRESET')
                     )
