@@ -1,8 +1,8 @@
 [run]
 omit = .env/*,
        tests/*,
-       app.py,
-       celery_app.py,
-       settings.py,
-       apps/swagger/*,
-       lib/logging.py
+       src/videoserver/app.py,
+       src/videoserver/celery_app.py,
+       src/videoserver/settings.py,
+       src/videoserver/apps/swagger/*,
+       src/videoserver/lib/logging.py

@@ -1,6 +1,6 @@
 import pytest
 
-from lib.video_editor.ffmpeg import FFMPEGVideoEditor
+from videoserver.lib.video_editor.ffmpeg import FFMPEGVideoEditor
 
 
 @pytest.mark.parametrize('filestreams', [('sample_0.mp4',)], indirect=True)

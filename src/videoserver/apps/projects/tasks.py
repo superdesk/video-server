@@ -6,8 +6,8 @@ from celery.exceptions import MaxRetriesExceededError
 from flask import current_app as app
 from pymongo import ReturnDocument
 
-from celery_app import celery
-from lib.video_editor import get_video_editor
+from videoserver.celery_app import celery
+from videoserver.lib.video_editor import get_video_editor
 
 logger = logging.getLogger(__name__)
 

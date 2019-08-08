@@ -3,7 +3,7 @@ from werkzeug.exceptions import InternalServerError
 from kombu.serialization import register
 from bson import json_util
 
-from lib.logging import logger
+from .lib.logging import logger
 
 celery = Celery(__name__)
 TaskBase = celery.Task

@@ -1,7 +1,0 @@
-flake8
-flake8-docstrings
-pep8
-pyflakes
-pydocstyle
-
--r requirements.txt

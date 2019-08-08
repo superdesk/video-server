@@ -6,8 +6,7 @@ import subprocess
 
 from flask import current_app as app
 
-from lib.utils import create_temp_file
-
+from videoserver.lib.utils import create_temp_file
 from .interface import VideoEditorInterface
 
 logger = logging.getLogger(__name__)
