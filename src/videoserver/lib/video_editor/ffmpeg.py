@@ -1,11 +1,12 @@
 import json
-import os
-import subprocess
 import logging
+import os
+import shlex
+import subprocess
 
 from flask import current_app as app
-from lib.utils import create_temp_file
 
+from videoserver.lib.utils import create_temp_file
 from .interface import VideoEditorInterface
 
 logger = logging.getLogger(__name__)
@@ -66,20 +67,13 @@ class FFMPEGVideoEditor(VideoEditorInterface):
         path_input = create_temp_file(stream_file, suffix=f".{filename.rsplit('.', 1)[-1]}")
         path_output = '{}_edit.{}'.format(*path_input.rsplit('.', 1))
         filter_string = ''
-
         try:
-            # trim
-            if trim:
-                self._run_ffmpeg(
-                    path_input=path_input,
-                    path_output=path_output,
-                    options=(
-                        '-ss', str(trim['start']),
-                        '-t', str(trim['end'] - trim['start']),
-                        '-qscale', '0',
-                        '-threads', str(app.config.get('FFMPEG_THREADS'))
-                    )
-                )
+            # get option for trim
+            trim_option = (
+                '-ss', str(trim['start']),
+                '-t', str(trim['end'] - trim['start']),
+                '-qscale', '0',
+            ) if trim else tuple()
             # crop
             # https://ffmpeg.org/ffmpeg-filters.html#crop
             if crop:
@@ -112,13 +106,17 @@ class FFMPEGVideoEditor(VideoEditorInterface):
                     rotate_string = 'transpose=2,transpose=2,transpose=2'
                 filter_string += ',' if filter_string != '' else ''
                 filter_string += rotate_string
-            # run ffmpeg -filter:v to apply all filters
-            if filter_string:
+            # get option for filter
+            filter_option = ('-filter:v', filter_string) if filter_string else tuple()
+            # run ffmpeg
+            if filter_option or trim_option:
+                # combine trim and filter to run one time
                 self._run_ffmpeg(
                     path_input=path_input,
                     path_output=path_output,
                     options=(
-                        '-filter:v', filter_string,
+                        *trim_option,
+                        *filter_option,
                         '-threads', str(app.config.get('FFMPEG_THREADS')),
                         '-preset', app.config.get('FFMPEG_PRESET')
                     )
@@ -130,7 +128,7 @@ class FFMPEGVideoEditor(VideoEditorInterface):
                 os.remove(path_input)
         return content, metadata_edit_file
 
-    def capture_thumbnail(self, stream_file, filename, duration, position):
+    def capture_thumbnail(self, stream_file, filename, duration, position, crop=None, rotate=0):
         """
         Use ffmpeg tool to capture video frame at a position.
         :param stream_file: video file
@@ -141,6 +139,10 @@ class FFMPEGVideoEditor(VideoEditorInterface):
         :type duration: int
         :param position: video position to capture a frame
         :type position: int
+        :param crop: crop editing rules
+        :type crop: dict
+        :param rotate: rotate degree
+        :type rotate: int
         :return: file stream, metadata
         :rtype: bytes, dict
         """
@@ -152,10 +154,28 @@ class FFMPEGVideoEditor(VideoEditorInterface):
                 position = duration - 0.1
             # create output file path
             output_file = f"{path_video}_preview_thumbnail.png"
-            # run ffmpeg command
-            subprocess.run(["ffmpeg", "-v", "error", "-y", "-accurate_seek", "-i", path_video,
-                            "-ss", str(position), "-vframes", "1", output_file])
+
+            vfilter = ''
+            if crop:
+                vfilter = f'-vf crop={crop["width"]}:{crop["height"]}:{crop["x"]}:{crop["y"]}'
+            if rotate:
+                vfilter += ',' if vfilter else '-vf '
+                transpose = f'transpose=1' if rotate > 0 else f'transpose=2'
+                vfilter += ','.join([transpose] * (rotate // 90))
+
             try:
+                # run ffmpeg command
+                self._run_ffmpeg(
+                    path_input=path_video,
+                    path_output=output_file,
+                    preoptions=('-y', '-accurate_seek'),
+                    options=(
+                        '-ss', str(position),
+                        '-vframes', '1',
+                        *shlex.split(vfilter),
+                    ),
+                    override=False,
+                )
                 # get metadata
                 thumbnail_metadata = self._get_meta(output_file)
                 thumbnail_metadata['mimetype'] = 'image/png'
@@ -164,8 +184,9 @@ class FFMPEGVideoEditor(VideoEditorInterface):
                     content = f.read()
                 return content, thumbnail_metadata
             finally:
-                # delete temp thumbnail file
-                os.remove(output_file)
+                if os.path.exists(output_file):
+                    # delete temp thumbnail file
+                    os.remove(output_file)
         finally:
             os.remove(path_video)
 
@@ -199,7 +220,7 @@ class FFMPEGVideoEditor(VideoEditorInterface):
             # subprocess bash -> ffmpeg in the loop
             subprocess.run([path_script, path_video, output_file, str(frame_per_second), str(thumbnails_amount)])
             for i in range(0, thumbnails_amount):
-                thumbnail_path =  f'{output_file}{i}.png'
+                thumbnail_path = f'{output_file}{i}.png'
                 try:
                     # get metadata
                     thumbnail_metadata = self._get_meta(thumbnail_path)
@@ -214,27 +235,34 @@ class FFMPEGVideoEditor(VideoEditorInterface):
         finally:
             os.remove(path_video)
 
-    def _run_ffmpeg(self, path_input, path_output, options=tuple()):
+    def _run_ffmpeg(self, path_input, path_output, preoptions=tuple(), options=tuple(), override=True):
         """
         Subprocess `ffmpeg` command.
         :param path_input: input file path
         :type path_input: str
         :param path_output: outut file path
         :type path_output: str
+        :param preoptions: options apply for input file
+        :type preoptions: tuple
         :param options: options for ffmpeg cmd
         :type options: tuple
+        :param override: replace input file with output file
+        :type override: bool
         :return: file path to edited file
         :rtype: str
         """
         try:
             # run ffmpeg with provided options
-            subprocess.run(["ffmpeg", "-loglevel", "error", "-i", path_input, *options, path_output])
+            subprocess.run(["ffmpeg", "-loglevel", "error", *preoptions, "-i", path_input, *options, path_output])
+            if not override:
+                return path_output
             # replace tmp origin
             subprocess.run(["cp", "-r", path_output, path_input])
             return path_input
         finally:
-            # delete old tmp input file
-            os.remove(path_output)
+            if override:
+                # delete old tmp input file
+                os.remove(path_output)
 
     def _get_meta(self, file_path):
         """

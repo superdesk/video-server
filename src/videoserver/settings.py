@@ -40,7 +40,7 @@ def celery_queue(name):
 BASE_PATH = os.path.dirname(__file__)
 
 #: logging
-LOG_CONFIG_FILE = env('LOG_CONFIG_FILE', 'logging_config.yml')
+LOG_CONFIG_FILE = env('LOG_CONFIG_FILE', os.path.join(BASE_PATH, 'logging_config.yml'))
 
 CORE_APPS = [
     'apps.swagger',

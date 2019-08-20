@@ -1,13 +1,13 @@
 import logging
+from time import time
 
-from bson import json_util, ObjectId
+from bson import ObjectId
+from celery.exceptions import MaxRetriesExceededError
 from flask import current_app as app
 from pymongo import ReturnDocument
 
-from celery.exceptions import MaxRetriesExceededError
-from lib.video_editor import get_video_editor
-
-from celery_app import celery
+from videoserver.celery_app import celery
+from videoserver.lib.video_editor import get_video_editor
 
 logger = logging.getLogger(__name__)
 
@@ -146,7 +146,7 @@ def generate_timeline_thumbnails(self, project, amount):
 
 
 @celery.task(bind=True, default_retry_delay=10)
-def generate_preview_thumbnail(self, project, position):
+def generate_preview_thumbnail(self, project, position, crop, rotate):
     video_editor = get_video_editor()
     preview_thumbnail = None
 
@@ -155,10 +155,15 @@ def generate_preview_thumbnail(self, project, position):
             stream_file=app.fs.get(project['storage_id']),
             filename=project['filename'],
             duration=project['metadata']['duration'],
-            position=position
+            position=position,
+            crop=crop,
+            rotate=rotate,
         )
+        # Generate _id to ensure filename is unique, avoid fs.put raises error,
+        # use of fs.replace will lead to lost original thumbnail if an error is occured
+        _id = round(time() * 1000)
         ext = app.config.get('CODEC_EXTENSION_MAP')[meta.get('codec_name')]
-        filename = f"{project['filename'].rsplit('.', 1)[0]}_preview-{position}.{ext}"
+        filename = f"{project['filename'].rsplit('.', 1)[0]}_preview-{position}_{_id}.{ext}"
         # save to storage
         storage_id = app.fs.put(
             content=stream,

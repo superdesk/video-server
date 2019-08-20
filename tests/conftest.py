@@ -6,7 +6,7 @@ from io import BytesIO
 import pytest
 from flask import url_for
 
-from app import get_app
+from videoserver.app import get_app
 
 
 @pytest.fixture(scope='function')

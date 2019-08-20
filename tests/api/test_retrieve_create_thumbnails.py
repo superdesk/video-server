@@ -97,10 +97,12 @@ def test_capture_preview_thumbnail_success(test_app, client, projects):
         assert resp.status == '202 ACCEPTED'
         assert resp_data == {'processing': True}
 
-        resp = client.get(url)
+        resp = client.get(
+            url_for('projects.retrieve_edit_destroy_project', project_id=project['_id'])
+        )
         resp_data = json.loads(resp.data)
         assert resp.status == '200 OK'
-        assert test_app.fs.get(resp_data['storage_id']).__class__ is bytes
+        assert test_app.fs.get(resp_data['thumbnails']['preview']['storage_id']).__class__ is bytes
 
 
 @pytest.mark.parametrize('projects', [({'file': 'sample_0.mp4', 'duplicate': False},)], indirect=True)
@@ -114,6 +116,71 @@ def test_capture_preview_thumbnail_bad_position(test_app, client, projects):
         ) + f'?type=preview&position={position}'
         resp = client.get(url)
         assert resp.status == '400 BAD REQUEST'
+
+
+@pytest.mark.parametrize('projects', [({'file': 'sample_0.mp4', 'duplicate': False},)], indirect=True)
+def test_capture_preview_thumbnail_crop_success(test_app, client, projects):
+    project = projects[0]
+    position = 4
+    crop = {'width': 640, 'height': 480, 'x': 0, 'y': 0}
+
+    with test_app.test_request_context():
+        url = url_for(
+            'projects.retrieve_or_create_thumbnails', project_id=project['_id']
+        ) + f'?type=preview&position={position}&crop={crop}'
+        resp = client.get(url)
+        assert resp.status == '202 ACCEPTED'
+
+        # get details
+        resp = client.get(
+            url_for('projects.retrieve_edit_destroy_project', project_id=project['_id'])
+        )
+        resp_data = json.loads(resp.data)
+        assert resp_data['thumbnails']['preview']['width'] == 640
+        assert resp_data['thumbnails']['preview']['height'] == 480
+
+
+@pytest.mark.parametrize('projects', [({'file': 'sample_0.mp4', 'duplicate': False},)], indirect=True)
+def test_capture_preview_thumbnail_crop_fail(test_app, client, projects):
+    project = projects[0]
+    position = 4
+
+    with test_app.test_request_context():
+        crop = {'width': 640, 'height': 480, 'x': 1000, 'y': 0}
+        url = url_for(
+            'projects.retrieve_or_create_thumbnails', project_id=project['_id']
+        ) + f'?type=preview&position={position}&crop={crop}'
+        resp = client.get(url)
+        resp_data = json.loads(resp.data)
+        assert resp.status == '400 BAD REQUEST'
+        assert resp_data == {'crop': [{'x': ['less than minimum allowed crop width']}]}
+
+        crop = {'width': 640, 'height': 480, 'x': 0, 'y': 1000}
+        url = url_for(
+            'projects.retrieve_or_create_thumbnails', project_id=project['_id']
+        ) + f'?type=preview&position={position}&crop={crop}'
+        resp = client.get(url)
+        resp_data = json.loads(resp.data)
+        assert resp.status == '400 BAD REQUEST'
+        assert resp_data == {'crop': [{'y': ['less than minimum allowed crop height']}]}
+
+        crop = {'width': 10000, 'height': 480, 'x': 0, 'y': 0}
+        url = url_for(
+            'projects.retrieve_or_create_thumbnails', project_id=project['_id']
+        ) + f'?type=preview&position={position}&crop={crop}'
+        resp = client.get(url)
+        resp_data = json.loads(resp.data)
+        assert resp.status == '400 BAD REQUEST'
+        assert resp_data == {'crop': [{'width': ["crop's frame is outside a video's frame"]}]}
+
+        crop = {'width': 640, 'height': 10000, 'x': 0, 'y': 0}
+        url = url_for(
+            'projects.retrieve_or_create_thumbnails', project_id=project['_id']
+        ) + f'?type=preview&position={position}&crop={crop}'
+        resp = client.get(url)
+        resp_data = json.loads(resp.data)
+        assert resp.status == '400 BAD REQUEST'
+        assert resp_data == {'crop': [{'height': ["crop's frame is outside a video's frame"]}]}
 
 
 @pytest.mark.parametrize('projects', [({'file': 'sample_0.mp4', 'duplicate': False},)], indirect=True)
@@ -232,9 +299,11 @@ def test_upload_custom_preview_remove_old_thumbnail(test_app, client, projects, 
         resp = client.get(url)
         assert resp.status == '202 ACCEPTED'
         # get storage_id of captured preview thumbnail
-        resp = client.get(url)
+        resp = client.get(
+            url_for('projects.retrieve_edit_destroy_project', project_id=project['_id'])
+        )
         resp_data = json.loads(resp.data)
-        captured_thumb_strage_id = resp_data['storage_id']
+        captured_thumb_strage_id = resp_data['thumbnails']['preview']['storage_id']
         # upload custom preview thumbnail
         url = url_for('projects.retrieve_or_create_thumbnails', project_id=project['_id'])
         resp = client.post(

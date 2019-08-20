@@ -1,6 +1,6 @@
 import pytest
 
-from lib.video_editor.ffmpeg import FFMPEGVideoEditor
+from videoserver.lib.video_editor.ffmpeg import FFMPEGVideoEditor
 
 
 @pytest.mark.parametrize('filestreams', [('sample_0.mp4',)], indirect=True)
@@ -123,10 +123,17 @@ def test_ffmpeg_video_editor_capture_thumbnail(test_app, filestreams):
 
     with test_app.app_context():
         filename = 'test_ffmpeg_video_editor_sample.mp4'
-        thumbnail, meta = editor.capture_thumbnail(mp4_stream, filename, 15, 5)
+        thumbnail, meta = editor.capture_thumbnail(
+            stream_file=mp4_stream,
+            filename=filename,
+            duration=15,
+            position=5,
+            crop={'width': 720, 'height': 360, 'x': 0, 'y': 0},
+            rotate=90
+        )
 
         assert thumbnail.__class__ is bytes
         assert meta['codec_name'] == 'png'
         assert meta['mimetype'] == 'image/png'
-        assert meta['width'] == 1280
+        assert meta['width'] == 360
         assert meta['height'] == 720

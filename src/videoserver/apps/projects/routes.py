@@ -1,25 +1,26 @@
-import os
-import re
 import copy
 import logging
-import bson
+import os
+import re
+from ast import literal_eval
 from datetime import datetime
 
-from flask import request, make_response
+import bson
 from flask import current_app as app
+from flask import request
 from pymongo import ReturnDocument
 from pymongo.errors import ServerSelectionTimeoutError
-from werkzeug.exceptions import BadRequest, InternalServerError, NotFound
+from werkzeug.exceptions import BadRequest, Conflict, InternalServerError, NotFound
 
-from lib.utils import (
-    create_file_name, json_response, add_urls, validate_document,
-    get_request_address, save_activity_log, paginate, storage2response
+from videoserver.lib.video_editor import get_video_editor
+from videoserver.lib.views import MethodView
+from videoserver.lib.utils import (
+    add_urls, create_file_name, get_request_address, json_response,
+    paginate, save_activity_log, storage2response, validate_document
 )
-from lib.video_editor import get_video_editor
-from lib.views import MethodView
 
-from .tasks import edit_video, generate_timeline_thumbnails, generate_preview_thumbnail
 from . import bp
+from .tasks import edit_video, generate_preview_thumbnail, generate_timeline_thumbnails
 
 logger = logging.getLogger(__name__)
 
@@ -564,12 +565,13 @@ class RetrieveEditDestroyProject(MethodView):
               type: object
               properties:
                 processing:
-                  type: boolean
-                  example: True
+                  type: array
+                  example:
+                    - Task edit video is still processing
         """
 
         if self.project['processing']['video']:
-            return json_response({'processing': True}, status=409)
+            raise Conflict({"processing": ["Task edit video is still processing"]})
 
         if self.project['version'] == 1:
             raise BadRequest({"project_id": [f"Video with version 1 is not editable, use duplicated project instead."]})
@@ -779,10 +781,19 @@ class DuplicateProject(MethodView):
                       preview:
                         type: object
                         example: {}
+          409:
+            description: A running task has not completed
+            schema:
+              type: object
+              properties:
+                processing:
+                  type: array
+                  example:
+                    - Some tasks is still processing
         """
 
         if any(self.project['processing'].values()):
-            return json_response({"processing": True}, status=409)
+            raise Conflict({"processing": ["Some tasks is still processing"]})
 
         # deepcopy & save a child_project
         child_project = copy.deepcopy(self.project)
@@ -882,45 +893,81 @@ class DuplicateProject(MethodView):
 
 
 class RetrieveOrCreateThumbnails(MethodView):
-    SCHEMA_THUMBNAILS = {
-        'type': {
-            'type': 'string',
-            'required': True,
-            'anyof': [
-                {
-                    'allowed': ['timeline'],
-                    'dependencies': ['amount'],
-                    'excludes': 'position',
-                },
-                {
-                    # make `amount` optional
-                    'allowed': ['timeline'],
-                    'excludes': 'position',
-                },
-                {
-                    'allowed': ['preview'],
-                    'dependencies': ['position'],
-                    'excludes': 'amount',
-                }
-            ],
-        },
-        'amount': {
-            'type': 'integer',
-            'coerce': int,
-            'min': 1,
-        },
-        'position': {
-            'type': 'float',
-            'coerce': float,
-        },
-    }
-
     SCHEMA_UPLOAD = {
         'file': {
             'type': 'filestorage',
             'required': True
         }
     }
+
+    @property
+    def schema_thumbnails(self):
+        return {
+            'type': {
+                'type': 'string',
+                'required': True,
+                'anyof': [
+                    {
+                        'allowed': ['timeline'],
+                        'dependencies': ['amount'],
+                        'excludes': ['position', 'crop', 'rotate'],
+                    },
+                    {
+                        # make `amount` optional
+                        'allowed': ['timeline'],
+                        'excludes': ['position', 'crop', 'rotate'],
+                    },
+                    {
+                        'allowed': ['preview'],
+                        'dependencies': ['position'],
+                        'excludes': 'amount',
+                    }
+                ],
+            },
+            'amount': {
+                'type': 'integer',
+                'coerce': int,
+                'min': 1,
+            },
+            'position': {
+                'type': 'float',
+                'coerce': float,
+            },
+            'crop': {
+                'type': 'dict',
+                'coerce': literal_eval,  # crop args are a string represent of a dict
+                'required': False,
+                'empty': True,
+                'schema': {
+                    'width': {
+                        'type': 'integer',
+                        'required': True,
+                        'min': app.config.get('MIN_VIDEO_WIDTH'),
+                    },
+                    'height': {
+                        'type': 'integer',
+                        'required': True,
+                        'min': app.config.get('MIN_VIDEO_HEIGHT'),
+                    },
+                    'x': {
+                        'type': 'integer',
+                        'required': True,
+                        'min': 0
+                    },
+                    'y': {
+                        'type': 'integer',
+                        'required': True,
+                        'min': 0
+                    }
+                }
+            },
+            'rotate': {
+                'type': 'integer',
+                'required': False,
+                'coerce': int,
+                'allowed': [-270, -180, -90, 90, 180, 270]
+            }
+        }
 
     def get(self, project_id):
         """
@@ -947,11 +994,65 @@ class RetrieveOrCreateThumbnails(MethodView):
           type: float
           description: Position in the video where preview thumbnail should be captured.
                        Used only when `type` is `preview`.
+        - name: crop
+          in: query
+          type: json
+          description: Crop rules apply to preview thumbnail. Used only when `type` is `preview`.
+          default: "{'width': 720, 'height': 360, 'x': 0, 'y':0}"
+        - name: rotate
+          in: query
+          type: integer
+          description: Number of degrees rotate preview thumbnail. Used only when `type` is `preview`.
+          enum: [-270, -180, -90, 90, 180, 270]
         responses:
+          200:
+            description: Timeline/preview thumbnails information
+            schema:
+              type: object
+              properties:
+                filename:
+                  type: string
+                  example: c2deb6fb933d4df186ad2539914ff374_preview-4.0.png
+                storage_id:
+                  type: string
+                  example: 2019/7/17/5cbd5acfe24f6045607e51aa/thumbnails/c2deb6fb933d4df186ad2539914ff374_preview-4.0.png  # noqa
+                mimetype:
+                  type: string
+                  example: image/png
+                width:
+                  type: integer
+                  example: 360
+                height:
+                  type: integer
+                  example: 720
+                size:
+                  type: integer
+                  example: 654321
+                position:
+                  type: integer
+                  example: 10
+                url:
+                  type: string
+                  example: http://localhost:5050/projects/5cbd5acfe24f6045607e51aa/raw/thumbnails/preview
           202:
-            description: Timeline/preview thumbnails information or status that thumbnails generation task was started.
+            description: Timeline/preview thumbnails status that thumbnails generation task was started.
+            schema:
+              type: object
+              properties:
+                processing:
+                  type: boolean
+                  example: True
+          409:
+            description: Timeline/preview task is still processing
+            schema:
+              type: object
+              properties:
+                processing:
+                  type: array
+                  example:
+                    - Task get preview thumbnails is still processing
         """
-        document = validate_document(request.args.to_dict(), self.SCHEMA_THUMBNAILS)
+        document = validate_document(request.args.to_dict(), self.schema_thumbnails)
         add_urls(self.project)
 
         if document['type'] == 'timeline':
@@ -959,7 +1060,7 @@ class RetrieveOrCreateThumbnails(MethodView):
                 amount=document.get('amount', app.config.get('DEFAULT_TOTAL_TIMELINE_THUMBNAILS'))
             )
 
-        return self._get_preview_thumbnail(document['position'])
+        return self._get_preview_thumbnail(document['position'], document.get('crop'), document.get('rotate', 0))
 
     def post(self, project_id):
         """
@@ -1007,6 +1108,15 @@ class RetrieveOrCreateThumbnails(MethodView):
                 positoin:
                   type: string
                   example: custom
+          409:
+            description: There is a running preview thumbnails task
+            schema:
+              type: object
+              properties:
+                processing:
+                  type: array
+                  example:
+                    - Task get preview thumbnails is still processing
         """
 
         # validate request
@@ -1023,7 +1133,7 @@ class RetrieveOrCreateThumbnails(MethodView):
 
         # check if busy
         if self.project['processing']['thumbnail_preview']:
-            return json_response({'processing': True}, status=409)
+            raise Conflict({"processing": ["Task get preview thumbnails is still processing"]})
 
         # save to fs
         thumbnail_filename = "{filename}_preview-custom.{original_ext}".format(
@@ -1031,6 +1141,10 @@ class RetrieveOrCreateThumbnails(MethodView):
             original_ext=request.files['file'].filename.rsplit('.', 1)[-1].lower()
         )
         mimetype = app.config.get('CODEC_MIMETYPE_MAP')[metadata.get('codec_name')]
+        if self.project['thumbnails']['preview']:
+            # delete old file
+            app.fs.delete(self.project['thumbnails']['preview']['storage_id'])
+
         storage_id = app.fs.put(
             content=file_stream,
             filename=thumbnail_filename,
@@ -1039,11 +1153,6 @@ class RetrieveOrCreateThumbnails(MethodView):
             storage_id=self.project['storage_id'],
             content_type=mimetype
         )
-
-        # delete old file
-        if self.project['thumbnails']['preview'] \
-                and storage_id != self.project['thumbnails']['preview']['storage_id']:
-            app.fs.delete(self.project['thumbnails']['preview']['storage_id'])
 
         # save new thumbnail info
         self.project = app.mongo.db.projects.find_one_and_update(
@@ -1074,8 +1183,10 @@ class RetrieveOrCreateThumbnails(MethodView):
         :rtype: flask.wrappers.Response
         """
         # resource is busy
-        if self.project['processing']['thumbnails_timeline']:
-            return json_response({"processing": True}, status=409)
+        # request get timeline thumbnails while editing video may lead to conflict with timeline task
+        # triggered by edit video right after it finished
+        if self.project['processing']['video'] or self.project['processing']['thumbnails_timeline']:
+            raise Conflict({"processing": ["Task get timeline thumbnails video is still processing"]})
         # no need to generate thumbnails
         elif amount == len(self.project['thumbnails']['timeline']):
             return json_response(self.project['thumbnails']['timeline'])
@@ -1093,20 +1204,32 @@ class RetrieveOrCreateThumbnails(MethodView):
             )
             return json_response({"processing": True}, status=202)
 
-    def _get_preview_thumbnail(self, position):
+    def _get_preview_thumbnail(self, position, crop, rotate):
         """
         Get or create thumbnail for preview
         :param position: video position to capture a frame
         :type position: int
+        :param crop: crop editing rules
+        :type crop: dict
+        :param rotate: rotate degree
+        :type rotate: int
         :return: json response
         :rtype: flask.wrappers.Response
         """
+        # validate crop param
+        if crop:
+            if self.project['metadata']['width'] - crop['x'] < app.config.get('MIN_VIDEO_WIDTH'):
+                raise BadRequest({"crop": [{"x": ["less than minimum allowed crop width"]}]})
+            elif self.project['metadata']['height'] - crop['y'] < app.config.get('MIN_VIDEO_HEIGHT'):
+                raise BadRequest({"crop": [{"y": ["less than minimum allowed crop height"]}]})
+            elif crop['x'] + crop['width'] > self.project['metadata']['width']:
+                raise BadRequest({"crop": [{"width": ["crop's frame is outside a video's frame"]}]})
+            elif crop['y'] + crop['height'] > self.project['metadata']['height']:
+                raise BadRequest({"crop": [{"height": ["crop's frame is outside a video's frame"]}]})
+
         # resource is busy
         if self.project['processing']['thumbnail_preview']:
-            return json_response({"processing": True}, status=409)
-        elif (self.project['thumbnails']['preview'] and
-              self.project['thumbnails']['preview'].get('position') == position):
-            return json_response(self.project['thumbnails']['preview'])
+            raise Conflict({"processing": ["Task get preview thumbnails video is still processing"]})
         elif self.project['metadata']['duration'] < position:
             raise BadRequest({
                 'position': [f"Requested position: '{position}' is more than video's duration: "
@@ -1122,7 +1245,9 @@ class RetrieveOrCreateThumbnails(MethodView):
             # run task
             generate_preview_thumbnail.delay(
                 self.project,
-                position
+                position,
+                crop,
+                rotate,
             )
             return json_response({"processing": True}, status=202)
 
@@ -1155,11 +1280,20 @@ class GetRawVideo(MethodView):
                 schema:
                   type: string
                   format: binary
+          409:
+            description: Timeline/preview task is still processing
+            schema:
+              type: object
+              properties:
+                processing:
+                  type: array
+                  example:
+                    - Task edit video is still processing
         """
 
         # video is processing
         if self.project['processing']['video']:
-            return json_response({'processing': True}, status=409)
+            raise Conflict({"processing": ["Task edit video is still processing"]})
 
         # get stream file for video
         video_range = request.headers.environ.get('HTTP_RANGE')

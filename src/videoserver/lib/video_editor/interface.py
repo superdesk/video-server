@@ -35,7 +35,7 @@ class VideoEditorInterface(metaclass=abc.ABCMeta):
         pass
 
     @abc.abstractmethod
-    def capture_thumbnail(self, stream_file, filename, duration, position):
+    def capture_thumbnail(self, stream_file, filename, duration, position, crop, rotate):
         """
         Capture video frame at a position.
         :param stream_file: video file
@@ -46,6 +46,10 @@ class VideoEditorInterface(metaclass=abc.ABCMeta):
         :type duration: int
         :param position: video position to capture a frame
         :type position: int
+        :param crop: crop editing rules
+        :type crop: dict
+        :param rotate: rotate degree
+        :type rotate: int
         :return: file stream, metadata
         :rtype: bytes, dict
         """
