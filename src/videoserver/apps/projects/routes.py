@@ -15,7 +15,7 @@ from werkzeug.exceptions import BadRequest, Conflict, InternalServerError, NotFo
 from videoserver.lib.video_editor import get_video_editor
 from videoserver.lib.views import MethodView
 from videoserver.lib.utils import (
-    add_urls, create_file_name, get_request_address, json_response,
+    add_urls, create_file_name, get_request_address, json_response, 
     paginate, save_activity_log, storage2response, validate_document
 )
 
@@ -370,24 +370,24 @@ class RetrieveEditDestroyProject(MethodView):
                 'empty': True,
                 'schema': {
                     'width': {
-                        'type': 'integer',
+                        'type': 'float',
                         'min': app.config.get('MIN_VIDEO_WIDTH'),
                         'max': app.config.get('MAX_VIDEO_WIDTH'),
                         'required': True
                     },
                     'height': {
-                        'type': 'integer',
+                        'type': 'float',
                         'min': app.config.get('MIN_VIDEO_HEIGHT'),
                         'max': app.config.get('MAX_VIDEO_HEIGHT'),
                         'required': True
                     },
                     'x': {
-                        'type': 'integer',
+                        'type': 'float',
                         'required': True,
                         'min': 0
                     },
                     'y': {
-                        'type': 'integer',
+                        'type': 'float',
                         'required': True,
                         'min': 0
                     }
@@ -600,9 +600,7 @@ class RetrieveEditDestroyProject(MethodView):
                     {"start": [f"trimmed video must be at least {app.config.get('MIN_TRIM_DURATION')} seconds"]}
                 ]})
             elif document['trim']['end'] > metadata['duration']:
-                raise BadRequest({"trim": [
-                    {"end": [f"outside of initial video's length"]}
-                ]})
+                document['trim']['end'] = metadata['duration']
             elif document['trim']['start'] == 0 and document['trim']['end'] == metadata['duration']:
                 raise BadRequest({"trim": [
                     {"end": ["trim is duplicating an entire video"]}
@@ -940,22 +938,22 @@ class RetrieveOrCreateThumbnails(MethodView):
                 'empty': True,
                 'schema': {
                     'width': {
-                        'type': 'integer',
+                        'type': 'float',
                         'required': True,
                         'min': app.config.get('MIN_VIDEO_WIDTH'),
                     },
                     'height': {
-                        'type': 'integer',
+                        'type': 'float',
                         'required': True,
                         'min': app.config.get('MIN_VIDEO_HEIGHT'),
                     },
                     'x': {
-                        'type': 'integer',
+                        'type': 'float',
                         'required': True,
                         'min': 0
                     },
                     'y': {
-                        'type': 'integer',
+                        'type': 'float',
                         'required': True,
                         'min': 0
                     }
@@ -1226,16 +1224,13 @@ class RetrieveOrCreateThumbnails(MethodView):
                 raise BadRequest({"crop": [{"width": ["crop's frame is outside a video's frame"]}]})
             elif crop['y'] + crop['height'] > self.project['metadata']['height']:
                 raise BadRequest({"crop": [{"height": ["crop's frame is outside a video's frame"]}]})
-
+        # validate position param
+        if self.project['metadata']['duration'] < position:
+              position = self.project['metadata']['duration']
         # resource is busy
         if self.project['processing']['thumbnail_preview']:
-            raise Conflict({"processing": ["Task get preview thumbnails video is still processing"]})
-        elif self.project['metadata']['duration'] < position:
-            raise BadRequest({
-                'position': [f"Requested position: '{position}' is more than video's duration: "
-                             f"'{self.project['metadata']['duration']}'."]
-            })
-        else:
+            raise Conflict({"processing": ["Task get preview thumbnails video is still processing"]})        
+        else:            
             # set processing flag
             self.project = app.mongo.db.projects.find_one_and_update(
                 {'_id': self.project['_id']},
