@@ -106,19 +106,6 @@ def test_capture_preview_thumbnail_success(test_app, client, projects):
 
 
 @pytest.mark.parametrize('projects', [({'file': 'sample_0.mp4', 'duplicate': False},)], indirect=True)
-def test_capture_preview_thumbnail_bad_position(test_app, client, projects):
-    project = projects[0]
-    position = 700
-
-    with test_app.test_request_context():
-        url = url_for(
-            'projects.retrieve_or_create_thumbnails', project_id=project['_id']
-        ) + f'?type=preview&position={position}'
-        resp = client.get(url)
-        assert resp.status == '400 BAD REQUEST'
-
-
-@pytest.mark.parametrize('projects', [({'file': 'sample_0.mp4', 'duplicate': False},)], indirect=True)
 def test_capture_preview_thumbnail_crop_success(test_app, client, projects):
     project = projects[0]
     position = 4

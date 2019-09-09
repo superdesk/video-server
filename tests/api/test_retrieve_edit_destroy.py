@@ -171,6 +171,29 @@ def test_edit_project_trim_success(test_app, client, projects):
         resp_data = json.loads(resp.data)
         assert not resp_data['processing']['video']
         assert resp_data['metadata']['duration'] == end - start
+        # edit request have trim end greater than duration
+        old_duration = resp_data['metadata']['duration']
+        url = url_for('projects.retrieve_edit_destroy_project', project_id=project['_id'])
+        start = 2.0
+        end = 20.0
+        resp = client.put(
+            url,
+            data=json.dumps({
+                "trim": {
+                    "start": start,
+                    "end": end
+                }
+            }),
+            content_type='application/json'
+        )
+        resp_data = json.loads(resp.data)
+        assert resp.status == '202 ACCEPTED'
+        assert resp_data == {'processing': True}
+        # get details
+        resp = client.get(url)
+        resp_data = json.loads(resp.data)
+        assert not resp_data['processing']['video']
+        assert resp_data['metadata']['duration'] == old_duration - start
 
 
 @pytest.mark.parametrize('projects', [({'file': 'sample_0.mp4', 'duplicate': True},)], indirect=True)
@@ -209,21 +232,6 @@ def test_edit_project_trim_fail(test_app, client, projects):
         resp_data = json.loads(resp.data)
         assert resp.status == '400 BAD REQUEST'
         assert resp_data == {'trim': [{'start': ['trimmed video must be at least 2 seconds']}]}
-
-        # edit request
-        resp = client.put(
-            url,
-            data=json.dumps({
-                "trim": {
-                    "start": 10,
-                    "end": 20
-                }
-            }),
-            content_type='application/json'
-        )
-        resp_data = json.loads(resp.data)
-        assert resp.status == '400 BAD REQUEST'
-        assert resp_data == {'trim': [{'end': ["outside of initial video's length"]}]}
 
         # edit request
         resp = client.put(
