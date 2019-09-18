@@ -370,24 +370,24 @@ class RetrieveEditDestroyProject(MethodView):
                 'empty': True,
                 'schema': {
                     'width': {
-                        'type': 'float',
+                        'type': 'integer',
                         'min': app.config.get('MIN_VIDEO_WIDTH'),
                         'max': app.config.get('MAX_VIDEO_WIDTH'),
                         'required': True
                     },
                     'height': {
-                        'type': 'float',
+                        'type': 'integer',
                         'min': app.config.get('MIN_VIDEO_HEIGHT'),
                         'max': app.config.get('MAX_VIDEO_HEIGHT'),
                         'required': True
                     },
                     'x': {
-                        'type': 'float',
+                        'type': 'integer',
                         'required': True,
                         'min': 0
                     },
                     'y': {
-                        'type': 'float',
+                        'type': 'integer',
                         'required': True,
                         'min': 0
                     }
@@ -601,6 +601,7 @@ class RetrieveEditDestroyProject(MethodView):
                 ]})
             elif document['trim']['end'] > metadata['duration']:
                 document['trim']['end'] = metadata['duration']
+                logger.info(f"Trimmed video endtime greater than video duration, Update it equal duration, ID: {project['_id']}")
             elif document['trim']['start'] == 0 and document['trim']['end'] == metadata['duration']:
                 raise BadRequest({"trim": [
                     {"end": ["trim is duplicating an entire video"]}
@@ -938,22 +939,22 @@ class RetrieveOrCreateThumbnails(MethodView):
                 'empty': True,
                 'schema': {
                     'width': {
-                        'type': 'float',
+                        'type': 'integer',
                         'required': True,
                         'min': app.config.get('MIN_VIDEO_WIDTH'),
                     },
                     'height': {
-                        'type': 'float',
+                        'type': 'integer',
                         'required': True,
                         'min': app.config.get('MIN_VIDEO_HEIGHT'),
                     },
                     'x': {
-                        'type': 'float',
+                        'type': 'integer',
                         'required': True,
                         'min': 0
                     },
                     'y': {
-                        'type': 'float',
+                        'type': 'integer',
                         'required': True,
                         'min': 0
                     }
@@ -1227,6 +1228,7 @@ class RetrieveOrCreateThumbnails(MethodView):
         # validate position param
         if self.project['metadata']['duration'] < position:
               position = self.project['metadata']['duration']
+              logger.info(f"Postition greater than video duration, Update it equal duration, ID: {project['_id']}")
         # resource is busy
         if self.project['processing']['thumbnail_preview']:
             raise Conflict({"processing": ["Task get preview thumbnails video is still processing"]})        
