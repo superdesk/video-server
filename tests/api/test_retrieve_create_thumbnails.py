@@ -104,6 +104,24 @@ def test_capture_preview_thumbnail_success(test_app, client, projects):
         assert resp.status == '200 OK'
         assert test_app.fs.get(resp_data['thumbnails']['preview']['storage_id']).__class__ is bytes
 
+    # postion greater than duration
+    position = 20
+    with test_app.test_request_context():
+        url = url_for(
+            'projects.retrieve_or_create_thumbnails', project_id=project['_id']
+        ) + f'?type=preview&position={position}'
+        resp = client.get(url)
+        resp_data = json.loads(resp.data)
+        assert resp.status == '202 ACCEPTED'
+        assert resp_data == {'processing': True}
+
+        resp = client.get(
+            url_for('projects.retrieve_edit_destroy_project', project_id=project['_id'])
+        )
+        resp_data = json.loads(resp.data)
+        assert resp.status == '200 OK'
+        assert test_app.fs.get(resp_data['thumbnails']['preview']['storage_id']).__class__ is bytes
+
 
 @pytest.mark.parametrize('projects', [({'file': 'sample_0.mp4', 'duplicate': False},)], indirect=True)
 def test_capture_preview_thumbnail_crop_success(test_app, client, projects):
