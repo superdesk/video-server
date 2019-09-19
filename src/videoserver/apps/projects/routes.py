@@ -338,20 +338,9 @@ class RetrieveEditDestroyProject(MethodView):
     def schema_edit(self):
         return {
             'trim': {
-                'type': 'dict',
+                'type': 'string',
                 'required': False,
-                'schema': {
-                    'start': {
-                        'type': 'float',
-                        'min': 0,
-                        'required': True
-                    },
-                    'end': {
-                        'type': 'float',
-                        'min': 1,
-                        'required': True
-                    },
-                }
+                'regex':'^\d+\.?\d*,\d+\.?\d*$'
             },
             'rotate': {
                 'type': 'integer',
@@ -365,33 +354,10 @@ class RetrieveEditDestroyProject(MethodView):
                 'required': False
             },
             'crop': {
-                'type': 'dict',
+                'type': 'string',
                 'required': False,
-                'empty': True,
-                'schema': {
-                    'width': {
-                        'type': 'integer',
-                        'min': app.config.get('MIN_VIDEO_WIDTH'),
-                        'max': app.config.get('MAX_VIDEO_WIDTH'),
-                        'required': True
-                    },
-                    'height': {
-                        'type': 'integer',
-                        'min': app.config.get('MIN_VIDEO_HEIGHT'),
-                        'max': app.config.get('MAX_VIDEO_HEIGHT'),
-                        'required': True
-                    },
-                    'x': {
-                        'type': 'integer',
-                        'required': True,
-                        'min': 0
-                    },
-                    'y': {
-                        'type': 'integer',
-                        'required': True,
-                        'min': 0
-                    }
-                }
+                'regex': '^\d+,\d+,\d+,\d+$'
+                
             }
         }
 
@@ -520,29 +486,11 @@ class RetrieveEditDestroyProject(MethodView):
             type: object
             properties:
               trim:
-                type: object
-                properties:
-                  start:
-                    type: integer
-                    example: 5
-                  end:
-                    type: integer
-                    example: 10
+                type: string
+                example: 5.1,10.5
               crop:
                 type: object
-                properties:
-                  width:
-                    type: integer
-                    example: 480
-                  height:
-                    type: integer
-                    example: 360
-                  x:
-                    type: integer
-                    example: 10
-                  y:
-                    type: integer
-                    example: 10
+                example: 480,360,10,10
               rotate:
                 type: integer
                 enum: [-270, -180, -90, 90, 180, 270]
@@ -592,6 +540,8 @@ class RetrieveEditDestroyProject(MethodView):
 
         # validate trim
         if 'trim' in document:
+            start, end = [ float(item) for item in str.split(document['trim'], ',') ]
+            document['trim'] = { "start":start, "end": end}            
             if document['trim']['start'] >= document['trim']['end']:
                 raise BadRequest({"trim": [{"start": ["must be less than 'end' value"]}]})
             elif (document['trim']['end'] - document['trim']['start'] < app.config.get('MIN_TRIM_DURATION')) \
@@ -601,13 +551,15 @@ class RetrieveEditDestroyProject(MethodView):
                 ]})
             elif document['trim']['end'] > metadata['duration']:
                 document['trim']['end'] = metadata['duration']
-                logger.info(f"Trimmed video endtime greater than video duration, Update it equal duration, ID: {project['_id']}")
+                logger.info(f"Trimmed video endtime greater than video duration, Update it equal duration, ID: {self.project['_id']}")
             elif document['trim']['start'] == 0 and document['trim']['end'] == metadata['duration']:
                 raise BadRequest({"trim": [
                     {"end": ["trim is duplicating an entire video"]}
                 ]})
         # validate crop
         if 'crop' in document:
+            x, y, width, height = [ int(item) for item in str.split(document['crop'], ',') ]
+            document['crop']= { "x":x, "y":y, "width":width, "height":height }            
             if metadata['width'] - document['crop']['x'] < app.config.get('MIN_VIDEO_WIDTH'):
                 raise BadRequest({"crop": [{"x": ["less than minimum allowed crop width"]}]})
             elif metadata['height'] - document['crop']['y'] < app.config.get('MIN_VIDEO_HEIGHT'):
@@ -933,32 +885,9 @@ class RetrieveOrCreateThumbnails(MethodView):
                 'coerce': float,
             },
             'crop': {
-                'type': 'dict',
-                'coerce': literal_eval,  # crop args are a string represent of a dict
+                'type': 'string',
                 'required': False,
-                'empty': True,
-                'schema': {
-                    'width': {
-                        'type': 'integer',
-                        'required': True,
-                        'min': app.config.get('MIN_VIDEO_WIDTH'),
-                    },
-                    'height': {
-                        'type': 'integer',
-                        'required': True,
-                        'min': app.config.get('MIN_VIDEO_HEIGHT'),
-                    },
-                    'x': {
-                        'type': 'integer',
-                        'required': True,
-                        'min': 0
-                    },
-                    'y': {
-                        'type': 'integer',
-                        'required': True,
-                        'min': 0
-                    }
-                }
+                'regex': '^\d+,\d+,\d+,\d+$'                
             },
             'rotate': {
                 'type': 'integer',
@@ -1217,6 +1146,8 @@ class RetrieveOrCreateThumbnails(MethodView):
         """
         # validate crop param
         if crop:
+            x, y, width, height = [ int(item) for item in str.split(crop, ',') ]
+            crop = { "x":x, "y":y, "width":width, "height":height }
             if self.project['metadata']['width'] - crop['x'] < app.config.get('MIN_VIDEO_WIDTH'):
                 raise BadRequest({"crop": [{"x": ["less than minimum allowed crop width"]}]})
             elif self.project['metadata']['height'] - crop['y'] < app.config.get('MIN_VIDEO_HEIGHT'):
@@ -1228,7 +1159,7 @@ class RetrieveOrCreateThumbnails(MethodView):
         # validate position param
         if self.project['metadata']['duration'] < position:
               position = self.project['metadata']['duration']
-              logger.info(f"Postition greater than video duration, Update it equal duration, ID: {project['_id']}")
+              logger.info(f"Postition greater than video duration, Update it equal duration, ID: {self.project['_id']}")
         # resource is busy
         if self.project['processing']['thumbnail_preview']:
             raise Conflict({"processing": ["Task get preview thumbnails video is still processing"]})        

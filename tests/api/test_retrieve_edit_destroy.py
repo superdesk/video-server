@@ -92,15 +92,11 @@ def test_edit_project_409_response(test_app, client, projects):
 
         # edit request
         url = url_for('projects.retrieve_edit_destroy_project', project_id=project['_id'])
-        start = 2.0
-        end = 6.0
+        trim = '2.0,6.0'
         resp = client.put(
             url,
             data=json.dumps({
-                "trim": {
-                    "start": start,
-                    "end": end
-                }
+                "trim": trim
             }),
             content_type='application/json'
         )
@@ -129,15 +125,11 @@ def test_edit_project_version_1(test_app, client, projects):
     with test_app.test_request_context():
         # edit request
         url = url_for('projects.retrieve_edit_destroy_project', project_id=project['_id'])
-        start = 2.0
-        end = 6.0
+        trim = '2.0,6.0'
         resp = client.put(
             url,
             data=json.dumps({
-                "trim": {
-                    "start": start,
-                    "end": end
-                }
+                "trim": trim
             }),
             content_type='application/json'
         )
@@ -156,10 +148,7 @@ def test_edit_project_trim_success(test_app, client, projects):
         resp = client.put(
             url,
             data=json.dumps({
-                "trim": {
-                    "start": start,
-                    "end": end
-                }
+                "trim": "%s,%s" % (start, end)
             }),
             content_type='application/json'
         )
@@ -175,14 +164,11 @@ def test_edit_project_trim_success(test_app, client, projects):
         old_duration = resp_data['metadata']['duration']
         url = url_for('projects.retrieve_edit_destroy_project', project_id=project['_id'])
         start = 2.0
-        end = 20.0
+        end = 6.0
         resp = client.put(
             url,
             data=json.dumps({
-                "trim": {
-                    "start": start,
-                    "end": end
-                }
+                "trim": "%s,%s" % (start, end)
             }),
             content_type='application/json'
         )
@@ -207,10 +193,7 @@ def test_edit_project_trim_fail(test_app, client, projects):
         resp = client.put(
             url,
             data=json.dumps({
-                "trim": {
-                    "start": 6.0,
-                    "end": 2.0
-                }
+                "trim": "6.0,2.0"
             }),
             content_type='application/json'
         )
@@ -222,10 +205,7 @@ def test_edit_project_trim_fail(test_app, client, projects):
         resp = client.put(
             url,
             data=json.dumps({
-                "trim": {
-                    "start": 0,
-                    "end": 1
-                }
+                "trim": "0,1"
             }),
             content_type='application/json'
         )
@@ -237,10 +217,7 @@ def test_edit_project_trim_fail(test_app, client, projects):
         resp = client.put(
             url,
             data=json.dumps({
-                "trim": {
-                    "start": 0,
-                    "end": 15
-                }
+                "trim": "0,15"
             }),
             content_type='application/json'
         )
@@ -300,12 +277,7 @@ def test_edit_project_crop_success(test_app, client, projects):
         resp = client.put(
             url,
             data=json.dumps({
-                "crop": {
-                    "x": 0,
-                    "y": 0,
-                    "width": 640,
-                    "height": 480
-                }
+                "crop": "0,0,640,480"
             }),
             content_type='application/json'
         )
@@ -330,12 +302,7 @@ def test_edit_project_crop_fail(test_app, client, projects):
         resp = client.put(
             url,
             data=json.dumps({
-                "crop": {
-                    "x": 2000,
-                    "y": 0,
-                    "width": 640,
-                    "height": 480
-                }
+                "crop": "2000,0,640,480"
             }),
             content_type='application/json'
         )
@@ -347,12 +314,7 @@ def test_edit_project_crop_fail(test_app, client, projects):
         resp = client.put(
             url,
             data=json.dumps({
-                "crop": {
-                    "x": 0,
-                    "y": 1000,
-                    "width": 640,
-                    "height": 480
-                }
+                "crop": "0,1000,640,480"
             }),
             content_type='application/json'
         )
@@ -364,12 +326,7 @@ def test_edit_project_crop_fail(test_app, client, projects):
         resp = client.put(
             url,
             data=json.dumps({
-                "crop": {
-                    "x": 300,
-                    "y": 0,
-                    "width": 1000,
-                    "height": 480
-                }
+                "crop": "300,0,1000,480"
             }),
             content_type='application/json'
         )
@@ -381,12 +338,7 @@ def test_edit_project_crop_fail(test_app, client, projects):
         resp = client.put(
             url,
             data=json.dumps({
-                "crop": {
-                    "x": 0,
-                    "y": 200,
-                    "width": 640,
-                    "height": 600
-                }
+                "crop": "0,200,640,600"
             }),
             content_type='application/json'
         )
@@ -503,12 +455,7 @@ def test_edit_project_scale_and_crop_success(test_app, client, projects):
             url,
             data=json.dumps({
                 "scale": 640,
-                "crop": {
-                    "x": 0,
-                    "y": 0,
-                    "width": 400,
-                    "height": 400
-                }
+                "crop": "0,0,400,400"
             }),
             content_type='application/json'
         )

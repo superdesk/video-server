@@ -127,7 +127,7 @@ def test_capture_preview_thumbnail_success(test_app, client, projects):
 def test_capture_preview_thumbnail_crop_success(test_app, client, projects):
     project = projects[0]
     position = 4
-    crop = {'width': 640, 'height': 480, 'x': 0, 'y': 0}
+    crop = "0,0,640,480"
 
     with test_app.test_request_context():
         url = url_for(
@@ -151,7 +151,7 @@ def test_capture_preview_thumbnail_crop_fail(test_app, client, projects):
     position = 4
 
     with test_app.test_request_context():
-        crop = {'width': 640, 'height': 480, 'x': 1000, 'y': 0}
+        crop = "1000,0,640,480"
         url = url_for(
             'projects.retrieve_or_create_thumbnails', project_id=project['_id']
         ) + f'?type=preview&position={position}&crop={crop}'
@@ -160,7 +160,7 @@ def test_capture_preview_thumbnail_crop_fail(test_app, client, projects):
         assert resp.status == '400 BAD REQUEST'
         assert resp_data == {'crop': [{'x': ['less than minimum allowed crop width']}]}
 
-        crop = {'width': 640, 'height': 480, 'x': 0, 'y': 1000}
+        crop = "0,1000,640,480"
         url = url_for(
             'projects.retrieve_or_create_thumbnails', project_id=project['_id']
         ) + f'?type=preview&position={position}&crop={crop}'
@@ -169,7 +169,7 @@ def test_capture_preview_thumbnail_crop_fail(test_app, client, projects):
         assert resp.status == '400 BAD REQUEST'
         assert resp_data == {'crop': [{'y': ['less than minimum allowed crop height']}]}
 
-        crop = {'width': 10000, 'height': 480, 'x': 0, 'y': 0}
+        crop = "0,0,10000,480"
         url = url_for(
             'projects.retrieve_or_create_thumbnails', project_id=project['_id']
         ) + f'?type=preview&position={position}&crop={crop}'
@@ -178,7 +178,7 @@ def test_capture_preview_thumbnail_crop_fail(test_app, client, projects):
         assert resp.status == '400 BAD REQUEST'
         assert resp_data == {'crop': [{'width': ["crop's frame is outside a video's frame"]}]}
 
-        crop = {'width': 640, 'height': 10000, 'x': 0, 'y': 0}
+        crop = "0,0,640,10000"
         url = url_for(
             'projects.retrieve_or_create_thumbnails', project_id=project['_id']
         ) + f'?type=preview&position={position}&crop={crop}'
