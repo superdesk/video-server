@@ -489,7 +489,7 @@ class RetrieveEditDestroyProject(MethodView):
                 type: string
                 example: 5.1,10.5
               crop:
-                type: object
+                type: string
                 example: 480,360,10,10
               rotate:
                 type: integer
@@ -926,7 +926,7 @@ class RetrieveOrCreateThumbnails(MethodView):
           in: query
           type: json
           description: Crop rules apply to preview thumbnail. Used only when `type` is `preview`.
-          default: "{'width': 720, 'height': 360, 'x': 0, 'y':0}"
+          default: "0,0,720,360"
         - name: rotate
           in: query
           type: integer
