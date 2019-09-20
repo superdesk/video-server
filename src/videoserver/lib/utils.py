@@ -133,6 +133,19 @@ def save_activity_log(action, project_id, payload=None):
         "create_date": datetime.utcnow()
     })
 
+def coerce_crop_str_to_dict(value):
+    """
+    Use for coerce crop value (regex:'^\d+,\d+,\d+,\d+$') from str to dict
+    """
+    x, y, width, height = [ int(item) for item in str.split(value, ',') ]            
+    return { "x":x, "y":y, "width":width, "height":height }
+    
+def coerce_trim_str_to_dict(value):
+    """
+    Use for coerce trim value (regex: ^\d+\.?\d*,\d+\.?\d*$') from str to dict
+    """
+    start, end = [ float(item) for item in str.split(value, ',') ]
+    return { "start":start, "end": end} 
 
 def validate_document(document, schema, **kwargs):
     """
@@ -147,10 +160,35 @@ def validate_document(document, schema, **kwargs):
     :raise: `BadRequest` if `document` is not valid
     """
 
-    validator = Validator(schema, **kwargs)
+    validator = videoValidator(schema, **kwargs)
     if not validator.validate(document):
         raise BadRequest(validator.errors)
     return validator.document
+
+class videoValidator(Validator):        
+    def _validate_allow_crop_width(self, limit, field, value):
+        if field == 'crop' and isinstance(value, dict):
+            wmin, wmax = limit
+            if value['width'] < wmin:
+                self._error(field, "width is lesser than minimum allowed crop width")
+            if value['width'] > wmax: 
+                self._error(field, "width is greater than maximum allowed crop width")
+
+    def _validate_allow_crop_height(self, limit, field, value):
+        if field == 'crop' and isinstance(value, dict):
+            hmin, hmax = limit  
+            if value['height'] < hmin:
+                self._error(field, "height is lesser than minimum allowed crop height")
+            if value['height'] > hmax:
+                self._error(field, "height is greater than maximum allowed crop height")
+    def _validate_min_trim_start(self, min, field, value):
+        if field == 'trim' and isinstance(value, dict):
+            if value['start'] < min:
+                self._error(field, "start time must be greater than %s" % min)
+    def _validate_min_trim_end(self, min, field, value):
+        if field == 'trim' and isinstance(value, dict):
+            if value['end'] < min:
+                self._error(field, "end time must be greater than %s" % min)
 
 
 def get_request_address(request_headers):
