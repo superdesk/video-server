@@ -225,6 +225,30 @@ def test_edit_project_trim_fail(test_app, client, projects):
         assert resp.status == '400 BAD REQUEST'
         assert resp_data == {'trim': [{'end': ['trim is duplicating an entire video']}]}
 
+        # edit request
+        resp = client.put(
+            url,
+            data=json.dumps({
+                "trim": "-1,3"
+            }),
+            content_type='application/json'
+        )
+        resp_data = json.loads(resp.data)
+        assert resp.status == '400 BAD REQUEST'
+        assert resp_data == {'trim': ['start time must be greater than 0']}
+
+        # edit request
+        resp = client.put(
+            url,
+            data=json.dumps({
+                "trim": "0,0"
+            }),
+            content_type='application/json'
+        )
+        resp_data = json.loads(resp.data)
+        assert resp.status == '400 BAD REQUEST'
+        assert resp_data == {'trim': ['end time must be greater than 1']}
+
 
 @pytest.mark.parametrize('projects', [({'file': 'sample_0.mp4', 'duplicate': True},)], indirect=True)
 def test_edit_project_rotate_success(test_app, client, projects):
@@ -345,6 +369,42 @@ def test_edit_project_crop_fail(test_app, client, projects):
         resp_data = json.loads(resp.data)
         assert resp.status == '400 BAD REQUEST'
         assert resp_data == {'crop': [{'height': ["crop's frame is outside a video's frame"]}]}
+
+        # edit request
+        resp = client.put(
+            url,
+            data=json.dumps({
+                "crop": "0,200,10000,600"
+            }),
+            content_type='application/json'
+        )
+        resp_data = json.loads(resp.data)
+        assert resp.status == '400 BAD REQUEST'
+        assert resp_data == {'crop': ['width is greater than maximum allowed crop width']}
+
+        # edit request
+        resp = client.put(
+            url,
+            data=json.dumps({
+                "crop": "0,0,300,600"
+            }),
+            content_type='application/json'
+        )
+        resp_data = json.loads(resp.data)
+        assert resp.status == '400 BAD REQUEST'
+        assert resp_data == {'crop': ['width is lesser than minimum allowed crop width']}
+
+        # edit request
+        resp = client.put(
+            url,
+            data=json.dumps({
+                "crop": "0,0,640,100"
+            }),
+            content_type='application/json'
+        )
+        resp_data = json.loads(resp.data)
+        assert resp.status == '400 BAD REQUEST'
+        assert resp_data == {'crop': ['height is lesser than minimum allowed crop height']}
 
 
 @pytest.mark.parametrize('projects', [({'file': 'sample_0.mp4', 'duplicate': True},)], indirect=True)

@@ -176,9 +176,27 @@ def test_capture_preview_thumbnail_crop_fail(test_app, client, projects):
         resp = client.get(url)
         resp_data = json.loads(resp.data)
         assert resp.status == '400 BAD REQUEST'
-        assert resp_data == {'crop': [{'width': ["crop's frame is outside a video's frame"]}]}
+        assert resp_data == {'crop': ['width is greater than maximum allowed crop width']}
 
         crop = "0,0,640,10000"
+        url = url_for(
+            'projects.retrieve_or_create_thumbnails', project_id=project['_id']
+        ) + f'?type=preview&position={position}&crop={crop}'
+        resp = client.get(url)
+        resp_data = json.loads(resp.data)
+        assert resp.status == '400 BAD REQUEST'
+        assert resp_data == {'crop': ['height is greater than maximum allowed crop height']}
+
+        crop = "0,0,1640,480"
+        url = url_for(
+            'projects.retrieve_or_create_thumbnails', project_id=project['_id']
+        ) + f'?type=preview&position={position}&crop={crop}'
+        resp = client.get(url)
+        resp_data = json.loads(resp.data)
+        assert resp.status == '400 BAD REQUEST'
+        assert resp_data == {'crop': [{'width': ["crop's frame is outside a video's frame"]}]}
+
+        crop = "0,0,640,1480"
         url = url_for(
             'projects.retrieve_or_create_thumbnails', project_id=project['_id']
         ) + f'?type=preview&position={position}&crop={crop}'
