@@ -2,7 +2,6 @@ import copy
 import logging
 import os
 import re
-from ast import literal_eval
 from datetime import datetime
 
 import bson
@@ -339,11 +338,10 @@ class RetrieveEditDestroyProject(MethodView):
         return {
             'trim': {
                 'required': False,
-                'regex': '^\d+\.?\d*,\d+\.?\d*$',
+                'regex': r'^\d+\.?\d*,\d+\.?\d*$',
                 'coerce': coerce_trim_str_to_dict,
                 'min_trim_start': 0,
                 'min_trim_end': 1
-                
             },
             'rotate': {
                 'type': 'integer',
@@ -358,7 +356,7 @@ class RetrieveEditDestroyProject(MethodView):
             },
             'crop': {
                 'required': False,
-                'regex': '^\d+,\d+,\d+,\d+$',
+                'regex': r'^\d+,\d+,\d+,\d+$',
                 'coerce': coerce_crop_str_to_dict,
                 'allow_crop_width': [app.config.get('MIN_VIDEO_WIDTH'), app.config.get('MAX_VIDEO_WIDTH')],
                 'allow_crop_height': [app.config.get('MIN_VIDEO_HEIGHT'), app.config.get('MAX_VIDEO_HEIGHT')]
@@ -554,7 +552,8 @@ class RetrieveEditDestroyProject(MethodView):
             elif document['trim']['end'] > metadata['duration']:
                 document['trim']['end'] = metadata['duration']
                 logger.info(
-                    f"Trimmed video endtime greater than video duration, Update it equal duration, ID: {self.project['_id']}")
+                    f"Trimmed video endtime greater than video duration, update it to equal duration, "
+                    f"ID: {self.project['_id']}")
             elif document['trim']['start'] == 0 and document['trim']['end'] == metadata['duration']:
                 raise BadRequest({"trim": [
                     {"end": ["trim is duplicating an entire video"]}
@@ -887,7 +886,7 @@ class RetrieveOrCreateThumbnails(MethodView):
             },
             'crop': {
                 'required': False,
-                'regex': '^\d+,\d+,\d+,\d+$',
+                'regex': r'^\d+,\d+,\d+,\d+$',
                 'coerce': coerce_crop_str_to_dict,
                 'allow_crop_width': [app.config.get('MIN_VIDEO_WIDTH'), app.config.get('MAX_VIDEO_WIDTH')],
                 'allow_crop_height': [app.config.get('MIN_VIDEO_HEIGHT'), app.config.get('MAX_VIDEO_HEIGHT')]
