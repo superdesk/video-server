@@ -167,7 +167,7 @@ class ListUploadProject(MethodView):
             },
             'thumbnails': {
                 'timeline': [],
-                'preview': None
+                'preview': {},
             }
         }
 
@@ -756,7 +756,7 @@ class DuplicateProject(MethodView):
         child_project['version'] += 1
         child_project['thumbnails'] = {
             'timeline': [],
-            'preview': None
+            'preview': {}
         }
         app.mongo.db.projects.insert_one(child_project)
 
