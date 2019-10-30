@@ -67,7 +67,7 @@ class FileSystemStorage(MediaStorageInterface):
 
         return media_file
 
-    def put(self, content, filename, project_id=None, asset_type='project', storage_id=None, content_type=None):
+    def put(self, content, filename, project_id=None, asset_type='project', storage_id=None, content_type=None, override=True):
         """
         Save file into a fs storage.
 
@@ -110,7 +110,9 @@ class FileSystemStorage(MediaStorageInterface):
         file_path = self._get_file_path(storage_id)
         # check if file exists
         if os.path.exists(file_path):
-            raise Exception(f'File {file_path} already exists, use "replace" method instead.')
+            if not override:
+                raise Exception(f'File {file_path} already exists, use "replace" method instead.')
+            self.replace(content,storage_id)
 
         # check if dir exists, if not create it
         file_dir = os.path.dirname(file_path)
