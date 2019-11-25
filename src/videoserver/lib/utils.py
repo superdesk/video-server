@@ -92,21 +92,12 @@ def add_urls(doc):
                     _external=True
                 )
 
-            if doc['thumbnails']['preview']:
+            if doc['thumbnails']['preview'] or doc['processing']['thumbnail_preview']:
                 doc['thumbnails']['preview']['url'] = url_for(
                     'projects.get_raw_preview_thumbnail',
                     project_id=doc['_id'],
                     _external=True
                 )
-
-            if doc['processing']['thumbnail_preview']:
-                doc['thumbnails']['preview'] = {
-                    "url": url_for(
-                        'projects.get_raw_preview_thumbnail',
-                        project_id=doc['_id'],
-                        _external=True
-                    ),
-                }
 
     if type(doc) is dict:
         _handle_doc(doc)
