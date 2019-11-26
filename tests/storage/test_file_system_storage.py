@@ -47,13 +47,13 @@ def test_fs_storage_put_already_exist(test_app, filestreams):
 
     project_id = 'project_one'
     with test_app.app_context():
-        with pytest.raises(Exception):
+        with pytest.raises(ValueError, match="Argument 'project_id' is required when 'asset_type' is 'project'"):
             storage_id = storage.put(
                 content=mp4_stream,
                 filename='sample_video.mp4',
                 asset_type='project'
             )
-        with pytest.raises(Exception):
+        with pytest.raises(ValueError, match="Argument 'storage_id' is required when 'asset_type' is not 'project'"):
             storage.put(
                 content=jpg_stream_0,
                 filename='sample_image.jpg',

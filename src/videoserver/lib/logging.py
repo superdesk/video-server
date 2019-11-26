@@ -37,4 +37,4 @@ def configure_logging(file_path):
 
         logging.config.dictConfig(logging_dict)
     except Exception:
-        logger.warn('Cannot load logging config. File: %s', file_path)
+        logger.warning('Cannot load logging config. File: %s', file_path)
