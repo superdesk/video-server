@@ -34,7 +34,7 @@ def test_upload_project_success(test_app, client, filestreams):
         assert resp_data['version'] == 1
         assert resp_data['parent'] is None
         assert resp_data['processing'] == {'video': False, 'thumbnail_preview': False, 'thumbnails_timeline': False}
-        assert resp_data['thumbnails'] == {'timeline': [], 'preview': None}
+        assert resp_data['thumbnails'] == {'timeline': [], 'preview': {}}
         assert resp_data['url'] == url_for('projects.get_raw_video', project_id=resp_data["_id"], _external=True)
 
 
@@ -168,7 +168,7 @@ def test_list_projects(test_app, client, filestreams):
             'thumbnail_preview': False,
             'thumbnails_timeline': False
         }
-        assert resp_data['_items'][0]['thumbnails'] == {'timeline': [], 'preview': None}
+        assert resp_data['_items'][0]['thumbnails'] == {'timeline': [], 'preview': {}}
         assert resp_data['_items'][0]['url'] == url_for('projects.get_raw_video',
                                                         project_id=resp_data["_items"][0]["_id"], _external=True)
         # list 1nd page explicitly

@@ -161,7 +161,7 @@ class FFMPEGVideoEditor(VideoEditorInterface):
             if rotate:
                 vfilter += ',' if vfilter else '-vf '
                 transpose = f'transpose=1' if rotate > 0 else f'transpose=2'
-                vfilter += ','.join([transpose] * (rotate // 90))
+                vfilter += ','.join([transpose] * abs(rotate // 90))
 
             try:
                 # run ffmpeg command

@@ -2,7 +2,6 @@ import copy
 import logging
 import os
 import re
-from ast import literal_eval
 from datetime import datetime
 
 import bson
@@ -15,8 +14,8 @@ from werkzeug.exceptions import BadRequest, Conflict, InternalServerError, NotFo
 from videoserver.lib.video_editor import get_video_editor
 from videoserver.lib.views import MethodView
 from videoserver.lib.utils import (
-    add_urls, create_file_name, get_request_address, json_response,
-    paginate, save_activity_log, storage2response, validate_document
+    add_urls, create_file_name, get_request_address, json_response, paginate, save_activity_log, storage2response,
+    validate_document, coerce_crop_str_to_dict, coerce_trim_str_to_dict
 )
 
 from . import bp
@@ -167,7 +166,7 @@ class ListUploadProject(MethodView):
             },
             'thumbnails': {
                 'timeline': [],
-                'preview': None
+                'preview': {},
             }
         }
 
@@ -338,20 +337,11 @@ class RetrieveEditDestroyProject(MethodView):
     def schema_edit(self):
         return {
             'trim': {
-                'type': 'dict',
                 'required': False,
-                'schema': {
-                    'start': {
-                        'type': 'float',
-                        'min': 0,
-                        'required': True
-                    },
-                    'end': {
-                        'type': 'float',
-                        'min': 1,
-                        'required': True
-                    },
-                }
+                'regex': r'^\d+\.?\d*,\d+\.?\d*$',
+                'coerce': coerce_trim_str_to_dict,
+                'min_trim_start': 0,
+                'min_trim_end': 1
             },
             'rotate': {
                 'type': 'integer',
@@ -365,33 +355,11 @@ class RetrieveEditDestroyProject(MethodView):
                 'required': False
             },
             'crop': {
-                'type': 'dict',
                 'required': False,
-                'empty': True,
-                'schema': {
-                    'width': {
-                        'type': 'integer',
-                        'min': app.config.get('MIN_VIDEO_WIDTH'),
-                        'max': app.config.get('MAX_VIDEO_WIDTH'),
-                        'required': True
-                    },
-                    'height': {
-                        'type': 'integer',
-                        'min': app.config.get('MIN_VIDEO_HEIGHT'),
-                        'max': app.config.get('MAX_VIDEO_HEIGHT'),
-                        'required': True
-                    },
-                    'x': {
-                        'type': 'integer',
-                        'required': True,
-                        'min': 0
-                    },
-                    'y': {
-                        'type': 'integer',
-                        'required': True,
-                        'min': 0
-                    }
-                }
+                'regex': r'^\d+,\d+,\d+,\d+$',
+                'coerce': coerce_crop_str_to_dict,
+                'allow_crop_width': [app.config.get('MIN_VIDEO_WIDTH'), app.config.get('MAX_VIDEO_WIDTH')],
+                'allow_crop_height': [app.config.get('MIN_VIDEO_HEIGHT'), app.config.get('MAX_VIDEO_HEIGHT')]
             }
         }
 
@@ -520,29 +488,11 @@ class RetrieveEditDestroyProject(MethodView):
             type: object
             properties:
               trim:
-                type: object
-                properties:
-                  start:
-                    type: integer
-                    example: 5
-                  end:
-                    type: integer
-                    example: 10
+                type: string
+                example: 5.1,10.5
               crop:
-                type: object
-                properties:
-                  width:
-                    type: integer
-                    example: 480
-                  height:
-                    type: integer
-                    example: 360
-                  x:
-                    type: integer
-                    example: 10
-                  y:
-                    type: integer
-                    example: 10
+                type: string
+                example: 480,360,10,10
               rotate:
                 type: integer
                 enum: [-270, -180, -90, 90, 180, 270]
@@ -600,9 +550,10 @@ class RetrieveEditDestroyProject(MethodView):
                     {"start": [f"trimmed video must be at least {app.config.get('MIN_TRIM_DURATION')} seconds"]}
                 ]})
             elif document['trim']['end'] > metadata['duration']:
-                raise BadRequest({"trim": [
-                    {"end": [f"outside of initial video's length"]}
-                ]})
+                document['trim']['end'] = metadata['duration']
+                logger.info(
+                    f"Trimmed video endtime greater than video duration, update it to equal duration, "
+                    f"ID: {self.project['_id']}")
             elif document['trim']['start'] == 0 and document['trim']['end'] == metadata['duration']:
                 raise BadRequest({"trim": [
                     {"end": ["trim is duplicating an entire video"]}
@@ -804,7 +755,7 @@ class DuplicateProject(MethodView):
         child_project['version'] += 1
         child_project['thumbnails'] = {
             'timeline': [],
-            'preview': None
+            'preview': {}
         }
         app.mongo.db.projects.insert_one(child_project)
 
@@ -934,32 +885,11 @@ class RetrieveOrCreateThumbnails(MethodView):
                 'coerce': float,
             },
             'crop': {
-                'type': 'dict',
-                'coerce': literal_eval,  # crop args are a string represent of a dict
                 'required': False,
-                'empty': True,
-                'schema': {
-                    'width': {
-                        'type': 'integer',
-                        'required': True,
-                        'min': app.config.get('MIN_VIDEO_WIDTH'),
-                    },
-                    'height': {
-                        'type': 'integer',
-                        'required': True,
-                        'min': app.config.get('MIN_VIDEO_HEIGHT'),
-                    },
-                    'x': {
-                        'type': 'integer',
-                        'required': True,
-                        'min': 0
-                    },
-                    'y': {
-                        'type': 'integer',
-                        'required': True,
-                        'min': 0
-                    }
-                }
+                'regex': r'^\d+,\d+,\d+,\d+$',
+                'coerce': coerce_crop_str_to_dict,
+                'allow_crop_width': [app.config.get('MIN_VIDEO_WIDTH'), app.config.get('MAX_VIDEO_WIDTH')],
+                'allow_crop_height': [app.config.get('MIN_VIDEO_HEIGHT'), app.config.get('MAX_VIDEO_HEIGHT')]
             },
             'rotate': {
                 'type': 'integer',
@@ -998,7 +928,7 @@ class RetrieveOrCreateThumbnails(MethodView):
           in: query
           type: json
           description: Crop rules apply to preview thumbnail. Used only when `type` is `preview`.
-          default: "{'width': 720, 'height': 360, 'x': 0, 'y':0}"
+          default: "0,0,720,360"
         - name: rotate
           in: query
           type: integer
@@ -1226,15 +1156,13 @@ class RetrieveOrCreateThumbnails(MethodView):
                 raise BadRequest({"crop": [{"width": ["crop's frame is outside a video's frame"]}]})
             elif crop['y'] + crop['height'] > self.project['metadata']['height']:
                 raise BadRequest({"crop": [{"height": ["crop's frame is outside a video's frame"]}]})
-
+        # validate position param
+        if self.project['metadata']['duration'] < position:
+            position = self.project['metadata']['duration']
+            logger.info(f"Postition greater than video duration, Update it equal duration, ID: {self.project['_id']}")
         # resource is busy
         if self.project['processing']['thumbnail_preview']:
             raise Conflict({"processing": ["Task get preview thumbnails video is still processing"]})
-        elif self.project['metadata']['duration'] < position:
-            raise BadRequest({
-                'position': [f"Requested position: '{position}' is more than video's duration: "
-                             f"'{self.project['metadata']['duration']}'."]
-            })
         else:
             # set processing flag
             self.project = app.mongo.db.projects.find_one_and_update(

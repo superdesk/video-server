@@ -136,10 +136,7 @@ where `5d7b841764c598157d53ef4a` is project's `_id` you want to make a duplicate
 curl -X PUT \
   http://0.0.0.0:5050/projects/5d7a35a04be797ba845e7871 \
   -d '{
-	"trim": {
-		"start": 2,
-		"end": 5
-	}
+	"trim": "2,5"
 }'
 ```
 where `2` and `5` are seconds.
@@ -169,12 +166,7 @@ where `480` is width you want to scale video to.
 curl -X PUT \
   http://0.0.0.0:5050/projects/5d7a35a04be797ba845e7871 \
   -d '{
-	"crop": {
-		"height": 180,
-		"width": 320,
-		"x": 0,
-		"y": 0
-	}
+	"crop": "0,0,180,320"
 }'
 ```
 where `width` and `height` are respectively width and height of capturing area,
@@ -193,7 +185,7 @@ curl -X GET 'http://0.0.0.0:5050/projects/5d7b98f52fac91d2e1ad7512/thumbnails?ty
 where `position` is a position in the video (seconds) used to capture a thumbnail. 
 
 You can also specify optional `crop` param if you want to crop a preview thumbnail, just add
-`crop={ "height": 180, "width": 320, "x": 0, "y": 0 }`.
+`crop="0,0,180,320"`.
 Example:
 ```bash
 curl -X GET \

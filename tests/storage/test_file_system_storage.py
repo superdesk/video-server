@@ -47,6 +47,18 @@ def test_fs_storage_put_already_exist(test_app, filestreams):
 
     project_id = 'project_one'
     with test_app.app_context():
+        with pytest.raises(ValueError, match="Argument 'project_id' is required when 'asset_type' is 'project'"):
+            storage_id = storage.put(
+                content=mp4_stream,
+                filename='sample_video.mp4',
+                asset_type='project'
+            )
+        with pytest.raises(ValueError, match="Argument 'storage_id' is required when 'asset_type' is not 'project'"):
+            storage.put(
+                content=jpg_stream_0,
+                filename='sample_image.jpg',
+                asset_type='thumbnail'
+            )
         storage_id = storage.put(
             content=mp4_stream,
             filename='sample_video.mp4',
@@ -64,8 +76,15 @@ def test_fs_storage_put_already_exist(test_app, filestreams):
                 content=jpg_stream_0,
                 filename='sample_image.jpg',
                 storage_id=storage_id,
-                asset_type='thumbnail'
+                asset_type='thumbnail',
+                override=False
             )
+        storage.put(
+            content=jpg_stream_0,
+            filename='sample_image.jpg',
+            storage_id=storage_id,
+            asset_type='thumbnail',
+        )
 
 
 @pytest.mark.parametrize('filestreams', [('sample_0.mp4',)], indirect=True)

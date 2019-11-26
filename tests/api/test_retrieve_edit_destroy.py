@@ -26,7 +26,7 @@ def test_retrieve_project_success(test_app, client, projects):
         assert resp_data['version'] == 1
         assert resp_data['parent'] is None
         assert resp_data['processing'] == {'video': False, 'thumbnail_preview': False, 'thumbnails_timeline': False}
-        assert resp_data['thumbnails'] == {'timeline': [], 'preview': None}
+        assert resp_data['thumbnails'] == {'timeline': [], 'preview': {}}
         assert resp_data['url'] == url_for('projects.get_raw_video', project_id=resp_data["_id"], _external=True)
         assert resp_data['metadata']['codec_name'] == 'h264'
         assert resp_data['metadata']['codec_long_name'] == 'H.264 / AVC / MPEG-4 AVC / MPEG-4 part 10'
@@ -92,15 +92,11 @@ def test_edit_project_409_response(test_app, client, projects):
 
         # edit request
         url = url_for('projects.retrieve_edit_destroy_project', project_id=project['_id'])
-        start = 2.0
-        end = 6.0
+        trim = '2.0,6.0'
         resp = client.put(
             url,
             data=json.dumps({
-                "trim": {
-                    "start": start,
-                    "end": end
-                }
+                "trim": trim
             }),
             content_type='application/json'
         )
@@ -129,15 +125,11 @@ def test_edit_project_version_1(test_app, client, projects):
     with test_app.test_request_context():
         # edit request
         url = url_for('projects.retrieve_edit_destroy_project', project_id=project['_id'])
-        start = 2.0
-        end = 6.0
+        trim = '2.0,6.0'
         resp = client.put(
             url,
             data=json.dumps({
-                "trim": {
-                    "start": start,
-                    "end": end
-                }
+                "trim": trim
             }),
             content_type='application/json'
         )
@@ -156,10 +148,7 @@ def test_edit_project_trim_success(test_app, client, projects):
         resp = client.put(
             url,
             data=json.dumps({
-                "trim": {
-                    "start": start,
-                    "end": end
-                }
+                "trim": "%s,%s" % (start, end)
             }),
             content_type='application/json'
         )
@@ -171,6 +160,26 @@ def test_edit_project_trim_success(test_app, client, projects):
         resp_data = json.loads(resp.data)
         assert not resp_data['processing']['video']
         assert resp_data['metadata']['duration'] == end - start
+        # edit request have trim end greater than duration
+        old_duration = resp_data['metadata']['duration']
+        url = url_for('projects.retrieve_edit_destroy_project', project_id=project['_id'])
+        start = 2.0
+        end = 6.0
+        resp = client.put(
+            url,
+            data=json.dumps({
+                "trim": "%s,%s" % (start, end)
+            }),
+            content_type='application/json'
+        )
+        resp_data = json.loads(resp.data)
+        assert resp.status == '202 ACCEPTED'
+        assert resp_data == {'processing': True}
+        # get details
+        resp = client.get(url)
+        resp_data = json.loads(resp.data)
+        assert not resp_data['processing']['video']
+        assert resp_data['metadata']['duration'] == old_duration - start
 
 
 @pytest.mark.parametrize('projects', [({'file': 'sample_0.mp4', 'duplicate': True},)], indirect=True)
@@ -184,10 +193,7 @@ def test_edit_project_trim_fail(test_app, client, projects):
         resp = client.put(
             url,
             data=json.dumps({
-                "trim": {
-                    "start": 6.0,
-                    "end": 2.0
-                }
+                "trim": "6.0,2.0"
             }),
             content_type='application/json'
         )
@@ -199,10 +205,7 @@ def test_edit_project_trim_fail(test_app, client, projects):
         resp = client.put(
             url,
             data=json.dumps({
-                "trim": {
-                    "start": 0,
-                    "end": 1
-                }
+                "trim": "0,1"
             }),
             content_type='application/json'
         )
@@ -214,31 +217,37 @@ def test_edit_project_trim_fail(test_app, client, projects):
         resp = client.put(
             url,
             data=json.dumps({
-                "trim": {
-                    "start": 10,
-                    "end": 20
-                }
-            }),
-            content_type='application/json'
-        )
-        resp_data = json.loads(resp.data)
-        assert resp.status == '400 BAD REQUEST'
-        assert resp_data == {'trim': [{'end': ["outside of initial video's length"]}]}
-
-        # edit request
-        resp = client.put(
-            url,
-            data=json.dumps({
-                "trim": {
-                    "start": 0,
-                    "end": 15
-                }
+                "trim": "0,15"
             }),
             content_type='application/json'
         )
         resp_data = json.loads(resp.data)
         assert resp.status == '400 BAD REQUEST'
         assert resp_data == {'trim': [{'end': ['trim is duplicating an entire video']}]}
+
+        # edit request
+        resp = client.put(
+            url,
+            data=json.dumps({
+                "trim": "-1,3"
+            }),
+            content_type='application/json'
+        )
+        resp_data = json.loads(resp.data)
+        assert resp.status == '400 BAD REQUEST'
+        assert resp_data == {'trim': ['start time must be greater than 0']}
+
+        # edit request
+        resp = client.put(
+            url,
+            data=json.dumps({
+                "trim": "0,0"
+            }),
+            content_type='application/json'
+        )
+        resp_data = json.loads(resp.data)
+        assert resp.status == '400 BAD REQUEST'
+        assert resp_data == {'trim': ['end time must be greater than 1']}
 
 
 @pytest.mark.parametrize('projects', [({'file': 'sample_0.mp4', 'duplicate': True},)], indirect=True)
@@ -292,12 +301,7 @@ def test_edit_project_crop_success(test_app, client, projects):
         resp = client.put(
             url,
             data=json.dumps({
-                "crop": {
-                    "x": 0,
-                    "y": 0,
-                    "width": 640,
-                    "height": 480
-                }
+                "crop": "0,0,640,480"
             }),
             content_type='application/json'
         )
@@ -322,12 +326,7 @@ def test_edit_project_crop_fail(test_app, client, projects):
         resp = client.put(
             url,
             data=json.dumps({
-                "crop": {
-                    "x": 2000,
-                    "y": 0,
-                    "width": 640,
-                    "height": 480
-                }
+                "crop": "2000,0,640,480"
             }),
             content_type='application/json'
         )
@@ -339,12 +338,7 @@ def test_edit_project_crop_fail(test_app, client, projects):
         resp = client.put(
             url,
             data=json.dumps({
-                "crop": {
-                    "x": 0,
-                    "y": 1000,
-                    "width": 640,
-                    "height": 480
-                }
+                "crop": "0,1000,640,480"
             }),
             content_type='application/json'
         )
@@ -356,12 +350,7 @@ def test_edit_project_crop_fail(test_app, client, projects):
         resp = client.put(
             url,
             data=json.dumps({
-                "crop": {
-                    "x": 300,
-                    "y": 0,
-                    "width": 1000,
-                    "height": 480
-                }
+                "crop": "300,0,1000,480"
             }),
             content_type='application/json'
         )
@@ -373,18 +362,49 @@ def test_edit_project_crop_fail(test_app, client, projects):
         resp = client.put(
             url,
             data=json.dumps({
-                "crop": {
-                    "x": 0,
-                    "y": 200,
-                    "width": 640,
-                    "height": 600
-                }
+                "crop": "0,200,640,600"
             }),
             content_type='application/json'
         )
         resp_data = json.loads(resp.data)
         assert resp.status == '400 BAD REQUEST'
         assert resp_data == {'crop': [{'height': ["crop's frame is outside a video's frame"]}]}
+
+        # edit request
+        resp = client.put(
+            url,
+            data=json.dumps({
+                "crop": "0,200,10000,600"
+            }),
+            content_type='application/json'
+        )
+        resp_data = json.loads(resp.data)
+        assert resp.status == '400 BAD REQUEST'
+        assert resp_data == {'crop': ['width is greater than maximum allowed crop width']}
+
+        # edit request
+        resp = client.put(
+            url,
+            data=json.dumps({
+                "crop": "0,0,300,600"
+            }),
+            content_type='application/json'
+        )
+        resp_data = json.loads(resp.data)
+        assert resp.status == '400 BAD REQUEST'
+        assert resp_data == {'crop': ['width is lesser than minimum allowed crop width']}
+
+        # edit request
+        resp = client.put(
+            url,
+            data=json.dumps({
+                "crop": "0,0,640,100"
+            }),
+            content_type='application/json'
+        )
+        resp_data = json.loads(resp.data)
+        assert resp.status == '400 BAD REQUEST'
+        assert resp_data == {'crop': ['height is lesser than minimum allowed crop height']}
 
 
 @pytest.mark.parametrize('projects', [({'file': 'sample_0.mp4', 'duplicate': True},)], indirect=True)
@@ -495,12 +515,7 @@ def test_edit_project_scale_and_crop_success(test_app, client, projects):
             url,
             data=json.dumps({
                 "scale": 640,
-                "crop": {
-                    "x": 0,
-                    "y": 0,
-                    "width": 400,
-                    "height": 400
-                }
+                "crop": "0,0,400,400"
             }),
             content_type='application/json'
         )

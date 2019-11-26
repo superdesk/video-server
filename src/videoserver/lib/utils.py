@@ -92,7 +92,7 @@ def add_urls(doc):
                     _external=True
                 )
 
-            if doc['thumbnails']['preview']:
+            if doc['thumbnails']['preview'] or doc['processing']['thumbnail_preview']:
                 doc['thumbnails']['preview']['url'] = url_for(
                     'projects.get_raw_preview_thumbnail',
                     project_id=doc['_id'],
@@ -125,6 +125,22 @@ def save_activity_log(action, project_id, payload=None):
     })
 
 
+def coerce_crop_str_to_dict(value):
+    """
+    Use for coerce crop value from str (x,y,w,h) to dict
+    """
+    x, y, width, height = [int(item) for item in value.split(',')]
+    return {"x": x, "y": y, "width": width, "height": height}
+
+
+def coerce_trim_str_to_dict(value):
+    """
+    Use for coerce trim value from str (start,end) to dict
+    """
+    start, end = [float(item) for item in value.split(',')]
+    return {"start": start, "end": end}
+
+
 def validate_document(document, schema, **kwargs):
     """
     Validate `document` against provided `schema`
@@ -138,10 +154,52 @@ def validate_document(document, schema, **kwargs):
     :raise: `BadRequest` if `document` is not valid
     """
 
-    validator = Validator(schema, **kwargs)
+    validator = VideoValidator(schema, **kwargs)
     if not validator.validate(document):
         raise BadRequest(validator.errors)
     return validator.document
+
+
+class VideoValidator(Validator):
+    def _validate_allow_crop_width(self, limit, field, value):
+        """Test allowed crop width range
+        The rule's arguments are validated against this schema:
+        {'min': 'limit[0]', 'max': 'limit[1]'}
+        """
+        if limit and len(limit) == 2:
+            wmin, wmax = limit
+            if value['width'] < wmin:
+                self._error(field, "width is lesser than minimum allowed crop width")
+            if value['width'] > wmax:
+                self._error(field, "width is greater than maximum allowed crop width")
+
+    def _validate_allow_crop_height(self, limit, field, value):
+        """Test allowed crop height range
+        The rule's arguments are validated against this schema:
+        {'min': 'limit[0]', 'max': 'limit[1]'}
+        """
+        if limit and len(limit) == 2:
+            hmin, hmax = limit
+            if value['height'] < hmin:
+                self._error(field, "height is lesser than minimum allowed crop height")
+            if value['height'] > hmax:
+                self._error(field, "height is greater than maximum allowed crop height")
+
+    def _validate_min_trim_start(self, min_trim, field, value):
+        """Test minimum allowed trim start value
+        The rule's arguments are validated against this schema:
+        {'min': 'min_trim'}
+        """
+        if min_trim is not None and value['start'] < min_trim:
+            self._error(field, "start time must be greater than %s" % min_trim)
+
+    def _validate_min_trim_end(self, min_trim, field, value):
+        """Test minium allowed trim end value
+        The rule's arguments are validated against this schema:
+        {'min': 'min_trim'}
+        """
+        if min_trim is not None and value['end'] < min_trim:
+            self._error(field, "end time must be greater than %s" % min_trim)
 
 
 def get_request_address(request_headers):
@@ -170,10 +228,10 @@ def create_temp_file(file_stream, suffix=None):
 def storage2response(storage_id, headers=None, status=200, start=None, length=None):
     """
     Fetch binary using `storage_id` and return http response.
-    
+
     :param storage_id: Unique storage id
     :type storage_id: str
-    :param headers: header for response 
+    :param headers: header for response
     :type headers: dict
     :param status: http status code
     :type status: int
