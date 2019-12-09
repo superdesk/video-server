@@ -1119,7 +1119,7 @@ class RetrieveOrCreateThumbnails(MethodView):
             raise Conflict({"processing": ["Task get timeline thumbnails video is still processing"]})
         # no need to generate thumbnails
         elif amount == len(self.project['thumbnails']['timeline']):
-            return json_response(self.project['thumbnails']['timeline'])
+            return json_response({"thumbnails": self.project['thumbnails']['timeline']})
         else:
             # set processing flag
             self.project = app.mongo.db.projects.find_one_and_update(
