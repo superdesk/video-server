@@ -176,7 +176,7 @@ def test_capture_preview_thumbnail_crop_fail(test_app, client, projects):
         resp = client.get(url)
         resp_data = json.loads(resp.data)
         assert resp.status == '400 BAD REQUEST'
-        assert resp_data == {'crop': ['width is greater than maximum allowed crop width']}
+        assert resp_data == {'crop': ['width 10000 is greater than maximum allowed crop width (3840)']}
 
         crop = "0,0,640,10000"
         url = url_for(
@@ -185,7 +185,7 @@ def test_capture_preview_thumbnail_crop_fail(test_app, client, projects):
         resp = client.get(url)
         resp_data = json.loads(resp.data)
         assert resp.status == '400 BAD REQUEST'
-        assert resp_data == {'crop': ['height is greater than maximum allowed crop height']}
+        assert resp_data == {'crop': ['height 10000 is greater than maximum allowed crop height (2160)']}
 
         crop = "0,0,1640,480"
         url = url_for(
