@@ -18,13 +18,13 @@ def test_capture_timeline_thumbnails_success(test_app, client, projects):
         resp = client.get(url)
         resp_data = json.loads(resp.data)
         assert resp.status == '202 ACCEPTED'
-        assert resp_data == {'processing': True}
+        assert resp_data == {'processing': True, 'thumbnails': []}
 
         resp = client.get(url)
         resp_data = json.loads(resp.data)
         assert resp.status == '200 OK'
-        assert len(resp_data) == amount
-        for thumbnail_data in resp_data:
+        assert len(resp_data['thumbnails']) == amount
+        for thumbnail_data in resp_data['thumbnails']:
             assert test_app.fs.get(thumbnail_data['storage_id']).__class__ is bytes
 
 
@@ -47,13 +47,13 @@ def test_capture_timeline_thumbnails_remove_old(test_app, client, projects):
         resp = client.get(url)
         resp_data = json.loads(resp.data)
         assert resp.status == '202 ACCEPTED'
-        assert resp_data == {'processing': True}
+        assert resp_data == {'processing': True, 'thumbnails': []}
 
         resp = client.get(url)
         resp_data = json.loads(resp.data)
         assert resp.status == '200 OK'
-        assert len(resp_data) == amount
-        for thumbnail_data in resp_data:
+        assert len(resp_data['thumbnails']) == amount
+        for thumbnail_data in resp_data['thumbnails']:
             assert test_app.fs.get(thumbnail_data['storage_id']).__class__ is bytes
 
 
@@ -69,7 +69,7 @@ def test_capture_timeline_thumbnails_409_resp(test_app, client, projects):
         resp = client.get(url)
         resp_data = json.loads(resp.data)
         assert resp.status == '202 ACCEPTED'
-        assert resp_data == {'processing': True}
+        assert resp_data == {'processing': True, 'thumbnails': []}
 
         # since we use CELERY_TASK_ALWAYS_EAGER, task will be executed immediately,
         # it means next request will return a finshed result,
