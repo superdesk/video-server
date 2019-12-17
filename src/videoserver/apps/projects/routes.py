@@ -972,6 +972,9 @@ class RetrieveOrCreateThumbnails(MethodView):
                 processing:
                   type: boolean
                   example: True
+                thumbnails:
+                  type: array
+                  example: []
           409:
             description: Timeline/preview task is still processing
             schema:
@@ -1119,7 +1122,10 @@ class RetrieveOrCreateThumbnails(MethodView):
             raise Conflict({"processing": ["Task get timeline thumbnails video is still processing"]})
         # no need to generate thumbnails
         elif amount == len(self.project['thumbnails']['timeline']):
-            return json_response({"thumbnails": self.project['thumbnails']['timeline']})
+            return json_response({
+                "processing": False,
+                "thumbnails": self.project['thumbnails']['timeline'],
+            })
         else:
             # set processing flag
             self.project = app.mongo.db.projects.find_one_and_update(
@@ -1132,7 +1138,10 @@ class RetrieveOrCreateThumbnails(MethodView):
                 self.project,
                 amount
             )
-            return json_response({"processing": True}, status=202)
+            return json_response({
+                "processing": True,
+                "thumbnails": [],
+            }, status=202)
 
     def _get_preview_thumbnail(self, position, crop, rotate):
         """
