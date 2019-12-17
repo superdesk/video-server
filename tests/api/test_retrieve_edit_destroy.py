@@ -380,7 +380,7 @@ def test_edit_project_crop_fail(test_app, client, projects):
         )
         resp_data = json.loads(resp.data)
         assert resp.status == '400 BAD REQUEST'
-        assert resp_data == {'crop': ['width is greater than maximum allowed crop width']}
+        assert resp_data == {'crop': ['width 10000 is greater than maximum allowed crop width (3840)']}
 
         # edit request
         resp = client.put(
@@ -392,7 +392,7 @@ def test_edit_project_crop_fail(test_app, client, projects):
         )
         resp_data = json.loads(resp.data)
         assert resp.status == '400 BAD REQUEST'
-        assert resp_data == {'crop': ['width is lesser than minimum allowed crop width']}
+        assert resp_data == {'crop': ['width 300 is less than minimum allowed crop width (320)']}
 
         # edit request
         resp = client.put(
@@ -404,7 +404,7 @@ def test_edit_project_crop_fail(test_app, client, projects):
         )
         resp_data = json.loads(resp.data)
         assert resp.status == '400 BAD REQUEST'
-        assert resp_data == {'crop': ['height is lesser than minimum allowed crop height']}
+        assert resp_data == {'crop': ['height 100 is less than minimum allowed crop height (180)']}
 
 
 @pytest.mark.parametrize('projects', [({'file': 'sample_0.mp4', 'duplicate': True},)], indirect=True)

@@ -169,9 +169,9 @@ class VideoValidator(Validator):
         if limit and len(limit) == 2:
             wmin, wmax = limit
             if value['width'] < wmin:
-                self._error(field, "width is lesser than minimum allowed crop width")
+                self._error(field, f"width {value['width']} is less than minimum allowed crop width ({wmin})")
             if value['width'] > wmax:
-                self._error(field, "width is greater than maximum allowed crop width")
+                self._error(field, f"width {value['width']} is greater than maximum allowed crop width ({wmax})")
 
     def _validate_allow_crop_height(self, limit, field, value):
         """Test allowed crop height range
@@ -181,9 +181,9 @@ class VideoValidator(Validator):
         if limit and len(limit) == 2:
             hmin, hmax = limit
             if value['height'] < hmin:
-                self._error(field, "height is lesser than minimum allowed crop height")
+                self._error(field, f"height {value['height']} is less than minimum allowed crop height ({hmin})")
             if value['height'] > hmax:
-                self._error(field, "height is greater than maximum allowed crop height")
+                self._error(field, f"height {value['height']} is greater than maximum allowed crop height ({hmax})")
 
     def _validate_min_trim_start(self, min_trim, field, value):
         """Test minimum allowed trim start value
