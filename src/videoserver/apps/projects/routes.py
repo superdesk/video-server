@@ -1118,30 +1118,30 @@ class RetrieveOrCreateThumbnails(MethodView):
         # resource is busy
         # request get timeline thumbnails while editing video may lead to conflict with timeline task
         # triggered by edit video right after it finished
-        if self.project['processing']['video'] or self.project['processing']['thumbnails_timeline']:
-            raise Conflict({"processing": ["Task get timeline thumbnails video is still processing"]})
+        if self.project['processing']['video']:
+            raise Conflict({"processing": ["Task get video is still processing"]})
         # no need to generate thumbnails
         elif amount == len(self.project['thumbnails']['timeline']):
             return json_response({
                 "processing": False,
                 "thumbnails": self.project['thumbnails']['timeline'],
             })
-        else:
-            # set processing flag
-            self.project = app.mongo.db.projects.find_one_and_update(
-                {'_id': self.project['_id']},
-                {'$set': {'processing.thumbnails_timeline': True}},
-                return_document=ReturnDocument.AFTER
-            )
-            # run task
-            generate_timeline_thumbnails.delay(
-                self.project,
-                amount
-            )
-            return json_response({
-                "processing": True,
-                "thumbnails": [],
-            }, status=202)
+        if self.project['processing']['thumbnails_timeline'] is False:            
+          # set processing flag
+          self.project = app.mongo.db.projects.find_one_and_update(
+              {'_id': self.project['_id']},
+              {'$set': {'processing.thumbnails_timeline': True}},
+              return_document=ReturnDocument.AFTER
+          )
+          # run task
+          generate_timeline_thumbnails.delay(
+              self.project,
+              amount
+          )
+        return json_response({
+            "processing": True,
+            "thumbnails": [],
+        }, status=202)
 
     def _get_preview_thumbnail(self, position, crop, rotate):
         """
