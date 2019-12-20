@@ -80,7 +80,8 @@ def test_capture_timeline_thumbnails_409_resp(test_app, client, projects):
         )
 
         resp = client.get(url)
-        assert resp.status == '409 CONFLICT'
+        assert resp.status == '200 OK'
+        assert resp_data == {'processing': True, 'thumbnails': []}
 
 
 @pytest.mark.parametrize('projects', [({'file': 'sample_0.mp4', 'duplicate': False},)], indirect=True)
