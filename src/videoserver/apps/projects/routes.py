@@ -1126,18 +1126,18 @@ class RetrieveOrCreateThumbnails(MethodView):
                 "processing": False,
                 "thumbnails": self.project['thumbnails']['timeline'],
             })
-        if self.project['processing']['thumbnails_timeline'] is False:            
-          # set processing flag
-          self.project = app.mongo.db.projects.find_one_and_update(
-              {'_id': self.project['_id']},
-              {'$set': {'processing.thumbnails_timeline': True}},
-              return_document=ReturnDocument.AFTER
-          )
-          # run task
-          generate_timeline_thumbnails.delay(
-              self.project,
-              amount
-          )
+        if self.project['processing']['thumbnails_timeline'] is False:
+            # set processing flag
+            self.project = app.mongo.db.projects.find_one_and_update(
+                {'_id': self.project['_id']},
+                {'$set': {'processing.thumbnails_timeline': True}},
+                return_document=ReturnDocument.AFTER
+            )
+            # run task
+            generate_timeline_thumbnails.delay(
+                self.project,
+                amount
+            )
         return json_response({
             "processing": True,
             "thumbnails": [],
