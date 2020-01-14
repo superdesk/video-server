@@ -543,50 +543,44 @@ class RetrieveEditDestroyProject(MethodView):
         # validate trim
         if 'trim' in document:
             if document['trim']['start'] >= document['trim']['end']:
-                raise BadRequest({"trim": [{"start": ["must be less than 'end' value"]}]})
+                raise BadRequest({"trim": ["'start' value must be less than 'end' value"]})
             elif (document['trim']['end'] - document['trim']['start'] < app.config.get('MIN_TRIM_DURATION')) \
                     or (metadata['duration'] - document['trim']['start'] < app.config.get('MIN_TRIM_DURATION')):
                 raise BadRequest({"trim": [
-                    {"start": [f"trimmed video must be at least {app.config.get('MIN_TRIM_DURATION')} seconds"]}
+                    f"Trimmed video duration must be at least {app.config.get('MIN_TRIM_DURATION')} seconds"
                 ]})
             elif document['trim']['end'] > metadata['duration']:
                 document['trim']['end'] = metadata['duration']
                 logger.info(
-                    f"Trimmed video endtime greater than video duration, update it to equal duration, "
+                    f"Trimmed video endtime is greater than video duration, update it to equal duration, "
                     f"ID: {self.project['_id']}")
             elif document['trim']['start'] == 0 and document['trim']['end'] == metadata['duration']:
-                raise BadRequest({"trim": [
-                    {"end": ["trim is duplicating an entire video"]}
-                ]})
+                raise BadRequest({"trim": ["'end' value of trim is duplicating an entire video"]})
         # validate crop
         if 'crop' in document:
             if metadata['width'] - document['crop']['x'] < app.config.get('MIN_VIDEO_WIDTH'):
-                raise BadRequest({"crop": [{"x": ["less than minimum allowed crop width"]}]})
+                raise BadRequest({"crop": ["x is less than minimum allowed crop width"]})
             elif metadata['height'] - document['crop']['y'] < app.config.get('MIN_VIDEO_HEIGHT'):
-                raise BadRequest({"crop": [{"y": ["less than minimum allowed crop height"]}]})
+                raise BadRequest({"crop": ["y is less than minimum allowed crop height"]})
             elif document['crop']['x'] + document['crop']['width'] > metadata['width']:
-                raise BadRequest({"crop": [{"width": ["crop's frame is outside a video's frame"]}]})
+                raise BadRequest({"crop": ["width of crop's frame is outside a video's frame"]})
             elif document['crop']['y'] + document['crop']['height'] > metadata['height']:
-                raise BadRequest({"crop": [{"height": ["crop's frame is outside a video's frame"]}]})
+                raise BadRequest({"crop": ["height of crop's frame is outside a video's frame"]})
         # validate scale
         if 'scale' in document:
             width = metadata['width']
             if 'crop' in document:
                 width = document['crop']['width']
             if document['scale'] == width:
-                raise BadRequest({"trim": [
-                    {"scale": ["video or crop option already has exactly the same width"]}
-                ]})
+                raise BadRequest({"trim": ["video and crop option have exactly the same width"]})
             elif not app.config.get('ALLOW_INTERPOLATION') and document['scale'] > width:
-                raise BadRequest({"trim": [
-                    {"scale": ["interpolation of pixels is not allowed"]}
-                ]})
+                raise BadRequest({"trim": ["interpolation of pixels is not allowed"]})
             elif app.config.get('ALLOW_INTERPOLATION') \
                     and document['scale'] > width \
                     and width >= app.config.get('INTERPOLATION_LIMIT'):
                 raise BadRequest({"trim": [
-                    {"scale": [f"interpolation is permitted only for videos which have width less than "
-                               f"{app.config.get('INTERPOLATION_LIMIT')}px"]}
+                    f"interpolation is permitted only for videos which have width less than "
+                    f"{app.config.get('INTERPOLATION_LIMIT')}px"
                 ]})
 
         # set processing flag
@@ -1158,13 +1152,13 @@ class RetrieveOrCreateThumbnails(MethodView):
         # validate crop param
         if crop:
             if self.project['metadata']['width'] - crop['x'] < app.config.get('MIN_VIDEO_WIDTH'):
-                raise BadRequest({"crop": [{"x": ["less than minimum allowed crop width"]}]})
+                raise BadRequest({"crop": ["x is less than minimum allowed crop width"]})
             elif self.project['metadata']['height'] - crop['y'] < app.config.get('MIN_VIDEO_HEIGHT'):
-                raise BadRequest({"crop": [{"y": ["less than minimum allowed crop height"]}]})
+                raise BadRequest({"crop": ["y is less than minimum allowed crop height"]})
             elif crop['x'] + crop['width'] > self.project['metadata']['width']:
-                raise BadRequest({"crop": [{"width": ["crop's frame is outside a video's frame"]}]})
+                raise BadRequest({"crop": ["width of crop's frame is outside a video's frame"]})
             elif crop['y'] + crop['height'] > self.project['metadata']['height']:
-                raise BadRequest({"crop": [{"height": ["crop's frame is outside a video's frame"]}]})
+                raise BadRequest({"crop": ["height of crop's frame is outside a video's frame"]})
         # validate position param
         if self.project['metadata']['duration'] < position:
             position = self.project['metadata']['duration']
