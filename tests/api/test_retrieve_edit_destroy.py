@@ -189,6 +189,30 @@ def test_edit_project_trim_fail(test_app, client, projects):
     with test_app.test_request_context():
         url = url_for('projects.retrieve_edit_destroy_project', project_id=project['_id'])
 
+        # incorrect type
+        resp = client.put(
+            url,
+            data=json.dumps({
+                "trim": 123
+            }),
+            content_type='application/json'
+        )
+        resp_data = json.loads(resp.data)
+        assert resp.status == '400 BAD REQUEST'
+        assert resp_data == {'trim': ["must be of string type"]}
+
+        # malformed format
+        resp = client.put(
+            url,
+            data=json.dumps({
+                "trim": "x,y"
+            }),
+            content_type='application/json'
+        )
+        resp_data = json.loads(resp.data)
+        assert resp.status == '400 BAD REQUEST'
+        assert resp_data == {'trim': ["value does not match regex '^\\d+\\.?\\d*,\\d+\\.?\\d*$'"]}
+
         # edit request
         resp = client.put(
             url,
@@ -321,6 +345,30 @@ def test_edit_project_crop_fail(test_app, client, projects):
 
     with test_app.test_request_context():
         url = url_for('projects.retrieve_edit_destroy_project', project_id=project['_id'])
+
+        # incorrect type
+        resp = client.put(
+            url,
+            data=json.dumps({
+                "crop": 1
+            }),
+            content_type='application/json'
+        )
+        resp_data = json.loads(resp.data)
+        assert resp.status == '400 BAD REQUEST'
+        assert resp_data == {'crop': ["must be of string type"]}
+
+        # malformed format
+        resp = client.put(
+            url,
+            data=json.dumps({
+                "crop": "x,y,w,h"
+            }),
+            content_type='application/json'
+        )
+        resp_data = json.loads(resp.data)
+        assert resp.status == '400 BAD REQUEST'
+        assert resp_data == {'crop': ["value does not match regex '^\\d+,\\d+,\\d+,\\d+$'"]}
 
         # edit request
         resp = client.put(

@@ -15,7 +15,7 @@ from videoserver.lib.video_editor import get_video_editor
 from videoserver.lib.views import MethodView
 from videoserver.lib.utils import (
     add_urls, create_file_name, get_request_address, json_response, paginate, save_activity_log, storage2response,
-    validate_document, coerce_crop_str_to_dict, coerce_trim_str_to_dict
+    validate_document
 )
 
 from . import bp
@@ -339,7 +339,7 @@ class RetrieveEditDestroyProject(MethodView):
             'trim': {
                 'required': False,
                 'regex': r'^\d+\.?\d*,\d+\.?\d*$',
-                'coerce': coerce_trim_str_to_dict,
+                'coerce': 'trim_to_dict',
                 'min_trim_start': 0,
                 'min_trim_end': 1
             },
@@ -357,7 +357,7 @@ class RetrieveEditDestroyProject(MethodView):
             'crop': {
                 'required': False,
                 'regex': r'^\d+,\d+,\d+,\d+$',
-                'coerce': coerce_crop_str_to_dict,
+                'coerce': 'crop_to_dict',
                 'allow_crop_width': [app.config.get('MIN_VIDEO_WIDTH'), app.config.get('MAX_VIDEO_WIDTH')],
                 'allow_crop_height': [app.config.get('MIN_VIDEO_HEIGHT'), app.config.get('MAX_VIDEO_HEIGHT')]
             }
@@ -881,7 +881,7 @@ class RetrieveOrCreateThumbnails(MethodView):
             'crop': {
                 'required': False,
                 'regex': r'^\d+,\d+,\d+,\d+$',
-                'coerce': coerce_crop_str_to_dict,
+                'coerce': 'crop_to_dict',
                 'allow_crop_width': [app.config.get('MIN_VIDEO_WIDTH'), app.config.get('MAX_VIDEO_WIDTH')],
                 'allow_crop_height': [app.config.get('MIN_VIDEO_HEIGHT'), app.config.get('MAX_VIDEO_HEIGHT')]
             },
