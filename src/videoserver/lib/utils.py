@@ -153,24 +153,21 @@ class VideoValidator(Validator):
         try:
             x, y, width, height = [int(item) for item in value.split(',')]
             return {"x": x, "y": y, "width": width, "height": height}
-        except (TypeError, ValueError, AttributeError):
+        except ValueError:
+            return value
+        except (TypeError, AttributeError):
+            self._error('crop', 'must be of string type')
             return value
 
-    def _is_malformed_format(self, field, value):
-        if type(value) != dict:
-            # avoid duplicate message
-            if len(self._errors) == 0:
-                # using cerberus string type will always fail after coerced
-                self._error(field, 'must be of string type')
-            return True
-        return False
+    def _is_malformed_format(self, value):
+        return type(value) != dict
 
     def _validate_allow_crop_width(self, limit, field, value):
         """Test allowed crop width range
         The rule's arguments are validated against this schema:
         {'min': 'limit[0]', 'max': 'limit[1]'}
         """
-        if self._is_malformed_format(field, value):
+        if self._is_malformed_format(value):
             return
         if limit and len(limit) == 2:
             wmin, wmax = limit
@@ -185,7 +182,7 @@ class VideoValidator(Validator):
         The rule's arguments are validated against this schema:
         {'min': 'limit[0]', 'max': 'limit[1]'}
         """
-        if self._is_malformed_format(field, value):
+        if self._is_malformed_format(value):
             return
         if limit and len(limit) == 2:
             hmin, hmax = limit
@@ -199,9 +196,12 @@ class VideoValidator(Validator):
         """Convert trim string (x,y) to dict
         """
         try:
-            start, end = [float(item) for item in str(value).split(',')]
+            start, end = [float(item) for item in value.split(',')]
             return {"start": start, "end": end}
-        except (TypeError, ValueError):
+        except ValueError:
+            return value
+        except (TypeError, AttributeError):
+            self._error('trim', 'must be of string type')
             return value
 
     def _validate_min_trim_start(self, min_trim, field, value):
@@ -209,7 +209,7 @@ class VideoValidator(Validator):
         The rule's arguments are validated against this schema:
         {'min': 'min_trim'}
         """
-        if self._is_malformed_format(field, value):
+        if self._is_malformed_format(value):
             return
         if min_trim is not None and value.get('start', -1) < min_trim:
             self._error(field, "start time must be greater than %s" % min_trim)
@@ -219,7 +219,7 @@ class VideoValidator(Validator):
         The rule's arguments are validated against this schema:
         {'min': 'min_trim'}
         """
-        if self._is_malformed_format(field, value):
+        if self._is_malformed_format(value):
             return
         if min_trim is not None and value.get('end', -1) < min_trim:
             self._error(field, "end time must be greater than %s" % min_trim)
