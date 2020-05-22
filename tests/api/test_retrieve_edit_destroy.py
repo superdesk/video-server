@@ -189,6 +189,30 @@ def test_edit_project_trim_fail(test_app, client, projects):
     with test_app.test_request_context():
         url = url_for('projects.retrieve_edit_destroy_project', project_id=project['_id'])
 
+        # incorrect type
+        resp = client.put(
+            url,
+            data=json.dumps({
+                "trim": 123
+            }),
+            content_type='application/json'
+        )
+        resp_data = json.loads(resp.data)
+        assert resp.status == '400 BAD REQUEST'
+        assert resp_data == {'trim': ["must be of string type"]}
+
+        # malformed format
+        resp = client.put(
+            url,
+            data=json.dumps({
+                "trim": "x,y"
+            }),
+            content_type='application/json'
+        )
+        resp_data = json.loads(resp.data)
+        assert resp.status == '400 BAD REQUEST'
+        assert resp_data == {'trim': ["value does not match regex '^\\d+\\.?\\d*,\\d+\\.?\\d*$'"]}
+
         # edit request
         resp = client.put(
             url,
@@ -199,7 +223,7 @@ def test_edit_project_trim_fail(test_app, client, projects):
         )
         resp_data = json.loads(resp.data)
         assert resp.status == '400 BAD REQUEST'
-        assert resp_data == {'trim': [{'start': ["must be less than 'end' value"]}]}
+        assert resp_data == {'trim': ["'start' value must be less than 'end' value"]}
 
         # edit request
         resp = client.put(
@@ -211,7 +235,7 @@ def test_edit_project_trim_fail(test_app, client, projects):
         )
         resp_data = json.loads(resp.data)
         assert resp.status == '400 BAD REQUEST'
-        assert resp_data == {'trim': [{'start': ['trimmed video must be at least 2 seconds']}]}
+        assert resp_data == {'trim': ['Trimmed video duration must be at least 2 seconds']}
 
         # edit request
         resp = client.put(
@@ -223,7 +247,7 @@ def test_edit_project_trim_fail(test_app, client, projects):
         )
         resp_data = json.loads(resp.data)
         assert resp.status == '400 BAD REQUEST'
-        assert resp_data == {'trim': [{'end': ['trim is duplicating an entire video']}]}
+        assert resp_data == {'trim': ["'end' value of trim is duplicating an entire video"]}
 
         # edit request
         resp = client.put(
@@ -322,6 +346,30 @@ def test_edit_project_crop_fail(test_app, client, projects):
     with test_app.test_request_context():
         url = url_for('projects.retrieve_edit_destroy_project', project_id=project['_id'])
 
+        # incorrect type
+        resp = client.put(
+            url,
+            data=json.dumps({
+                "crop": 1
+            }),
+            content_type='application/json'
+        )
+        resp_data = json.loads(resp.data)
+        assert resp.status == '400 BAD REQUEST'
+        assert resp_data == {'crop': ["must be of string type"]}
+
+        # malformed format
+        resp = client.put(
+            url,
+            data=json.dumps({
+                "crop": "x,y,w,h"
+            }),
+            content_type='application/json'
+        )
+        resp_data = json.loads(resp.data)
+        assert resp.status == '400 BAD REQUEST'
+        assert resp_data == {'crop': ["value does not match regex '^\\d+,\\d+,\\d+,\\d+$'"]}
+
         # edit request
         resp = client.put(
             url,
@@ -332,7 +380,7 @@ def test_edit_project_crop_fail(test_app, client, projects):
         )
         resp_data = json.loads(resp.data)
         assert resp.status == '400 BAD REQUEST'
-        assert resp_data == {'crop': [{'x': ['less than minimum allowed crop width']}]}
+        assert resp_data == {'crop': ['x is less than minimum allowed crop width']}
 
         # edit request
         resp = client.put(
@@ -344,7 +392,7 @@ def test_edit_project_crop_fail(test_app, client, projects):
         )
         resp_data = json.loads(resp.data)
         assert resp.status == '400 BAD REQUEST'
-        assert resp_data == {'crop': [{'y': ['less than minimum allowed crop height']}]}
+        assert resp_data == {'crop': ['y is less than minimum allowed crop height']}
 
         # edit request
         resp = client.put(
@@ -356,7 +404,7 @@ def test_edit_project_crop_fail(test_app, client, projects):
         )
         resp_data = json.loads(resp.data)
         assert resp.status == '400 BAD REQUEST'
-        assert resp_data == {'crop': [{'width': ["crop's frame is outside a video's frame"]}]}
+        assert resp_data == {'crop': ["width of crop's frame is outside a video's frame"]}
 
         # edit request
         resp = client.put(
@@ -368,7 +416,7 @@ def test_edit_project_crop_fail(test_app, client, projects):
         )
         resp_data = json.loads(resp.data)
         assert resp.status == '400 BAD REQUEST'
-        assert resp_data == {'crop': [{'height': ["crop's frame is outside a video's frame"]}]}
+        assert resp_data == {'crop': ["height of crop's frame is outside a video's frame"]}
 
         # edit request
         resp = client.put(
@@ -380,7 +428,7 @@ def test_edit_project_crop_fail(test_app, client, projects):
         )
         resp_data = json.loads(resp.data)
         assert resp.status == '400 BAD REQUEST'
-        assert resp_data == {'crop': ['width is greater than maximum allowed crop width']}
+        assert resp_data == {'crop': ['width 10000 is greater than maximum allowed crop width (3840)']}
 
         # edit request
         resp = client.put(
@@ -392,7 +440,7 @@ def test_edit_project_crop_fail(test_app, client, projects):
         )
         resp_data = json.loads(resp.data)
         assert resp.status == '400 BAD REQUEST'
-        assert resp_data == {'crop': ['width is lesser than minimum allowed crop width']}
+        assert resp_data == {'crop': ['width 300 is less than minimum allowed crop width (320)']}
 
         # edit request
         resp = client.put(
@@ -404,7 +452,7 @@ def test_edit_project_crop_fail(test_app, client, projects):
         )
         resp_data = json.loads(resp.data)
         assert resp.status == '400 BAD REQUEST'
-        assert resp_data == {'crop': ['height is lesser than minimum allowed crop height']}
+        assert resp_data == {'crop': ['height 100 is less than minimum allowed crop height (180)']}
 
 
 @pytest.mark.parametrize('projects', [({'file': 'sample_0.mp4', 'duplicate': True},)], indirect=True)
@@ -472,7 +520,7 @@ def test_edit_project_scale_fail(test_app, client, projects):
         )
         resp_data = json.loads(resp.data)
         assert resp.status == '400 BAD REQUEST'
-        assert resp_data == {'trim': [{'scale': ['video or crop option already has exactly the same width']}]}
+        assert resp_data == {'trim': ['video and crop option have exactly the same width']}
 
         # edit request
         resp = client.put(
@@ -485,7 +533,7 @@ def test_edit_project_scale_fail(test_app, client, projects):
         resp_data = json.loads(resp.data)
         assert resp.status == '400 BAD REQUEST'
         assert resp_data == {
-            'trim': [{'scale': ['interpolation is permitted only for videos which have width less than 1280px']}]
+            'trim': ['interpolation is permitted only for videos which have width less than 1280px']
         }
 
         # edit request
@@ -500,7 +548,7 @@ def test_edit_project_scale_fail(test_app, client, projects):
         resp_data = json.loads(resp.data)
         assert resp.status == '400 BAD REQUEST'
         assert resp_data == {
-            'trim': [{'scale': ['interpolation of pixels is not allowed']}]
+            'trim': ['interpolation of pixels is not allowed']
         }
 
 

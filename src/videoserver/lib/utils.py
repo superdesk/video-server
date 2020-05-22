@@ -125,22 +125,6 @@ def save_activity_log(action, project_id, payload=None):
     })
 
 
-def coerce_crop_str_to_dict(value):
-    """
-    Use for coerce crop value from str (x,y,w,h) to dict
-    """
-    x, y, width, height = [int(item) for item in value.split(',')]
-    return {"x": x, "y": y, "width": width, "height": height}
-
-
-def coerce_trim_str_to_dict(value):
-    """
-    Use for coerce trim value from str (start,end) to dict
-    """
-    start, end = [float(item) for item in value.split(',')]
-    return {"start": start, "end": end}
-
-
 def validate_document(document, schema, **kwargs):
     """
     Validate `document` against provided `schema`
@@ -161,36 +145,73 @@ def validate_document(document, schema, **kwargs):
 
 
 class VideoValidator(Validator):
+    def _normalize_coerce_crop_to_dict(self, value):
+        """Convert crop string (x,y,w,h) to dict
+        """
+        # cerberus run coercion func before validation rule
+        # if provided value is malformed, return original value (str) to validate against regex rule
+        try:
+            x, y, width, height = [int(item) for item in value.split(',')]
+            return {"x": x, "y": y, "width": width, "height": height}
+        except ValueError:
+            return value
+        except (TypeError, AttributeError):
+            self._error('crop', 'must be of string type')
+            return value
+
+    def _is_malformed_format(self, value):
+        return type(value) != dict
+
     def _validate_allow_crop_width(self, limit, field, value):
         """Test allowed crop width range
         The rule's arguments are validated against this schema:
         {'min': 'limit[0]', 'max': 'limit[1]'}
         """
+        if self._is_malformed_format(value):
+            return
         if limit and len(limit) == 2:
             wmin, wmax = limit
-            if value['width'] < wmin:
-                self._error(field, "width is lesser than minimum allowed crop width")
-            if value['width'] > wmax:
-                self._error(field, "width is greater than maximum allowed crop width")
+            width = value.get('width', 0)
+            if width < wmin:
+                self._error(field, f"width {width} is less than minimum allowed crop width ({wmin})")
+            if width > wmax:
+                self._error(field, f"width {width} is greater than maximum allowed crop width ({wmax})")
 
     def _validate_allow_crop_height(self, limit, field, value):
         """Test allowed crop height range
         The rule's arguments are validated against this schema:
         {'min': 'limit[0]', 'max': 'limit[1]'}
         """
+        if self._is_malformed_format(value):
+            return
         if limit and len(limit) == 2:
             hmin, hmax = limit
-            if value['height'] < hmin:
-                self._error(field, "height is lesser than minimum allowed crop height")
-            if value['height'] > hmax:
-                self._error(field, "height is greater than maximum allowed crop height")
+            height = value.get('height', 0)
+            if height < hmin:
+                self._error(field, f"height {height} is less than minimum allowed crop height ({hmin})")
+            if height > hmax:
+                self._error(field, f"height {height} is greater than maximum allowed crop height ({hmax})")
+
+    def _normalize_coerce_trim_to_dict(self, value):
+        """Convert trim string (x,y) to dict
+        """
+        try:
+            start, end = [float(item) for item in value.split(',')]
+            return {"start": start, "end": end}
+        except ValueError:
+            return value
+        except (TypeError, AttributeError):
+            self._error('trim', 'must be of string type')
+            return value
 
     def _validate_min_trim_start(self, min_trim, field, value):
         """Test minimum allowed trim start value
         The rule's arguments are validated against this schema:
         {'min': 'min_trim'}
         """
-        if min_trim is not None and value['start'] < min_trim:
+        if self._is_malformed_format(value):
+            return
+        if min_trim is not None and value.get('start', -1) < min_trim:
             self._error(field, "start time must be greater than %s" % min_trim)
 
     def _validate_min_trim_end(self, min_trim, field, value):
@@ -198,7 +219,9 @@ class VideoValidator(Validator):
         The rule's arguments are validated against this schema:
         {'min': 'min_trim'}
         """
-        if min_trim is not None and value['end'] < min_trim:
+        if self._is_malformed_format(value):
+            return
+        if min_trim is not None and value.get('end', -1) < min_trim:
             self._error(field, "end time must be greater than %s" % min_trim)
 
 

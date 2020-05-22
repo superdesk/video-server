@@ -18,13 +18,13 @@ def test_capture_timeline_thumbnails_success(test_app, client, projects):
         resp = client.get(url)
         resp_data = json.loads(resp.data)
         assert resp.status == '202 ACCEPTED'
-        assert resp_data == {'processing': True}
+        assert resp_data == {'processing': True, 'thumbnails': []}
 
         resp = client.get(url)
         resp_data = json.loads(resp.data)
         assert resp.status == '200 OK'
-        assert len(resp_data) == amount
-        for thumbnail_data in resp_data:
+        assert len(resp_data['thumbnails']) == amount
+        for thumbnail_data in resp_data['thumbnails']:
             assert test_app.fs.get(thumbnail_data['storage_id']).__class__ is bytes
 
 
@@ -47,13 +47,13 @@ def test_capture_timeline_thumbnails_remove_old(test_app, client, projects):
         resp = client.get(url)
         resp_data = json.loads(resp.data)
         assert resp.status == '202 ACCEPTED'
-        assert resp_data == {'processing': True}
+        assert resp_data == {'processing': True, 'thumbnails': []}
 
         resp = client.get(url)
         resp_data = json.loads(resp.data)
         assert resp.status == '200 OK'
-        assert len(resp_data) == amount
-        for thumbnail_data in resp_data:
+        assert len(resp_data['thumbnails']) == amount
+        for thumbnail_data in resp_data['thumbnails']:
             assert test_app.fs.get(thumbnail_data['storage_id']).__class__ is bytes
 
 
@@ -69,7 +69,7 @@ def test_capture_timeline_thumbnails_409_resp(test_app, client, projects):
         resp = client.get(url)
         resp_data = json.loads(resp.data)
         assert resp.status == '202 ACCEPTED'
-        assert resp_data == {'processing': True}
+        assert resp_data == {'processing': True, 'thumbnails': []}
 
         # since we use CELERY_TASK_ALWAYS_EAGER, task will be executed immediately,
         # it means next request will return a finshed result,
@@ -80,7 +80,8 @@ def test_capture_timeline_thumbnails_409_resp(test_app, client, projects):
         )
 
         resp = client.get(url)
-        assert resp.status == '409 CONFLICT'
+        assert resp.status == '200 OK'
+        assert resp_data == {'processing': True, 'thumbnails': []}
 
 
 @pytest.mark.parametrize('projects', [({'file': 'sample_0.mp4', 'duplicate': False},)], indirect=True)
@@ -158,7 +159,7 @@ def test_capture_preview_thumbnail_crop_fail(test_app, client, projects):
         resp = client.get(url)
         resp_data = json.loads(resp.data)
         assert resp.status == '400 BAD REQUEST'
-        assert resp_data == {'crop': [{'x': ['less than minimum allowed crop width']}]}
+        assert resp_data == {'crop': ['x is less than minimum allowed crop width']}
 
         crop = "0,1000,640,480"
         url = url_for(
@@ -167,7 +168,7 @@ def test_capture_preview_thumbnail_crop_fail(test_app, client, projects):
         resp = client.get(url)
         resp_data = json.loads(resp.data)
         assert resp.status == '400 BAD REQUEST'
-        assert resp_data == {'crop': [{'y': ['less than minimum allowed crop height']}]}
+        assert resp_data == {'crop': ['y is less than minimum allowed crop height']}
 
         crop = "0,0,10000,480"
         url = url_for(
@@ -176,7 +177,7 @@ def test_capture_preview_thumbnail_crop_fail(test_app, client, projects):
         resp = client.get(url)
         resp_data = json.loads(resp.data)
         assert resp.status == '400 BAD REQUEST'
-        assert resp_data == {'crop': ['width is greater than maximum allowed crop width']}
+        assert resp_data == {'crop': ['width 10000 is greater than maximum allowed crop width (3840)']}
 
         crop = "0,0,640,10000"
         url = url_for(
@@ -185,7 +186,7 @@ def test_capture_preview_thumbnail_crop_fail(test_app, client, projects):
         resp = client.get(url)
         resp_data = json.loads(resp.data)
         assert resp.status == '400 BAD REQUEST'
-        assert resp_data == {'crop': ['height is greater than maximum allowed crop height']}
+        assert resp_data == {'crop': ['height 10000 is greater than maximum allowed crop height (2160)']}
 
         crop = "0,0,1640,480"
         url = url_for(
@@ -194,7 +195,7 @@ def test_capture_preview_thumbnail_crop_fail(test_app, client, projects):
         resp = client.get(url)
         resp_data = json.loads(resp.data)
         assert resp.status == '400 BAD REQUEST'
-        assert resp_data == {'crop': [{'width': ["crop's frame is outside a video's frame"]}]}
+        assert resp_data == {'crop': ["width of crop's frame is outside a video's frame"]}
 
         crop = "0,0,640,1480"
         url = url_for(
@@ -203,7 +204,7 @@ def test_capture_preview_thumbnail_crop_fail(test_app, client, projects):
         resp = client.get(url)
         resp_data = json.loads(resp.data)
         assert resp.status == '400 BAD REQUEST'
-        assert resp_data == {'crop': [{'height': ["crop's frame is outside a video's frame"]}]}
+        assert resp_data == {'crop': ["height of crop's frame is outside a video's frame"]}
 
 
 @pytest.mark.parametrize('projects', [({'file': 'sample_0.mp4', 'duplicate': False},)], indirect=True)
