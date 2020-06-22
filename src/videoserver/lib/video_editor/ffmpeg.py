@@ -83,6 +83,9 @@ class FFMPEGVideoEditor(VideoEditorInterface):
             # https://trac.ffmpeg.org/wiki/Scaling
             if scale:
                 filter_string += ',' if filter_string != '' else ''
+                # avoid width not divisible by 2
+                if scale % 2 == 1:
+                    scale -= 1
                 filter_string += f"scale={scale}:-2"
             # rotate
             # https://ffmpeg.org/ffmpeg-all.html#transpose
