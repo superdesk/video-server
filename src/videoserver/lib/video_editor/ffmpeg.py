@@ -212,9 +212,9 @@ class FFMPEGVideoEditor(VideoEditorInterface):
         try:
             # time period between two frames
             if thumbnails_amount == 1:
-                frame_per_second = (duration - 1)
+                frame_per_second = (duration - 0.05)
             else:
-                frame_per_second = (duration - 1) / (thumbnails_amount - 1)
+                frame_per_second = (duration - 0.05) / (thumbnails_amount - 1)
 
             # capture list frame via script capture_list_frames.sh
             path_script = os.path.dirname(__file__) + '/script/capture_list_frames.sh'
