@@ -77,26 +77,37 @@ def add_urls(doc):
     """
 
     def _handle_doc(doc):
+        PROXY_ENABLED = app.config.get('FILE_STREAM_PROXY_ENABLED')
+        PROXY_URL = app.config.get('FILE_STREAM_PROXY_URL')
+
+        def _url_for(*args, **kwargs):
+            kwargs['_external'] = not PROXY_ENABLED
+            url = url_for(*args, **kwargs)
+
+            if PROXY_ENABLED:
+                url = PROXY_URL + url
+
+            return url
+
         if '_id' in doc:
-            doc['url'] = url_for(
+            url = _url_for(
                 'projects.get_raw_video',
-                project_id=doc['_id'],
-                _external=True
+                project_id=doc['_id']
             )
 
+            doc['url'] = url
+
             for index, thumb in enumerate(doc['thumbnails']['timeline']):
-                thumb['url'] = url_for(
+                thumb['url'] = _url_for(
                     'projects.get_raw_timeline_thumbnail',
                     project_id=doc['_id'],
-                    index=index,
-                    _external=True
+                    index=index
                 )
 
             if doc['thumbnails']['preview'] or doc['processing']['thumbnail_preview']:
-                doc['thumbnails']['preview']['url'] = url_for(
+                doc['thumbnails']['preview']['url'] = _url_for(
                     'projects.get_raw_preview_thumbnail',
-                    project_id=doc['_id'],
-                    _external=True
+                    project_id=doc['_id']
                 )
 
     if type(doc) is dict:
