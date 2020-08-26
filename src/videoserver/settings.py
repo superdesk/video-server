@@ -96,6 +96,13 @@ DEFAULT_TOTAL_TIMELINE_THUMBNAILS = int(env('DEFAULT_TOTAL_TIMELINE_THUMBNAILS',
 #: set PORT for video server
 VIDEO_SERVER_PORT = env('VIDEO_SERVER_PORT', 5050)
 
+#: use custom url for reading video/picture files. Affects how urls are build in `add_urls`
+FILE_STREAM_PROXY_ENABLED = strtobool(env('FILE_STREAM_PROXY_ENABLED', 'False'))
+FILE_STREAM_PROXY_URL = env('FILE_STREAM_PROXY_URL', '')
+
+if FILE_STREAM_PROXY_ENABLED and not FILE_STREAM_PROXY_URL:
+    raise ValueError('FILE_STREAM_PROXY_URL is required if FILE_STREAM_PROXY_ENABLED')
+
 #: video edit constraints
 ALLOW_INTERPOLATION = strtobool(env('ALLOW_INTERPOLATION', 'True'))
 INTERPOLATION_LIMIT = env('INTERPOLATION_LIMIT', 1280)
