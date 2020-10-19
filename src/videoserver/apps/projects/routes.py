@@ -524,7 +524,7 @@ class RetrieveEditDestroyProject(MethodView):
             raise Conflict({"processing": ["Task edit video is still processing"]})
 
         if self.project['version'] == 1:
-            raise BadRequest({"project_id": [f"Video with version 1 is not editable, use duplicated project instead."]})
+            raise BadRequest({"project_id": ["Video with version 1 is not editable, use duplicated project instead."]})
 
         request_json = request.get_json()
         document = validate_document(
