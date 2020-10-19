@@ -325,7 +325,7 @@ class ListUploadProject(MethodView):
                 '_meta': {
                     'page': page,
                     'max_results': app.config.get('ITEMS_PER_PAGE'),
-                    'total': app.mongo.db.projects.count()
+                    'total': app.mongo.db.projects.estimated_document_count()
                 }
             }
         )
