@@ -1230,10 +1230,12 @@ class GetRawVideo(MethodView):
         video_range = request.headers.environ.get('HTTP_RANGE')
         length = self.project['metadata'].get('size')
         if video_range:
+            # http range bytes=0-
             _range = re.split('[= | -]', video_range)
             start = int(_range[1])
             # TODO doublecheck streaming range
             end = length - 1
+            # handle end range part in case of bytes=100-200
             if len(_range) == 3 and _range[2]:
                 end = int(_range[2])
             chunksize = end - start + 1
