@@ -28,7 +28,7 @@ dev_requirements = (
 
 setup(
     name='videoserver',
-    version='0.9.1',
+    version='1.0.1',
     description='HTTP API video editor.',
     long_description='Friendly HTTP API video editor with pluggable file storage, '
                      'video editing backend, and streaming capabilities.',
