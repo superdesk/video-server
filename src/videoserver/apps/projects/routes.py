@@ -325,7 +325,7 @@ class ListUploadProject(MethodView):
                 '_meta': {
                     'page': page,
                     'max_results': app.config.get('ITEMS_PER_PAGE'),
-                    'total': app.mongo.db.projects.count()
+                    'total': app.mongo.db.projects.estimated_document_count()
                 }
             }
         )
@@ -524,7 +524,7 @@ class RetrieveEditDestroyProject(MethodView):
             raise Conflict({"processing": ["Task edit video is still processing"]})
 
         if self.project['version'] == 1:
-            raise BadRequest({"project_id": [f"Video with version 1 is not editable, use duplicated project instead."]})
+            raise BadRequest({"project_id": ["Video with version 1 is not editable, use duplicated project instead."]})
 
         request_json = request.get_json()
         document = validate_document(
@@ -1230,9 +1230,14 @@ class GetRawVideo(MethodView):
         video_range = request.headers.environ.get('HTTP_RANGE')
         length = self.project['metadata'].get('size')
         if video_range:
-            start = int(re.split('[= | -]', video_range)[1])
+            # http range bytes=0-
+            _range = re.split('[= | -]', video_range)
+            start = int(_range[1])
             # TODO doublecheck streaming range
             end = length - 1
+            # handle end range part in case of bytes=100-200
+            if len(_range) == 3 and _range[2]:
+                end = int(_range[2])
             chunksize = end - start + 1
 
             return storage2response(

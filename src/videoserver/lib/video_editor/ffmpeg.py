@@ -83,6 +83,9 @@ class FFMPEGVideoEditor(VideoEditorInterface):
             # https://trac.ffmpeg.org/wiki/Scaling
             if scale:
                 filter_string += ',' if filter_string != '' else ''
+                # avoid width not divisible by 2
+                if scale % 2 == 1:
+                    scale -= 1
                 filter_string += f"scale={scale}:-2"
             # rotate
             # https://ffmpeg.org/ffmpeg-all.html#transpose
@@ -160,7 +163,7 @@ class FFMPEGVideoEditor(VideoEditorInterface):
                 vfilter = f'-vf crop={crop["width"]}:{crop["height"]}:{crop["x"]}:{crop["y"]}'
             if rotate:
                 vfilter += ',' if vfilter else '-vf '
-                transpose = f'transpose=1' if rotate > 0 else f'transpose=2'
+                transpose = 'transpose=1' if rotate > 0 else 'transpose=2'
                 vfilter += ','.join([transpose] * abs(rotate // 90))
 
             try:
@@ -209,9 +212,9 @@ class FFMPEGVideoEditor(VideoEditorInterface):
         try:
             # time period between two frames
             if thumbnails_amount == 1:
-                frame_per_second = (duration - 1)
+                frame_per_second = (duration - 0.05)
             else:
-                frame_per_second = (duration - 1) / (thumbnails_amount - 1)
+                frame_per_second = (duration - 0.05) / (thumbnails_amount - 1)
 
             # capture list frame via script capture_list_frames.sh
             path_script = os.path.dirname(__file__) + '/script/capture_list_frames.sh'

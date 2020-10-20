@@ -47,7 +47,7 @@ def test_get_raw_preview_thumbnail_success(test_app, client, projects):
         # capture preview thumbnail
         url = url_for(
             'projects.retrieve_or_create_thumbnails', project_id=project['_id']
-        ) + f'?type=preview&position=5'
+        ) + '?type=preview&position=5'
         client.get(url)
         # get raw preview thumbnail
         url = url_for('projects.get_raw_preview_thumbnail', project_id=project['_id'])
