@@ -1,0 +1,8 @@
+[run]
+omit = .env/*,
+       tests/*,
+       src/videoserver/app.py,
+       src/videoserver/celery_app.py,
+       src/videoserver/settings.py,
+       src/videoserver/apps/swagger/*,
+       src/videoserver/lib/logging.py
