@@ -16,7 +16,7 @@ do
         ;;
 		1)
         docker rmi -f lambiengcode/video-server
-		docker build -t lambiengcode/video-server . 
+		docker build -t lambiengcode/video-server .
 		break
 		;;
 		2)

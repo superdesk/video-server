@@ -37,6 +37,8 @@ class FFMPEGVideoEditor(VideoEditorInterface):
         :rtype: dict
         """
 
+        print(os.environ['PATH'])
+
         file_temp_path = create_temp_file(filestream)
         try:
             metadata = self._get_meta(file_temp_path)

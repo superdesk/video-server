@@ -141,6 +141,8 @@ class ListUploadProject(MethodView):
             raise BadRequest({"file": ["required field"]})
         document = validate_document(request.files, self.SCHEMA_UPLOAD)
 
+        print("START HERE")
+
         # validate codec
         file_stream = document['file'].stream.read()
         metadata = get_video_editor().get_meta(file_stream)
@@ -170,6 +172,8 @@ class ListUploadProject(MethodView):
             }
         }
 
+        print("START HERE 2")
+
         # put file stream into storage
         storage_id = app.fs.put(
             content=file_stream,
@@ -180,12 +184,15 @@ class ListUploadProject(MethodView):
         # set 'storage_id' for project
         project['storage_id'] = storage_id
 
+        print("START HERE 3")
+
         try:
             # save project
             app.mongo.db.projects.insert_one(project)
         except ServerSelectionTimeoutError as e:
             # delete project dir
             app.fs.delete_dir(storage_id)
+            print("ERROR HERE")
             raise InternalServerError(str(e))
 
         logger.info(f"New project was created. ID: {project['_id']}")
