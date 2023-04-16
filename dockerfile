@@ -1,5 +1,5 @@
 # base ubuntu 20.04 image
-FROM ubuntu:focal
+FROM --platform=linux/amd64 ubuntu:focal
 
 ## system-wide dependencies
 ## system-wide dependencies
