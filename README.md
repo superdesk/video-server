@@ -46,9 +46,9 @@ git clone https://github.com/superdesk/video-server.git
 # install video server for development
 # NOTE: your virtualenv must be activated
 pip install -e video-server/[dev]
-
-# rename `.env-example` to `.env` and fill out your S3 bucket information
 ```
+
+- rename `.env-example` to `.env` and fill out your S3 bucket information
 
 
 ### Run video server for development
