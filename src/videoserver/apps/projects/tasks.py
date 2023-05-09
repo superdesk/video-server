@@ -38,7 +38,6 @@ def edit_video(self, project, changes):
             project['storage_id'],
             None
         )
-
         logger.info(f"Replaced file {project['storage_id']} in {app.fs.__class__.__name__} "
                     f"in project {project.get('_id')}")
     except Exception as exc:
