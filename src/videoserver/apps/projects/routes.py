@@ -1,8 +1,9 @@
+from dotenv import load_dotenv
+load_dotenv()
 import copy
 import logging
 import os
 import re
-import io
 from datetime import datetime
 
 import bson
@@ -185,10 +186,10 @@ class ListUploadProject(MethodView):
         # set 'storage_id' for project
         project['storage_id'] = storage_id
 
-        upload_succeed = upload_file_to_s3(storage_id, file_name_s3, document['file'].mimetype)
+        exception_s3 = upload_file_to_s3(storage_id, file_name_s3, document['file'].mimetype)
 
-        if not upload_succeed:
-          raise InternalServerError("Upload file to s3 error!")
+        if not exception_s3 is None:
+          raise InternalServerError(exception_s3)
 
         try:
             # save project

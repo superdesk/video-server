@@ -2,6 +2,8 @@ from dotenv import load_dotenv
 load_dotenv()
 import boto3, botocore
 import json
+import os
+import io
 import uuid
 from datetime import datetime
 from tempfile import mkstemp
@@ -36,10 +38,10 @@ def upload_file_to_s3(storage_id, filename, mimetype):
                   }
               ) 
 
-            return true
+            return None
         except Exception as e:
             # This is a catch all exception, edit this part to fit your needs.
-            return false
+            return str(e)
 
 def create_file_name(ext):
     """

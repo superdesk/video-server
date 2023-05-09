@@ -1,5 +1,7 @@
 import logging
 from time import time
+from datetime import datetime
+import os
 
 from bson import ObjectId
 from celery.exceptions import MaxRetriesExceededError
@@ -8,6 +10,7 @@ from pymongo import ReturnDocument
 
 from videoserver.celery_app import celery
 from videoserver.lib.video_editor import get_video_editor
+from videoserver.lib.utils import (upload_file_to_s3, create_file_name)
 
 logger = logging.getLogger(__name__)
 
@@ -35,6 +38,7 @@ def edit_video(self, project, changes):
             project['storage_id'],
             None
         )
+
         logger.info(f"Replaced file {project['storage_id']} in {app.fs.__class__.__name__} "
                     f"in project {project.get('_id')}")
     except Exception as exc:
@@ -57,6 +61,11 @@ def edit_video(self, project, changes):
         logger.info(f"Removed {len(old_timeline_thumbnails)} old thumbnails from {app.fs.__class__.__name__} "
                     f"in project {project.get('_id')}")
 
+        new_name = create_file_name(ext=project['filename'].rsplit('.')[-1])
+        file_name_s3 = "videos/" + new_name
+        
+        exception_s3 = upload_file_to_s3(project['storage_id'], file_name_s3, project['mime_type'])
+
         # update project record
         app.mongo.db.projects.find_one_and_update(
             {'_id': project['_id']},
@@ -64,6 +73,7 @@ def edit_video(self, project, changes):
                 'processing.video': False,
                 'metadata': metadata,
                 'thumbnails.timeline': [],
+                'urlToVideoS3': os.getenv('AWS_DOMAIN') + file_name_s3,
                 'version': project['version'] + 1
             }},
             return_document=ReturnDocument.BEFORE
