@@ -105,6 +105,11 @@ def generate_timeline_thumbnails(self, project, amount):
                 storage_id=project['storage_id'],
                 content_type=meta.get('mimetype')
             )
+
+            new_name = create_file_name(ext=filename.rsplit('.')[-1])
+            file_name_s3 = "timelines/" + new_name
+            upload_file_to_s3(storage_id, file_name_s3, meta.get('mimetype'))
+
             timeline_thumbnails.append(
                 {
                     'filename': filename,
@@ -112,7 +117,8 @@ def generate_timeline_thumbnails(self, project, amount):
                     'mimetype': meta.get('mimetype'),
                     'width': meta.get('width'),
                     'height': meta.get('height'),
-                    'size': meta.get('size')
+                    'size': meta.get('size'),
+                    'urlToImageS3': os.getenv('AWS_DOMAIN') + file_name_s3
                 }
             )
         logger.info(f"Created and saved {len(timeline_thumbnails)} thumbnails to {app.fs.__class__.__name__} "
