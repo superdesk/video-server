@@ -12,7 +12,8 @@ services:
     volumes:
       - mongodb_data:/data/db
   server:
-    build: .
+    # build: .
+    image: lambiengcode/video-server
     container_name: video-server
     ports:
       - "5050:5050"

@@ -1,2 +1,4 @@
 honcho==1.0.1
 gunicorn==19.7.1
+boto3==1.26.129
+python-dotenv==1.0.0
