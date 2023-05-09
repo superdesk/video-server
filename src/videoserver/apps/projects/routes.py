@@ -1015,6 +1015,7 @@ class RetrieveOrCreateThumbnails(MethodView):
           description: Unique project id
         - in: formData
           name: file
+          type: file
           description: image file
           required: True
         responses:
@@ -1093,6 +1094,11 @@ class RetrieveOrCreateThumbnails(MethodView):
             content_type=mimetype
         )
 
+        new_name = create_file_name(ext=thumbnail_filename.rsplit('.')[-1])
+        file_name_s3 = "thumbnails/" + new_name
+
+        exception_s3 = upload_file_to_s3(storage_id, file_name_s3, mimetype)
+
         # save new thumbnail info
         self.project = app.mongo.db.projects.find_one_and_update(
             {'_id': self.project['_id']},
@@ -1104,7 +1110,8 @@ class RetrieveOrCreateThumbnails(MethodView):
                     'width': metadata.get('width'),
                     'height': metadata.get('height'),
                     'size': metadata.get('size'),
-                    'position': 'custom'
+                    'position': 'custom',
+                    'urlToImageS3': os.getenv('AWS_DOMAIN') + file_name_s3
                 }
             }},
             return_document=ReturnDocument.AFTER

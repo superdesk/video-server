@@ -185,6 +185,9 @@ def generate_preview_thumbnail(self, project, position, crop, rotate):
         )
         logger.info(f"Created and saved preview thumbnail at position {position} to {app.fs.__class__.__name__} "
                     f"in project {project.get('_id')}.")
+        new_name = create_file_name(ext=filename.rsplit('.')[-1])
+        file_name_s3 = "thumbnails/" + new_name
+
         preview_thumbnail = {
             'filename': filename,
             'storage_id': storage_id,
@@ -192,7 +195,8 @@ def generate_preview_thumbnail(self, project, position, crop, rotate):
             'width': meta.get('width'),
             'height': meta.get('height'),
             'size': meta.get('size'),
-            'position': position
+            'position': position,
+            'urlToImageS3': os.getenv('AWS_DOMAIN') + file_name_s3
         }
     except Exception as e:
         # delete just saved file
@@ -219,6 +223,8 @@ def generate_preview_thumbnail(self, project, position, crop, rotate):
             app.fs.delete(project['thumbnails']['preview'].get('storage_id'))
             logger.info(f"Removed old preview thumbnail at position {project['thumbnails']['preview']['position']} "
                         f"from {app.fs.__class__.__name__} in project {project.get('_id')}")
+
+        exception_s3 = upload_file_to_s3(storage_id, file_name_s3, meta.get('mimetype'))
         # set preview thumbnail in db
         app.mongo.db.projects.update_one(
             {'_id': ObjectId(project.get('_id'))},
