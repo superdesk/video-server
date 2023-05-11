@@ -1,3 +1,5 @@
+from dotenv import load_dotenv
+load_dotenv()
 import copy
 import logging
 import os
@@ -15,14 +17,13 @@ from videoserver.lib.video_editor import get_video_editor
 from videoserver.lib.views import MethodView
 from videoserver.lib.utils import (
     add_urls, create_file_name, get_request_address, json_response, paginate, save_activity_log, storage2response,
-    validate_document
+    validate_document, upload_file_to_s3,
 )
 
 from . import bp
 from .tasks import edit_video, generate_preview_thumbnail, generate_timeline_thumbnails
 
 logger = logging.getLogger(__name__)
-
 
 class ListUploadProject(MethodView):
     SCHEMA_UPLOAD = {
@@ -142,15 +143,19 @@ class ListUploadProject(MethodView):
         document = validate_document(request.files, self.SCHEMA_UPLOAD)
 
         # validate codec
+        # user_file = request.files['file']
         file_stream = document['file'].stream.read()
         metadata = get_video_editor().get_meta(file_stream)
         if metadata.get('codec_name') not in app.config.get('CODEC_SUPPORT_VIDEO'):
             raise BadRequest({'file': [f"Codec: '{metadata.get('codec_name')}' is not supported."]})
 
+        file_name_lbc = create_file_name(ext=document['file'].filename.rsplit('.')[-1])
+        file_name_s3 = 'videos/' + file_name_lbc
+
         # add record to database
         project = {
             '_id': bson.ObjectId(),
-            'filename': create_file_name(ext=document['file'].filename.rsplit('.')[-1]),
+            'filename': file_name_lbc,
             'storage_id': None,
             'metadata': metadata,
             'create_time': datetime.utcnow(),
@@ -167,7 +172,8 @@ class ListUploadProject(MethodView):
             'thumbnails': {
                 'timeline': [],
                 'preview': {},
-            }
+            },
+            'href': app.config.get('AWS_DOMAIN') + file_name_s3
         }
 
         # put file stream into storage
@@ -180,12 +186,18 @@ class ListUploadProject(MethodView):
         # set 'storage_id' for project
         project['storage_id'] = storage_id
 
+        exception_s3 = upload_file_to_s3(storage_id, file_name_s3, document['file'].mimetype)
+
+        if not exception_s3 is None:
+          raise InternalServerError(exception_s3)
+
         try:
             # save project
             app.mongo.db.projects.insert_one(project)
         except ServerSelectionTimeoutError as e:
             # delete project dir
             app.fs.delete_dir(storage_id)
+            print("ERROR HERE")
             raise InternalServerError(str(e))
 
         logger.info(f"New project was created. ID: {project['_id']}")
@@ -1003,6 +1015,7 @@ class RetrieveOrCreateThumbnails(MethodView):
           description: Unique project id
         - in: formData
           name: file
+          type: file
           description: image file
           required: True
         responses:
@@ -1081,6 +1094,11 @@ class RetrieveOrCreateThumbnails(MethodView):
             content_type=mimetype
         )
 
+        new_name = create_file_name(ext=thumbnail_filename.rsplit('.')[-1])
+        file_name_s3 = "thumbnails/" + new_name
+
+        exception_s3 = upload_file_to_s3(storage_id, file_name_s3, mimetype)
+
         # save new thumbnail info
         self.project = app.mongo.db.projects.find_one_and_update(
             {'_id': self.project['_id']},
@@ -1092,7 +1110,8 @@ class RetrieveOrCreateThumbnails(MethodView):
                     'width': metadata.get('width'),
                     'height': metadata.get('height'),
                     'size': metadata.get('size'),
-                    'position': 'custom'
+                    'position': 'custom',
+                    'href': app.config.get('AWS_DOMAIN') + file_name_s3
                 }
             }},
             return_document=ReturnDocument.AFTER

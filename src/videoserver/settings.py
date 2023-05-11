@@ -121,3 +121,10 @@ FFMPEG_THREADS = env('FFMPEG_THREADS', '0')
 # but the file size will be larger when compared to medium. The visual quality will be the same.
 # Valid presets are ultrafast, superfast, veryfast, faster, fast, medium, slow, slower, veryslow and placebo.
 FFMPEG_PRESET = env('FFMPEG_PRESET', 'medium')
+
+
+# S3 configuration
+AWS_ACCESS_KEY = env('AWS_ACCESS_KEY', '')
+AWS_SECRET_ACCESS_KEY = env('AWS_SECRET_ACCESS_KEY', '')
+AWS_BUCKET_NAME = env('AWS_BUCKET_NAME', 'video-server')
+AWS_DOMAIN = env('AWS_DOMAIN', '')
