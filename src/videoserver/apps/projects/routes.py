@@ -154,7 +154,6 @@ class ListUploadProject(MethodView):
 
         # add record to database
         project = {
-            'urlToVideoS3': os.getenv('AWS_DOMAIN') + file_name_s3,
             '_id': bson.ObjectId(),
             'filename': file_name_lbc,
             'storage_id': None,
@@ -173,7 +172,8 @@ class ListUploadProject(MethodView):
             'thumbnails': {
                 'timeline': [],
                 'preview': {},
-            }
+            },
+            'href': app.config.get('AWS_DOMAIN') + file_name_s3
         }
 
         # put file stream into storage
@@ -1111,7 +1111,7 @@ class RetrieveOrCreateThumbnails(MethodView):
                     'height': metadata.get('height'),
                     'size': metadata.get('size'),
                     'position': 'custom',
-                    'urlToImageS3': os.getenv('AWS_DOMAIN') + file_name_s3
+                    'href': app.config.get('AWS_DOMAIN') + file_name_s3
                 }
             }},
             return_document=ReturnDocument.AFTER

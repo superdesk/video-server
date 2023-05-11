@@ -11,6 +11,7 @@
 
 import importlib
 import os
+import boto3, botocore
 
 from flask import Flask, jsonify
 from flask_pymongo import PyMongo
@@ -76,6 +77,16 @@ def get_app(config=None):
 
     app.init_db = init_db
     app.init_db()
+
+    def init_aws_s3():
+        app.s3 = boto3.client(
+            "s3",
+            aws_access_key_id=app.config.get('AWS_ACCESS_KEY'),
+            aws_secret_access_key=app.config.get('AWS_SECRET_ACCESS_KEY')
+        )
+
+    app.init_aws_s3 = init_aws_s3
+    app.init_aws_s3()
 
     init_celery(app)
 
