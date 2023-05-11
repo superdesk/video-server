@@ -48,11 +48,7 @@ git clone https://github.com/superdesk/video-server.git
 pip install -e video-server/[dev]
 ```
 
-<<<<<<< HEAD
 - rename `.env-example` to `.env` and fill out your S3 bucket information
-
-=======
->>>>>>> master
 
 ### Run video server for development
 Video server consists from two main parts: http api and celery workers.  
